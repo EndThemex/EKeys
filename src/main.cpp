@@ -1,15 +1,59 @@
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
 #include <lvgl.h>
+#include "keyscan/KeyScanConfig.h"
+#include "keyscan/KeyEvent.h"
+#include "keyscan/MatrixScanner.h"
 
-#define TFT_MOSI 11
-#define TFT_SCLK 12
-#define TFT_DC 9
-#define TFT_RST 21
-#define TFT_CS 10
-#define TFT_BL 2
+using namespace ekeys;
+
+#define TFT_MOSI 42
+#define TFT_SCLK 41
+#define TFT_DC 45
+#define TFT_RST 46
+#define TFT_CS 40
+#define TFT_BL 37
 
 #define TFT_MISO GFX_NOT_DEFINED
+
+/*
+ * ------------------------------------------------------------
+ * Global state
+ * ------------------------------------------------------------
+ */
+
+/* Handle to the on-screen "currently pressed key" label */
+static lv_obj_t *g_key_label = NULL;
+
+/*
+ * Fatal error: print once, then halt silently so the message is not
+ * drowned out by repeated output.
+ */
+static void halt(const char *msg)
+{
+    Serial.printf("[FATAL] %s\n", msg);
+    Serial.flush();
+    while (true)
+    {
+        delay(1000);
+    }
+}
+
+/*
+ * Allocation helper: returns NULL on OOM after halting. Lets the call
+ * sites stay tidy:
+ *
+ *     Arduino_GFX *gfx = alloc(new Arduino_NV3007(...));
+ */
+template <typename T>
+static T *alloc(T *p)
+{
+    if (p == nullptr)
+    {
+        halt("out of memory");
+    }
+    return p;
+}
 
 /*
  * ------------------------------------------------------------
@@ -31,30 +75,19 @@
 
 /*
  * ------------------------------------------------------------
- * SPI bus
+ * SPI bus & NV3007 display
  * ------------------------------------------------------------
  */
-Arduino_DataBus *bus = new Arduino_ESP32SPI(
+#define SPI_FAST_HZ 10000000
+
+Arduino_DataBus *bus = alloc(new Arduino_ESP32SPI(
     TFT_DC,
     TFT_CS,
     TFT_SCLK,
     TFT_MOSI,
-    TFT_MISO);
+    TFT_MISO));
 
-/*
- * ------------------------------------------------------------
- * NV3007 display
- * ------------------------------------------------------------
- *
- * The 2.79" NV3007 uses a special initialization sequence.
- *
- * Arduino_GFX already contains:
- *
- *     nv3007_279_init_operations
- *
- * and the corresponding constructor.
- */
-Arduino_GFX *gfx = new Arduino_NV3007(
+Arduino_GFX *gfx = alloc(new Arduino_NV3007(
     bus,
     TFT_RST,
     1,          // rotation
@@ -66,7 +99,7 @@ Arduino_GFX *gfx = new Arduino_NV3007(
     14,         // column offset 2
     0,          // row offset 2
     nv3007_279_init_operations,
-    sizeof(nv3007_279_init_operations));
+    sizeof(nv3007_279_init_operations)));
 
 /*
  * ------------------------------------------------------------
@@ -89,17 +122,6 @@ static lv_disp_draw_buf_t draw_buf;
 
 static lv_color_t lv_buf1[SCREEN_WIDTH * LVGL_BUFFER_LINES];
 static lv_color_t lv_buf2[SCREEN_WIDTH * LVGL_BUFFER_LINES];
-
-/*
- * ------------------------------------------------------------
- * LVGL tick
- * ------------------------------------------------------------
- */
-
-static uint32_t lvgl_tick_cb()
-{
-    return millis();
-}
 
 /*
  * ------------------------------------------------------------
@@ -130,11 +152,89 @@ static void my_disp_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_col
 
 /*
  * ------------------------------------------------------------
+ * KeyScan — minimal viable version
+ * ------------------------------------------------------------
+ *
+ * 单独的 FreeRTOS 任务跑 1ms 周期的矩阵扫描，
+ * 事件直接通过 Serial 打印，方便硬件验证。
+ */
+
+static KeyScanConfig g_keyCfg{};
+static MatrixScanner g_matrix{g_keyCfg};
+static KeyEventList g_eventBuf;
+static TaskHandle_t g_scanTaskHandle = nullptr;
+
+/* Scan task pushes the currently-pressed key id (0 = none) to this queue.
+   The UI loop drains it to refresh the on-screen label.
+   容量 4 足够 —— 同一时刻最多一个键按下，1ms tick 下基本只装 1 条。 */
+static QueueHandle_t g_pressedKeyQueue = nullptr;
+
+static void scanTaskEntry(void * /*arg*/)
+{
+    g_matrix.begin();
+    g_eventBuf.reserve(32);
+    Serial.println("[KeyScan] task started, 1ms tick, 5ms debounce");
+
+    uint8_t lastReportedKeyId = 0; // 0 = 无按键
+
+    const TickType_t period = pdMS_TO_TICKS(SCAN_INTERVAL_MS);
+    TickType_t lastWake = xTaskGetTickCount();
+    while (true)
+    {
+        g_eventBuf.clear();
+        g_matrix.poll(g_eventBuf);
+        for (const auto &ev : g_eventBuf)
+        {
+            Serial.printf("[KeyScan] %s\n", ev.toString().c_str());
+        }
+
+        /* 计算当前按下的键（按 keyId 升序取第一个）；只在变化时上报
+           —— 避免每毫秒重复写队列导致 UI 反复重绘。 */
+        const uint32_t mask = g_matrix.stableMask();
+        uint8_t currentKeyId = 0;
+        for (uint8_t k = 1; k <= KEY_NUM; ++k)
+        {
+            if (mask & (1UL << (k - 1)))
+            {
+                currentKeyId = k;
+                break;
+            }
+        }
+        if (currentKeyId != lastReportedKeyId && g_pressedKeyQueue != nullptr)
+        {
+            // 非阻塞写入；UI 队列满时丢弃，最坏情况 UI 显示会延迟一帧
+            xQueueSend(g_pressedKeyQueue, &currentKeyId, 0);
+            lastReportedKeyId = currentKeyId;
+        }
+
+        vTaskDelayUntil(&lastWake, period);
+    }
+}
+
+static void startKeyScanTask()
+{
+    g_pressedKeyQueue = xQueueCreate(4, sizeof(uint8_t));
+    if (g_pressedKeyQueue == nullptr)
+    {
+        Serial.println("[KeyScan] FATAL: failed to create pressed-key queue");
+        return;
+    }
+
+    BaseType_t ok = xTaskCreatePinnedToCore(
+        scanTaskEntry, "KeyScan", 4096, nullptr, 2, &g_scanTaskHandle, 0);
+    if (ok != pdPASS)
+    {
+        Serial.println("[KeyScan] FATAL: failed to create scan task");
+    }
+}
+
+/*
+ * ------------------------------------------------------------
  * LVGL display initialization
  * ------------------------------------------------------------
  */
 
-static void lvgl_display_init()
+static bool lvgl_display_init()
 {
     /* Initialize draw buffers */
     lv_disp_draw_buf_init(&draw_buf, lv_buf1, lv_buf2, SCREEN_WIDTH * LVGL_BUFFER_LINES);
@@ -154,7 +254,12 @@ static void lvgl_display_init()
     disp_drv.flush_cb = my_disp_flush;
 
     /* Register LVGL display */
-    lv_disp_drv_register(&disp_drv);
+    lv_disp_t *disp = lv_disp_drv_register(&disp_drv);
+    if (disp == NULL)
+    {
+        halt("lv_disp_drv_register() returned NULL");
+    }
+    return true;
 }
 
 /*
@@ -170,32 +275,20 @@ static void create_ui()
 
     /* Title */
     lv_obj_t *title = lv_label_create(screen);
-    lv_label_set_text(title, "NV3007");
+    lv_label_set_text(title, "EKeys");
     lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_20, LV_PART_MAIN);
     lv_obj_align(title, LV_ALIGN_TOP_LEFT, 15, 10);
 
-    /* Resolution label */
-    lv_obj_t *resolution = lv_label_create(screen);
-    lv_label_set_text(resolution, "428 x 142");
-    lv_obj_set_style_text_color(resolution, lv_color_hex(0xAAAAAA), LV_PART_MAIN);
-    lv_obj_align(resolution, LV_ALIGN_TOP_LEFT, 15, 38);
+    /* Currently pressed key: "--" means idle, otherwise "KEY<n>".
+       Updated from the keyscan task via a FreeRTOS queue. */
+    lv_obj_t *key_label = lv_label_create(screen);
+    lv_label_set_text(key_label, "KEY: --");
+    lv_obj_set_style_text_color(key_label, lv_color_hex(0x00FFCC), LV_PART_MAIN);
+    lv_obj_set_style_text_font(key_label, &lv_font_montserrat_20, LV_PART_MAIN);
+    lv_obj_align(key_label, LV_ALIGN_TOP_LEFT, 15, 50);
 
-    /* Status */
-    lv_obj_t *status = lv_label_create(screen);
-    lv_label_set_text(status, "ESP32-S3 + LVGL");
-    lv_obj_set_style_text_color(status, lv_color_hex(0x00FF88), LV_PART_MAIN);
-    lv_obj_align(status, LV_ALIGN_TOP_LEFT, 15, 62);
-
-    /* Button */
-    lv_obj_t *button = lv_btn_create(screen);
-    lv_obj_set_size(button, 120, 45);
-    lv_obj_align(button, LV_ALIGN_RIGHT_MID, -15, 0);
-
-    /* Button label */
-    lv_obj_t *button_label = lv_label_create(button);
-    lv_label_set_text(button_label, "TEST");
-    lv_obj_center(button_label);
+    g_key_label = key_label;
 }
 
 /*
@@ -211,35 +304,28 @@ void setup()
 
     Serial.println();
     Serial.println("==============================");
-    Serial.println("ESP32-S3 NV3007 + LVGL");
+    Serial.println("EKeys");
     Serial.println("==============================");
 
-    /* Backlight */
+    /* Backlight (active-LOW module: LOW = on, HIGH = off) */
     pinMode(TFT_BL, OUTPUT);
-    digitalWrite(TFT_BL, HIGH);
+    digitalWrite(TFT_BL, LOW);
 
-    /* Initialize LCD */
-    Serial.println("Initializing NV3007...");
-    if (!gfx->begin(10000000))
+    if (!gfx->begin(SPI_FAST_HZ))
     {
-        Serial.println("ERROR: gfx->begin() failed!");
-        while (true)
-        {
-            delay(1000);
-        }
+        halt("gfx->begin() failed");
     }
-    Serial.println("NV3007 initialized.");
-
-    /* Clear screen */
-    gfx->fillScreen(RGB565_BLACK);
 
     /* Initialize LVGL */
     lv_init();
-    lvgl_display_init();
+    if (!lvgl_display_init())
+    {
+        halt("LVGL display init failed");
+    }
     create_ui();
 
     Serial.println("LVGL initialized.");
-    Serial.println("Setup completed.");
+    startKeyScanTask();
 }
 
 /*
@@ -257,6 +343,29 @@ void loop()
     {
         lv_tick_inc(now - last_ms);
         last_ms = now;
+    }
+
+    /* Drain the keyscan queue: update the "currently pressed key" label.
+       队列里只装边沿事件，所以排空时永远显示最新状态。 */
+    if (g_key_label != NULL && g_pressedKeyQueue != nullptr)
+    {
+        uint8_t latestKeyId = UINT8_MAX; // sentinel = "no update this tick"
+        uint8_t v;
+        while (xQueueReceive(g_pressedKeyQueue, &v, 0) == pdTRUE)
+        {
+            latestKeyId = v;
+        }
+        if (latestKeyId != UINT8_MAX)
+        {
+            if (latestKeyId == 0)
+            {
+                lv_label_set_text(g_key_label, "KEY: --");
+            }
+            else
+            {
+                lv_label_set_text_fmt(g_key_label, "KEY: KEY%u", latestKeyId);
+            }
+        }
     }
 
     lv_timer_handler();
