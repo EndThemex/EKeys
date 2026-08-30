@@ -21,26 +21,16 @@ EC11(U8) 连接到：
 
 ## 2. 触发策略
 
-EC11 在每次「咔哒」时产生一个完整四步序列：
+旋转：用 **ESP32Encoder（PCNT 硬件计数器）半正交模式**，每对 A/B 边沿计 1 格，
+并提供 1023 大小的数字滤波。一步变化对应 1 个 `EncoderRotate` 事件。
 
-```
-RA  ─┐ ┌──┐ ┌──┐ ┌──
-     └─┘  └─┘  └─┘
-RB  ───┐ ┌──┐ ┌──┐ ┌
-       └─┘  └─┘  └─┘
-```
+按键：用 **OneButton** 库识别单击 / 双击 / 长按。
 
-读取策略：**双信号边沿触发**，每对边沿计 1 格。
-- 上升沿 A 且 B=0 → 顺时针 +1
-- 下降沿 A 且 B=1 → 顺时针 +1
-- 上升沿 A 且 B=1 → 逆时针 +1
-- 下降沿 A 且 B=0 → 逆时针 +1
-（Gray 编码的标准解码）
-
-按键 SW（OneButton 模式）：
-- 单击：单击事件
-- 双击：可选，本期不实现
-- 长按 ≥ 500 ms：可选，本期不实现
+| 按键动作 | encoderDelta | UI 显示 |
+|---|---|---|
+| 单击 | 1 | `ENC: click` |
+| 双击 | 2 | `ENC: double` |
+| 长按起始 | 3 | `ENC: long` |
 
 ---
 
@@ -49,60 +39,47 @@ RB  ───┐ ┌──┐ ┌──┐ ┌
 ```cpp
 class RotaryEncoder : public IKeySource {
 public:
-    struct Callbacks {
-        std::function<void(int8_t delta)>    onRotate; // delta = ±1
-        std::function<void()>                onClick;
-    };
-
-    explicit RotaryEncoder(const KeyScanConfig& cfg);
+    RotaryEncoder() = default;
 
     // IKeySource
-    void begin() override;                  // 配置 GPIO + 中断
-    void poll(KeyEventList& out) override;  // 在 MatrixScanner 之后调用
+    void begin() override;                  // 配置 PCNT + OneButton
+    void poll(KeyEventList& out) override;  // tick + 取出累计事件
+
+    // OneButton tick —— 由 poll() 内部调用，也可单独调用以让 click 计时生效
+    void tick();
 };
 ```
 
 事件结构（统一用 `KeyEvent`）：
 
 ```cpp
-enum class KeyEventType { Press, Release, EncoderRotate, EncoderClick };
+enum class KeyEventType {
+    Press, Release,
+    EncoderRotate,   // encoderDelta = ±1
+    EncoderClick,    // encoderDelta = 1 (click) / 2 (double) / 3 (long)
+};
 
 struct KeyEvent {
     KeyEventType type;
-    uint8_t      keyId;       // 1..11 或 ROTARY_KEY_ID
-    int8_t       delta;       // 仅 EncoderRotate 用
+    uint8_t      keyId;       // ROTARY_KEY_ID (= 0xFE) 区分于 1..12 物理键
+    int8_t       encoderDelta;
     uint32_t     timestamp_ms;
 };
 ```
 
-> `ROTARY_KEY_ID = 0xFE`，避免与 1..11 物理键冲突。
+---
+
+## 4. 互斥与同步
+
+- `RotaryEncoder` 的 A/B 引脚 (5, 21) 与矩阵 GPIO 完全不交集；
+  矩阵扫描时不需要释放任何编码器引脚。
+- 按钮事件通过 `volatile bool g_clickFlag / g_doubleFlag / g_longPressFlag`
+  在 OneButton 回调（task 上下文）置位，在 `poll()`（scan task 上下文）读取。
+  因为三个标志位互斥，bool 读/写就是原子操作，无需额外同步原语。
 
 ---
 
-## 4. 消抖
+## 5. 调试
 
-- 旋转：硬件 RC + 软件 1 ms 间隔足够；`MatrixScanner` 调度周期 1 ms = 天然节流
-- 按键：用 `Bounce2` 或手写 5 ms 消抖（不引入 OneButton 减少依赖）
-
----
-
-## 5. 与矩阵扫描的互斥
-
-`KeyScanManager` 主循环顺序：
-
-```
-1. matrix.poll(out)         // 占用 COL0~COL3 作为输入
-2. encoder.poll(out)        // COL1/COL2 此刻已被释放为高阻
-3. dispatcher.dispatch(out) // 把这一轮的事件派发出去
-4. vTaskDelay(pdMS(1))      // 给 EC11 物理电容充放电
-```
-
-矩阵扫描器在每次扫描完后**主动 `pinMode(COL1/COL2, INPUT)`** 还原为高阻。
-此窗口内 EC11 可以安全读取引脚。
-
----
-
-## 6. 测试钩子
-
-- 不接编码器时（GPIO 高/低稳定），`poll()` 不产生任何事件。
-- 强制事件注入：保留 `KeyEventDispatcher::inject()` 调试接口（仅在 `DEBUG_KEYSCAN` 宏打开时编译）。
+- `Serial.println("[Encoder] click")` 等仅用于硬件验证。
+- 后续若需要清屏时，可在 loop 中加一个超时清除（例如 500 ms 无事件后恢复 `--`）。

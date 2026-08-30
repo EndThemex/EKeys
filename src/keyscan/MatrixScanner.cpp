@@ -83,9 +83,27 @@ void MatrixScanner::advance(uint8_t keyId, bool rawPressed, uint32_t nowMs,
 void MatrixScanner::poll(KeyEventList& out) {
     const uint32_t now = millis();
 
+    // 诊断：每 500ms 输出一帧"每个 ROW 拉低后各 COL 的原始电平"。
+    // 用来区分"行没拉低"和"列没接通"。节流避免淹没串口。
+    static uint32_t lastDbgMs = 0;
+    bool dbgThisFrame = (now - lastDbgMs) >= 500;
+    if (dbgThisFrame) lastDbgMs = now;
+
     for (uint8_t r = 0; r < KEY_MATRIX_ROWS; ++r) {
         driveRowLow(r);
         delayMicroseconds(ROW_SETTLE_US);
+
+        if (dbgThisFrame) {
+            char line[80];
+            int n = snprintf(line, sizeof(line), "[MatrixDiag] ROW%d(pin=%d) COL=",
+                             r, cfg_.rowPins[r]);
+            for (uint8_t c = 0; c < KEY_MATRIX_COLS; ++c) {
+                n += snprintf(line + n, sizeof(line) - n, "%d:%d ",
+                              cfg_.colPins[c], digitalRead(cfg_.colPins[c]));
+            }
+            snprintf(line + n, sizeof(line) - n, "\n");
+            Serial.print(line);
+        }
 
         for (uint8_t c = 0; c < KEY_MATRIX_COLS; ++c) {
             const uint8_t keyId = cfg_.keyMap[r][c];

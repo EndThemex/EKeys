@@ -34,12 +34,13 @@ struct KeyScanConfig {
     const int8_t encoderSWPin = 9;    // ENCODER_SW
 
     // keyId → (row, col) 映射；keyId=0 表示该物理位置无键
-    // ROW0..ROW2 × COL0..COL3 = keyId 1..12 连续编号
+    // 实际硬件布局（梯形）：ROW0=2 键、ROW1=3 键、ROW2=4 键
+    // keyId 连续 1..9，未用位置填 0 跳过扫描。
     const uint8_t keyMap[KEY_MATRIX_ROWS][KEY_MATRIX_COLS] = {
         // COL0  COL1  COL2  COL3
-        {   1,    2,    3,    4 },   // ROW0
-        {   5,    6,    7,    8 },   // ROW1
-        {   9,   10,   11,   12 },   // ROW2
+        {   1,    2,    0,    0 },   // ROW0: 2 keys (COL0, COL1)
+        {   0,    3,    4,    5 },   // ROW1: 3 keys (COL1, COL2, COL3)
+        {   6,    7,    8,    9 },   // ROW2: 4 keys (all COLs)
     };
 };
 

@@ -1,25 +1,27 @@
 # keyscan — 按键扫描子系统
 
-> 本目录包含 ESP32-S3 上 11 键矩阵 + EC11 编码器的扫描、事件化、派发代码。
+> 本目录包含 ESP32-S3 上 12 键矩阵 + EC11 编码器的扫描、事件化、派发代码。
 
 ---
 
-## 文件清单（设计稿）
+## 文件清单
 
 ```
 keyscan/
 ├── README.md                ← 本文件
 ├── KeyScanConfig.h          ← GPIO 与键位映射常量
 ├── KeyEvent.h               ← 事件结构 + 队列消息类型
+├── KeyEvent.cpp             ← toString() 实现
 ├── IKeySource.h             ← 抽象事件源接口
 ├── MatrixScanner.h
 ├── MatrixScanner.cpp
 ├── RotaryEncoder.h
-├── RotaryEncoder.cpp
-├── KeyEventDispatcher.h
-├── KeyEventDispatcher.cpp
-├── KeyScanManager.h
-└── KeyScanManager.cpp
+├── RotaryEncoder.cpp        ← ESP32Encoder + OneButton
+└── (后续)
+    ├── KeyEventDispatcher.h
+    ├── KeyEventDispatcher.cpp
+    ├── KeyScanManager.h
+    └── KeyScanManager.cpp
 ```
 
 ---
@@ -43,12 +45,13 @@ keyscan/
 
 | 模块 | 设计 | 代码 | 测试 |
 |---|---|---|---|
-| `KeyScanConfig.h` | ✅ | ⏳ | — |
-| `KeyEvent.h` | ✅ | ⏳ | — |
-| `IKeySource.h` | ✅ | ⏳ | — |
-| `MatrixScanner` | ✅ | ⏳ | ⏳ |
-| `RotaryEncoder` | ✅ | ⏳ | ⏳ |
+| `KeyScanConfig.h` | ✅ | ✅ | — |
+| `KeyEvent.h/.cpp` | ✅ | ✅ | — |
+| `IKeySource.h` | ✅ | ✅ | — |
+| `MatrixScanner` | ✅ | ✅ | ✅ |
+| `RotaryEncoder` | ✅ | ✅ | ⏳ |
 | `KeyEventDispatcher` | ✅ | ⏳ | ⏳ |
 | `KeyScanManager` | ✅ | ⏳ | ⏳ |
 
-> 本次重构只产出**设计文档**；代码进入下一阶段统一提交。
+> **当前阶段**（最小可运行版本）：矩阵 + 编码器都已可直接 `begin/poll`，
+> 事件直接通过 Serial 输出，UI 显示当前按键 + 最近编码器事件。
