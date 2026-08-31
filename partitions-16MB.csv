@@ -1,0 +1,19 @@
+# ESP32-S3-WROOM-1 N16R8 (16MB Flash) partition table
+#
+# Name      Type SubType  Offset    Size
+# ------------------------------------------------------------
+# nvs       data nvs      0x9000    0x6000    ; 24 KB  - 键值存储 (WiFi/BLE/Config)
+# otadata   data ota      0xF000    0x2000    ; 8 KB   - OTA 切换标记
+# phy_init  data phy      0x11000   0x1000    ; 4 KB   - RF 校准数据
+# ota_0     app  ota_0    0x20000   0x300000  ; 3 MB   - 当前应用固件
+# ota_1     app  ota_1    0x320000  0x300000  ; 3 MB   - OTA 备份区
+# storage   data spiffs   0x620000  0x3E0000  ; 3.875 MB - SPIFFS (config / keymap / 字体 / WAV / PNG)
+#
+# Total used: ~9.94 MB / 16 MB
+# Remaining for future expansion: ~6 MB
+nvs,      data, nvs,     0x9000,   0x6000
+otadata,  data, ota,     0xF000,   0x2000
+phy_init, data, phy,     0x11000,  0x1000
+ota_0,    app,  ota_0,   0x20000,  0x300000
+ota_1,    app,  ota_1,   0x320000, 0x300000
+storage,  data, spiffs,  0x620000, 0x3E0000
