@@ -125,15 +125,13 @@ src/output/
 ├── IKeyboard.h                 # 抽象接口：begin / press / release / releaseAll / isConnected / send
 ├── USBKeyboardImpl.h/.cpp      # TinyUSB HID + Consumer Control
 ├── BLEKeyboardImpl.h/.cpp      # BLE HID（释放经典蓝牙内存）
-├── IRadio24G.h                 # 2.4G 射频抽象（阶段 07：nRF24L01+ 等硬件到位后实现）
-├── Wireless24GKeyboardImpl.h/.cpp  # 2.4G 后端：委托 IRadio24G；硬件未到位 begin() 返回 false 走 USB 回退
 ├── KeyboardFactory.h/.cpp      # 根据 Configuration::WORK_MODE 创建对应实例
 └── ConsumerControlCodes.h      # 媒体键码常量
 ```
 
 - `KeyboardFactory::create()` 是 `AppContext::applyWorkMode()` 的唯一入口。
-- `WIRELESS_2_4G_KEYBOARD_MODE`：接口已实现（阶段 07 7.1），硬件未接入时
-  安全回退 USB（`2.4G not implemented` 日志），不破坏 USB/BLE 切换流程。
+- `WIRELESS_2_4G_KEYBOARD_MODE`：按用户决定暂不实现（2026-08-31），
+  选择该模式打印 warning 并安全回退 USB。
 
 ### 3.6 协议层（FEATURE_DOC §5）
 
@@ -342,31 +340,31 @@ src/upgrade/
 
 ## 4. 功能划分对照表（FEATURE_DOC ↔ 代码位置）
 
-| FEATURE_DOC 章节  | 关键类 / 文件                                                                                                                                                                                                                                                         |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| §1.2 软件架构     | `src/tasks/MainTask.cpp`、`src/tasks/DisplayTask.cpp`、`src/message_types.h`、`src/services/EventBus.h`                                                                                                                                                               |
-| §2.1 矩阵扫描     | `src/input/MatrixScanner.cpp`                                                                                                                                                                                                                                         |
-| §2.2 旋钮         | `src/input/RotaryEncoder.cpp`                                                                                                                                                                                                                                         |
-| §2.3 外挂模块     | `src/input/I2CMasterController.cpp`                                                                                                                                                                                                                                   |
-| §2.4 特殊输入     | `src/config/Configuration.h` (`CONFIG_SPECIAL_INPUT_NUM`)                                                                                                                                                                                                             |
-| §3 键映射         | `src/keymap/`                                                                                                                                                                                                                                                         |
-| §3.2 配置持久化   | `src/services/ConfigStore.cpp`、`src/services/KeymapRepository.cpp`                                                                                                                                                                                                   |
-| §3.3 Profile 切换 | `src/services/ProfileManager.cpp`                                                                                                                                                                                                                                     |
-| §3.4 HID 触发     | `src/keymap/KeyEventDispatcher.cpp`                                                                                                                                                                                                                                   |
-| §4 键盘输出       | `src/output/`                                                                                                                                                                                                                                                         |
-| §5 私有协议       | `src/protocol/`                                                                                                                                                                                                                                                       |
-| §6 CMD_CONFIG_SET | `src/config/parseConfigSetCommand.cpp`                                                                                                                                                                                                                                |
-| §7 网络           | `src/network/`                                                                                                                                                                                                                                                        |
-| §8 显示与 UI      | `src/display/{DisplayDriver,LvglPort,Backlight}.cpp`、`src/ui/{ui_minimal,ui,ui_events,ui_helpers,ui_StatusBar}.cpp`、`src/hardware/PinMap.h`（LCD 引脚）；详见 §3.9。                                                                                                |
-| §9 RGB            | `src/rgb/`                                                                                                                                                                                                                                                            |
-| §10 音频          | `src/audio/`                                                                                                                                                                                                                                                          |
-| §11 语音          | `src/voice/`                                                                                                                                                                                                                                                          |
-| §12 PC 状态       | `src/ui/ui_helpers.cpp` + `src/protocol/commands/cmd_pc_status.cpp`                                                                                                                                                                                                   |
-| §13 音乐控制      | `src/protocol/commands/cmd_music.cpp` + `src/ui/ui_helpers.cpp`                                                                                                                                                                                                       |
-| §14 HA 状态       | `src/services/EventBus.cpp` + `src/ui/ui_StatusBar.cpp`                                                                                                                                                                                                               |
-| §15 日志          | `src/logging/LogManager.cpp`                                                                                                                                                                                                                                          |
-| §16 电源          | `src/hardware/Boost5V.cpp`                                                                                                                                                                                                                                            |
-| §17 待办          | 阶段 07 已补齐：`src/output/Wireless24GKeyboardImpl.cpp` + `IRadio24G.h`、`src/audio/AudioAnalyzer.cpp`（DisplayTask 调度）、`src/upgrade/Upgrade.cpp`、`src/protocol/commands/cmd_firmware.cpp` `CMD_CONF_VERSION_SET` / `cmd_device_info.cpp` `CMD_DEVICE_INFO_SET` |
+| FEATURE_DOC 章节  | 关键类 / 文件                                                                                                                                                                                                                          |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| §1.2 软件架构     | `src/tasks/MainTask.cpp`、`src/tasks/DisplayTask.cpp`、`src/message_types.h`、`src/services/EventBus.h`                                                                                                                                |
+| §2.1 矩阵扫描     | `src/input/MatrixScanner.cpp`                                                                                                                                                                                                          |
+| §2.2 旋钮         | `src/input/RotaryEncoder.cpp`                                                                                                                                                                                                          |
+| §2.3 外挂模块     | `src/input/I2CMasterController.cpp`                                                                                                                                                                                                    |
+| §2.4 特殊输入     | `src/config/Configuration.h` (`CONFIG_SPECIAL_INPUT_NUM`)                                                                                                                                                                              |
+| §3 键映射         | `src/keymap/`                                                                                                                                                                                                                          |
+| §3.2 配置持久化   | `src/services/ConfigStore.cpp`、`src/services/KeymapRepository.cpp`                                                                                                                                                                    |
+| §3.3 Profile 切换 | `src/services/ProfileManager.cpp`                                                                                                                                                                                                      |
+| §3.4 HID 触发     | `src/keymap/KeyEventDispatcher.cpp`                                                                                                                                                                                                    |
+| §4 键盘输出       | `src/output/`                                                                                                                                                                                                                          |
+| §5 私有协议       | `src/protocol/`                                                                                                                                                                                                                        |
+| §6 CMD_CONFIG_SET | `src/config/parseConfigSetCommand.cpp`                                                                                                                                                                                                 |
+| §7 网络           | `src/network/`                                                                                                                                                                                                                         |
+| §8 显示与 UI      | `src/display/{DisplayDriver,LvglPort,Backlight}.cpp`、`src/ui/{ui_minimal,ui,ui_events,ui_helpers,ui_StatusBar}.cpp`、`src/hardware/PinMap.h`（LCD 引脚）；详见 §3.9。                                                                 |
+| §9 RGB            | `src/rgb/`                                                                                                                                                                                                                             |
+| §10 音频          | `src/audio/`                                                                                                                                                                                                                           |
+| §11 语音          | `src/voice/`                                                                                                                                                                                                                           |
+| §12 PC 状态       | `src/ui/ui_helpers.cpp` + `src/protocol/commands/cmd_pc_status.cpp`                                                                                                                                                                    |
+| §13 音乐控制      | `src/protocol/commands/cmd_music.cpp` + `src/ui/ui_helpers.cpp`                                                                                                                                                                        |
+| §14 HA 状态       | `src/services/EventBus.cpp` + `src/ui/ui_StatusBar.cpp`                                                                                                                                                                                |
+| §15 日志          | `src/logging/LogManager.cpp`                                                                                                                                                                                                           |
+| §16 电源          | `src/hardware/Boost5V.cpp`                                                                                                                                                                                                             |
+| §17 待办          | 阶段 07 已补齐（2.4G 按用户决定暂不实现）：`src/audio/AudioAnalyzer.cpp`（DisplayTask 调度）、`src/upgrade/Upgrade.cpp`、`src/protocol/commands/cmd_firmware.cpp` `CMD_CONF_VERSION_SET` / `cmd_device_info.cpp` `CMD_DEVICE_INFO_SET` |
 
 ---
 

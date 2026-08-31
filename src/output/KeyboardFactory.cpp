@@ -6,7 +6,6 @@
 
 #include "BLEKeyboardImpl.h"
 #include "USBKeyboardImpl.h"
-#include "Wireless24GKeyboardImpl.h"
 #include "logging/LogManager.h"
 
 namespace ekeys
@@ -37,21 +36,12 @@ namespace ekeys
             return create(WorkMode::Wired);
         }
         case WorkMode::Wireless24G:
-        {
             /*
-             * 2.4G 后端（阶段 07）：硬件未到位（BOARD_HAS_24G 未定义）时
-             * begin() 内部打印 "2.4G not implemented" 并返回 false，
-             * 走 USB 回退，不破坏 USB/BLE 切换流程（docs/07 7.1）。
+             * 2.4G 功能按用户决定暂不实现（2026-08-31）：
+             * 打印警告后回退 USB，保证选到该模式时设备仍可用。
              */
-            auto kb = std::unique_ptr<Wireless24GKeyboardImpl>(
-                new Wireless24GKeyboardImpl());
-            if (kb->begin())
-            {
-                return std::unique_ptr<IKeyboard>(std::move(kb));
-            }
-            LOG_WARNING("KBD", "Wireless24GKeyboardImpl begin() failed, fallback to USB");
+            LOG_WARNING("KBD", "2.4G mode not implemented, fallback to USB");
             return create(WorkMode::Wired);
-        }
         }
         return nullptr;
     }

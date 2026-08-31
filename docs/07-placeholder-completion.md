@@ -26,7 +26,7 @@
 
 ## 任务清单
 
-- [ ] **7.1 `Wireless24GKeyboardImpl`**：定义 `IRadio24G` 抽象（nRF24L01+ / 其他模块由硬件决定）；本期仅提供接口与日志告警，硬件未到位时仍允许打印 `2.4G not implemented`。
+- [ ] **7.1 `Wireless24GKeyboardImpl`**（已撤销：用户决定暂不实现 2.4G，保持警告 + USB 回退）：定义 `IRadio24G` 抽象（nRF24L01+ / 其他模块由硬件决定）；本期仅提供接口与日志告警，硬件未到位时仍允许打印 `2.4G not implemented`。
 - [ ] **7.2 `AudioAnalyzer` 调度**：`DisplayTask::loop()` 增加频谱屏可见性判断，进入音乐屏时调度；不在时释放 CPU。
 - [ ] **7.3 `Upgrade::begin / performOta`**：基于 `HTTPUpdate` 或 `esp_https_ota`；通过 `CMD_FIRMWARE_INFO` (0x0b) 携带 URL 与 checksum。
 - [ ] **7.4 `cmd_firmware.cpp`**：新增 `0x02 CMD_CONF_VERSION_SET` handler；写 `version` 字段到 `DeviceSettings`。
@@ -44,6 +44,7 @@
 
 ## 变更记录
 
+- 2026-08-31（用户决定追加）：**7.1 撤销**——2.4G 功能按用户决定暂不实现，已删除 `IRadio24G.h` / `Wireless24GKeyboardImpl.h/.cpp`，`KeyboardFactory::Wireless24G` 恢复为警告 + USB 回退（`work_mode=2` 配置仍兼容，选择后设备可用 USB）。7.8 文档（FEATURE_DOC §17 / ARCHITECTURE §3.5）已同步该决定。
 - 2026-08-31（阶段 07 代码完成）：
   - **7.1**：新增 `src/output/IRadio24G.h`（射频抽象）与 `Wireless24GKeyboardImpl`（实现 IKeyboard，6-key 报告缓冲 + 修饰键位表）；`KeyboardFactory::Wireless24G` 分支改走该后端，`BOARD_HAS_24G` 未定义时 `begin()` 打印 `2.4G not implemented` 并回退 USB。
   - **7.2**：`DisplayTask` 新增 `updateSpectrum()`——主循环每拍判断活动屏，仅 `UI_SCREEN_MUSIC(_SECONDARY)` 可见时挂起 VoiceRecognizer、接管 Mic（I2S0）、读 512 样本喂 `AudioAnalyzer`（FFT 16 频段 0~255）并调 `ui_MusicScreen_drawAudioBandsCool` 渲染；离开音乐屏释放 Mic 并 resume 语音识别，不消耗 CPU。
