@@ -56,6 +56,12 @@ namespace ekeys
             {
                 return "audio";
             }
+            if (strcmp(key, "config_version") == 0 ||
+                strcmp(key, "device_name") == 0 ||
+                strcmp(key, "serial_number") == 0)
+            {
+                return "system";
+            }
             if (strncmp(key, "voice_", 6) == 0)
             {
                 return "voice";
@@ -168,6 +174,13 @@ namespace ekeys
             static_cast<uint8_t>(ini.GetLongValue("audio", "audio_enable", 0));
         settings_.power_mode =
             static_cast<uint8_t>(ini.GetLongValue("audio", "power_mode", 0));
+
+        settings_.config_version =
+            static_cast<uint32_t>(ini.GetLongValue("system", "config_version", 0));
+        strncpy(settings_.device_name, ini.GetValue("system", "device_name", ""),
+                sizeof(settings_.device_name) - 1);
+        strncpy(settings_.serial_number, ini.GetValue("system", "serial_number", ""),
+                sizeof(settings_.serial_number) - 1);
 
         LOG_INFO("CONFIG", "config.ini loaded (active profile=%u)",
                  static_cast<unsigned>(settings_.active_keymap_profile));

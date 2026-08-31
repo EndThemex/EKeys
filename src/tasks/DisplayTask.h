@@ -66,7 +66,15 @@ namespace ekeys
         void applyMusicPlayer(const DisplayMessage &msg);
         void navigateNow(ui_screen_tag_t tag);
 
+        /*
+         * 频谱调度（阶段 07 任务 7.2）：
+         * 音乐屏可见时接管 Mic → AudioAnalyzer → drawAudioBandsCool，
+         * 离开时释放 Mic 并恢复语音识别。
+         */
+        void updateSpectrum();
+
         QueueHandle_t queue_;
+        bool spectrum_active_ = false;
     };
 
 } // namespace ekeys

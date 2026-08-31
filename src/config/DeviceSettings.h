@@ -57,6 +57,11 @@ struct DeviceSettings {
 
     /* 当前激活键映射 Profile（0~7） */
     uint8_t active_keymap_profile;
+
+    /* 阶段 07：设备元数据（0x02/0x04 写入，system 节持久化） */
+    uint32_t config_version;
+    char     device_name[33];
+    char     serial_number[33];
 };
 
 }  // namespace ekeys

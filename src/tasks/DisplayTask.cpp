@@ -19,6 +19,8 @@
 #include <stdio.h>
 
 #include "config/Configuration.h"
+#include "audio/AudioAnalyzer.h"
+#include "audio/Mic.h"
 #include "display/Backlight.h"
 #include "display/LvglPort.h"
 #include "logging/LogManager.h"
@@ -28,10 +30,12 @@
 #include "ui/ui_HaScreenSecondary.h"
 #include "ui/ui_KeyMappedSecondary.h"
 #include "ui/ui_MainScreen.h"
+#include "ui/ui_MusicScreen.h"
 #include "ui/ui_MusicScreenSecondary.h"
 #include "ui/ui_PcStatusScreen.h"
 #include "ui/ui_SettingScreenSecondary.h"
 #include "ui/ui_StatusBar.h"
+#include "voice/VoiceRecognizer.h"
 
 namespace ekeys
 {
@@ -168,6 +172,8 @@ namespace ekeys
                 LvglPort::instance().tick(delta);
                 /* RGB 动画 tick（内部 30ms 帧节流，docs/06 6.15） */
                 RGBLightControl::instance().tick(delta);
+                /* 频谱调度（阶段 07 7.2）：仅音乐屏可见时占用 Mic/CPU */
+                updateSpectrum();
                 last = now;
             }
 
@@ -469,6 +475,61 @@ namespace ekeys
             m.connected, m.is_playing, m.is_paused,
             m.can_prev, m.can_next,
             m.current_seconds, m.total_seconds);
+    }
+
+    void DisplayTask::updateSpectrum()
+    {
+        const ui_screen_tag_t tag = ui_get_active_screen_tag();
+        const bool visible = (tag == UI_SCREEN_MUSIC ||
+                              tag == UI_SCREEN_MUSIC_SECONDARY);
+
+        if (!visible)
+        {
+            if (spectrum_active_)
+            {
+                spectrum_active_ = false;
+                Mic::instance().end();
+                VoiceRecognizer::instance().resume();
+                LOG_INFO("DISP", "spectrum stopped");
+            }
+            return;
+        }
+
+        if (!spectrum_active_)
+        {
+            /* 正在录音（ASR）时推迟接管，避免双读 I2S */
+            if (VoiceRecognizer::instance().isCapturing())
+            {
+                return;
+            }
+            /* 挂起语音识别（docs/06：音乐屏 suspend / 离开 resume） */
+            VoiceRecognizer::instance().suspend();
+            if (!Mic::instance().begin())
+            {
+                return; // 下一轮重试
+            }
+            AudioAnalyzer::instance().begin();
+            spectrum_active_ = true;
+            LOG_INFO("DISP", "spectrum started");
+        }
+
+        /* 读一帧 PCM（512 样本 @16kHz = 32ms，天然节流）并做 FFT */
+        static int16_t chunk[AudioAnalyzer::kFftSize];
+        static float bands[AudioAnalyzer::kBandCount];
+        const size_t n = Mic::instance().Read(chunk, AudioAnalyzer::kFftSize);
+        if (n == 0)
+        {
+            return;
+        }
+        AudioAnalyzer::instance().process(chunk, n, bands, AudioAnalyzer::kBandCount);
+
+        /* 0~1 → 0~255（ui_MusicScreen_drawAudioBandsCool 期望刻度） */
+        float draw_bands[AudioAnalyzer::kBandCount];
+        for (size_t i = 0; i < AudioAnalyzer::kBandCount; ++i)
+        {
+            draw_bands[i] = bands[i] * 255.0f;
+        }
+        ui_MusicScreen_drawAudioBandsCool(draw_bands);
     }
 
 } // namespace ekeys
