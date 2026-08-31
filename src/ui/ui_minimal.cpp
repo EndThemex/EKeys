@@ -1,23 +1,54 @@
 /*
  * ui_minimal.cpp
  *
- * 阶段 01 临时主屏示例已移除（参见 docs/01-minimal-hid.md §1.12 变更记录）。
+ * 阶段 02 最小主屏：
  *
- * 阶段 05 由 SquareLine Studio 生成的 src/ui/ui.cpp 接管，
- * 本文件保持空实现，避免 main.cpp 引用变更。
+ *   [ 标题"EKeys"  ]  [ 时间 HH:MM:SS ]
+ *
+ * DisplayTask 持有 LABE引用，并通过 setTimeLabel() 更新右侧标签。
  */
 
 #include "ui_minimal.h"
 
-namespace ekeys
+#include <Arduino.h>
+#include <lvgl.h>
+
+namespace ekeys {
+
+namespace {
+
+lv_obj_t *g_title_label = nullptr;
+lv_obj_t *g_time_label  = nullptr;
+
+}  // namespace
+
+void ui_minimal::create()
 {
+    lv_obj_t *screen = lv_scr_act();
+    lv_obj_set_style_bg_color(screen, lv_color_hex(0x101820), LV_PART_MAIN);
 
-    void ui_minimal::create()
-    {
-        /*
-         * 阶段 01 起主屏测试代码已移除。
-         * 阶段 02 后 DisplayTask 默认显示黑屏（NV3007 已上电、背光常亮）。
-         */
+    g_title_label = lv_label_create(screen);
+    lv_label_set_text(g_title_label, "EKeys");
+    lv_obj_set_style_text_color(g_title_label, lv_color_hex(0xFFFFFF),
+                                LV_PART_MAIN);
+    lv_obj_set_style_text_font(g_title_label, &lv_font_montserrat_20,
+                               LV_PART_MAIN);
+    lv_obj_align(g_title_label, LV_ALIGN_LEFT_MID, 15, 0);
+
+    g_time_label = lv_label_create(screen);
+    lv_label_set_text(g_time_label, "--:--:--");
+    lv_obj_set_style_text_color(g_time_label, lv_color_hex(0x00FF88),
+                                LV_PART_MAIN);
+    lv_obj_set_style_text_font(g_time_label, &lv_font_montserrat_28,
+                               LV_PART_MAIN);
+    lv_obj_align(g_time_label, LV_ALIGN_RIGHT_MID, -15, 0);
+}
+
+void ui_minimal::setTimeLabel(const char *text)
+{
+    if (g_time_label != nullptr && text != nullptr) {
+        lv_label_set_text(g_time_label, text);
     }
+}
 
-} // namespace ekeys
+}  // namespace ekeys

@@ -1,0 +1,11 @@
+# clangd 回退编译参数：
+# 项目根目录的 compile_commands.json 由 PlatformIO 在构建时生成，
+# 构建前（或数据库过期时）使用以下参数解析 src/ 与 include/ 头文件。
+CompileFlags:
+  Add:
+    - -Isrc
+    - -Iinclude
+    - -DARDUINO_USB_MODE=1
+    - -DARDUINO_USB_CDC_ON_BOOT=1
+    - -DLV_CONF_INCLUDE_SIMPLE
+    - -std=gnu++17

@@ -2,7 +2,7 @@
  * AppContext.h
  *
  * 全局单例（ARCHITECTURE §3.1）：持有 MainTask / DisplayTask / IKeyboard
- * 等子系统指针。阶段 01 仅持有几个必要的全局对象。
+ * / Configuration / KeymapRepository 等子系统指针。
  */
 
 #ifndef EKEYS_APP_APP_CONTEXT_H
@@ -13,29 +13,39 @@
 #include "output/IKeyboard.h"
 #include "tasks/MainTask.h"
 
-namespace ekeys {
+namespace ekeys
+{
 
-class AppContext {
-public:
-    static AppContext &instance();
+    class Configuration;
+    class KeymapRepository;
 
-    void init();
-    void shutdown();
-
-    MainTask       &mainTask()    { return main_task_; }
-    IKeyboard      *keyboard()    { return keyboard_.get(); }
-    void            setKeyboard(std::unique_ptr<IKeyboard> kb)
+    class AppContext
     {
-        keyboard_ = std::move(kb);
-    }
+    public:
+        static AppContext &instance();
 
-private:
-    AppContext() = default;
+        void init();
+        void shutdown();
 
-    MainTask                  main_task_;
-    std::unique_ptr<IKeyboard> keyboard_;
-};
+        MainTask &mainTask() { return main_task_; }
+        IKeyboard *keyboard() { return keyboard_.get(); }
+        Configuration *configuration() { return configuration_; }
+        KeymapRepository *keymapRepository() { return keymap_repo_.get(); }
 
-}  // namespace ekeys
+        void setKeyboard(std::unique_ptr<IKeyboard> kb)
+        {
+            keyboard_ = std::move(kb);
+        }
 
-#endif  // EKEYS_APP_APP_CONTEXT_H
+    private:
+        AppContext() = default;
+
+        MainTask main_task_;
+        std::unique_ptr<IKeyboard> keyboard_;
+        Configuration *configuration_ = nullptr; // 指向单例，不持有所有权
+        std::unique_ptr<KeymapRepository> keymap_repo_;
+    };
+
+} // namespace ekeys
+
+#endif // EKEYS_APP_APP_CONTEXT_H

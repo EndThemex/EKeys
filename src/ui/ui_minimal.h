@@ -1,11 +1,8 @@
 /*
  * ui_minimal.h
  *
- * 阶段 01 / 02 期间使用的最小主屏。
- * 把 src/main.cpp 中原 create_ui() 整体搬到这里。
- *
- * 阶段 05 由 SquareLine Studio 生成的 ui.cpp 接管，
- * 本文件保留作为设备首屏示例（FEATURE_DOC §17 占位）。
+ * 阶段 02 期间最小主屏：标题 + 时间标签。
+ * 阶段 05 由 SquareLine Studio 生成的 src/ui/ui.cpp 接管。
  */
 
 #ifndef EKEYS_UI_UI_MINIMAL_H
@@ -16,14 +13,15 @@ namespace ekeys {
 class ui_minimal {
 public:
     /*
-     * 在当前 LVGL 主屏（lv_scr_act()）上画一个 demo UI：
-     *
-     *   - 标题"Nike"（NV3007）
-     *   - 分辨率"428 x 142"
-     *   - 状态"ESP32-S3 + LVGL"
-     *   - 右侧"TEST"按钮
+     * 初次创建主屏（在 DisplayTask 启动之前调用一次）。
      */
     static void create();
+
+    /*
+     * 由 DisplayTask 在收到 DisplayMessageType::TimeUpdate 时调用。
+     * text 应为 "HH:MM:SS" 形式的 NUL 结尾字符串。
+     */
+    static void setTimeLabel(const char *text);
 };
 
 }  // namespace ekeys

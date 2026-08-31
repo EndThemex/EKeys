@@ -1,6 +1,6 @@
 # 阶段 03 — 配置持久化
 
-> 状态：未开始
+> 状态：进行中（3.1~3.10 已完成，3.11 编译验证待用户执行）
 > 关联章节：[`FEATURE_DOC.md §3.2`](../FEATURE_DOC.md) / [`§3.3`](../FEATURE_DOC.md)
 > 关联目录：[`../ARCHITECTURE.md §3.7`](../ARCHITECTURE.md)
 
@@ -22,18 +22,18 @@
 
 ## 任务清单
 
-- [ ] **3.1 `lib_deps` 追加 `SimpleIni@4.19`**：在 [`../platformio.ini`](../platformio.ini) 中加入 `SimpleIni`。
-- [ ] **3.2 `data/config.ini`**：示例文件，至少包含 `[system] active_keymap_profile=0`、`[wifi] wifi_switch=0 wifi_ssid= wifi_password=`、`[rgb] rgb_mode=0`。
-- [ ] **3.3 `data/keymap1.ini`**：示例文件，键 1~11 各自 `function_key=` 或 `normal_key=a+b` 等。
-- [ ] **3.4 `src/services/ConfigStore.h/.cpp`**：封装 SPIFFS 挂载与 SimpleIni 加载/保存；提供 `loadGlobal(path)` / `saveGlobal(path)` / `exists(path)`。
-- [ ] **3.5 `src/services/KeymapRepository.h/.cpp`**：按 `FEATURE_DOC §3.2` API；互斥量 `Configuration::mutex_` 由本类持有。
-- [ ] **3.6 `src/config/Configuration.h/.cpp`**：单例，提供 `load()`、`saveSetting()`、`loadActiveProfileKeyMapping()`、`switchActiveProfile(uint8_t)`、`getProfileConfigPath(uint8_t)` / `getProfileDisplayName(uint8_t)` / `getProfileIconPath(uint8_t)`。
-- [ ] **3.7 `src/config/DeviceSettings.h`**：POD，字段对齐 `FEATURE_DOC §6` 列表（`wifi_* / work_mode / rgb_* / tft_* / device_volume / voice_* / pc_status_mask / active_keymap_profile`），先全部 `= 0` 占位。
-- [ ] **3.8 `src/keymap/KeyResolver`**：构造函数接收 `Configuration&`；`begin()` 时调用 `loadActiveProfileKeyMapping()`；每次按键边沿结束后回写 LED 状态（占位即可）。
-- [ ] **3.9 `src/app/AppContext.h/.cpp`**：持有 `Configuration` 与 `KeymapRepository` 指针；`MainTask::begin()` 中调用 `Configuration::load()`。
-- [ ] **3.10 `src/main.cpp`**：新增 SPIFFS 挂载步骤；启动失败则进入 `LOG_ERROR` 死循环（参考阶段 02 自检标准）。
+- [x] **3.1 `lib_deps` 追加 `SimpleIni@4.19`**：在 [`../platformio.ini`](../platformio.ini) 中加入 `SimpleIni`。
+- [x] **3.2 `data/config.ini`**：示例文件，至少包含 `[system] active_keymap_profile=0`、`[wifi] wifi_switch=0 wifi_ssid= wifi_password=`、`[rgb] rgb_mode=0`。
+- [x] **3.3 `data/keymap1.ini`**：示例文件，键 1~11 各自 `function_key=` 或 `normal_key=a+b` 等。
+- [x] **3.4 `src/services/ConfigStore.h/.cpp`**：封装 SPIFFS 挂载与 SimpleIni 加载/保存；提供 `loadGlobal(path)` / `saveGlobal(path)` / `exists(path)`。
+- [x] **3.5 `src/services/KeymapRepository.h/.cpp`**：按 `FEATURE_DOC §3.2` API；互斥量 `Configuration::mutex_` 由本类持有。
+- [x] **3.6 `src/config/Configuration.h/.cpp`**：单例，提供 `load()`、`saveSetting()`、`loadActiveProfileKeyMapping()`、`switchActiveProfile(uint8_t)`、`getProfileConfigPath(uint8_t)` / `getProfileDisplayName(uint8_t)` / `getProfileIconPath(uint8_t)`。
+- [x] **3.7 `src/config/DeviceSettings.h`**：POD，字段对齐 `FEATURE_DOC §6` 列表（`wifi_* / work_mode / rgb_* / tft_* / device_volume / voice_* / pc_status_mask / active_keymap_profile`），先全部 `= 0` 占位。
+- [x] **3.8 `src/keymap/KeyResolver`**：构造函数接收 `Configuration&`；`begin()` 时调用 `loadActiveProfileKeyMapping()`；每次按键边沿结束后回写 LED 状态（占位即可）。
+- [x] **3.9 `src/app/AppContext.h/.cpp`**：持有 `Configuration` 与 `KeymapRepository` 指针；`MainTask::begin()` 中调用 `Configuration::load()`。
+- [x] **3.10 `src/main.cpp`**：新增 SPIFFS 挂载步骤；启动失败则进入 `LOG_ERROR` 死循环（参考阶段 02 自检标准）。
 - [ ] **3.11 编译验证**：`pio run -t uploadfs` 把 `data/` 上传到 SPIFFS 分区；按键映射与示例 `keymap1.ini` 一致。
-- [ ] **3.12 自检记录**：在 `变更记录` 记录 SimpleIni 版本与 SPIFFS 分区大小。
+- [x] **3.12 自检记录**：在 `变更记录` 记录 SimpleIni 版本与 SPIFFS 分区大小。
 
 ## 验收标准
 
@@ -44,7 +44,13 @@
 
 ## 变更记录
 
-- _暂无_
+- 2026-08-31：完成 3.1~3.10、3.12。
+  - 依赖：SimpleIni 4.19（header-only）。PlatformIO Registry 无 `brofield/SimpleIni` 条目（实测 `UnknownPackageError`），最终采用 GitHub 直连：`https://github.com/brofield/simpleini.git#4.19`。
+  - SPIFFS 分区：`storage` 0x620000 起，大小 0x3E0000（3.875 MB），见 `partitions-16MB.csv`；`data/` 通过 `pio run -t uploadfs` 烧录（3.11 待执行）。
+  - 新增文件：`src/config/DeviceSettings.h`、`src/config/Configuration.h/.cpp`、`src/services/ConfigStore.h/.cpp`、`src/services/KeymapRepository.h/.cpp`、`data/config.ini`、`data/keymap1.ini`。
+  - 修改：`KeyResolver` 构造函数接收 `Configuration&`，`begin()` 优先加载 keymap{N}.ini，失败回退默认 a~k；按键边沿新增 `notifyLedEdge()` 占位。`MainTask` 构造注入 Configuration，`begin()` 先 `Configuration::load()`；`AppContext` 持有 `configuration()` / `keymapRepository()`；`main.cpp` 在 `AppContext::init()` 前调用 `ConfigStore::mount()`。
+  - 互斥量实现说明：`Configuration::mutex_`（FreeRTOS mutex）由 `Configuration` 单例持有，`saveSetting()` / `load()` 等公开接口内部加锁；`KeymapRepository` 为纯文件层不感知锁（与 ARCHITECTURE §3.7 一致）。
+  - 已知限制：`loadGlobalSettings_locked()` 暂只解析 `system/wifi/rgb/display/audio` 段；`voice_*`、`connect_host`、`pc_status_mask`、`tft_brightness` 下限校验随阶段 04 `parseConfigSetCommand` 接入。
 
 ## 备注
 
