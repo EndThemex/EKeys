@@ -1,6 +1,6 @@
 # 阶段 06 — 网络 / 语音 / RGB / 音频
 
-> 状态：未开始
+> 状态：模块层代码已落盘（6.1~6.23 实现，任务调度接线未完成；编译验证待执行）
 > 关联章节：[`FEATURE_DOC.md §7 / §9 / §10 / §11`](../FEATURE_DOC.md)
 > 关联目录：[`../ARCHITECTURE.md §3.8 / §3.10 / §3.11`](../ARCHITECTURE.md)
 
@@ -81,7 +81,16 @@
 
 ## 变更记录
 
-- _暂无_
+- 2026-08-31：6.1~6.23 模块层代码已全部落盘（未接线 / 未编译验证，复选框暂不勾选）。
+  - **6.1~6.4 网络**：`src/network/` 四模块完成；`TcpChannel` 内部串接 `DiscoveryService`（TCP 在线时启停）与 `WiFiManager`（断线重连调度）；`NetDiagnostics` 聚合 RSSI / IP / TCP 状态。
+  - **6.5~6.6 输出**：`BLEKeyboardImpl` + `KeyboardFactory` 完成；`AppContext::applyWorkMode()` 已调用 `KeyboardFactory::create(wm)`，BLE `begin()` 失败回落 USB 并告警。
+  - **6.7~6.9 音频**：`Speaker`（ESP32-audioI2S）/ `Mic`（ICS43434 I2S RX）/ `AudioAnalyzer`（FFT 512 / 16 频段，PSRAM 双缓冲）完成。
+  - **6.10~6.13 语音**：`VoiceRecognizer` + `AsrTokenCache` + `VoiceConfig` 完成；`KeyEventDispatcher` 已接入 `startCapture()/finishCapture()`；识别文本经 `TcpChannel` 在线时上报（0x0c 路径）。
+  - **6.14~6.16 RGB**：`RGBDriver` / `RGBLightControl` / `ClickHighlight` 完成；`ClickHighlight::onKeyEdge()` 已由 `KeyEventDispatcher` 调用。
+  - **6.17~6.23 协议**：cmd_music / cmd_pc_status / cmd_profile / cmd_keymap / cmd_firmware / cmd_device_info 全部实现，`registration.cpp` 已注册。
+  - **依赖修正**：Registry 无 `schreibfaul1/ESP32-audioI2S` 条目且上游无 `3.0.11` tag，改用参考工程同款 `esphome/ESP32-audioI2S@^2.3.0`；`kosme/arduinoFFT` 无 `1.9.2` 版本，改 `@^2.0.4`。
+  - **FFT 2.x 适配**：`AudioAnalyzer` 已从 1.9.x 旧 API（`arduinoFFT` / `Windowing` / `Compute`）迁移到 2.0.4 模板 API（`ArduinoFFT<double>` / `compute(FFTDirection::Forward)` / `complexToMagnitude()`，采样率参数显式转 double）。
+  - **待接线（下一步）**：`main.cpp` 仍为 stage 03 初始化；`MainTask::loop()` 缺 WiFi 重连调度 / TcpChannel 轮询 / Speaker::loop() / VoiceRecognizer 后处理；`DisplayTask` 缺 RGBLightControl tick 与 AudioAnalyzer 频谱调度。接线完成后再统一勾选 6.1~6.23 并执行 6.24 / 6.25。
 
 ## 备注
 

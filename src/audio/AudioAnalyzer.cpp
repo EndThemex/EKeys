@@ -1,8 +1,8 @@
 /*
  * AudioAnalyzer.cpp
  *
- * 见 AudioAnalyzer.h。arduinoFFT@1.9.2 旧版 API
- * （Windowing / Compute(FFT_FORWARD) / ComplexToMagnitude）。
+ * 见 AudioAnalyzer.h。arduinoFFT@2.0.4 模板 API
+ * （ArduinoFFT<double> / compute(FFTDirection::Forward) / complexToMagnitude）。
  */
 
 #include "AudioAnalyzer.h"
@@ -75,15 +75,17 @@ namespace ekeys
       v_imag_[i] = 0.0f;
     }
 
-    arduinoFFT fft(v_real_, v_imag_, kFftSize, kSampleRate);
-    fft.Windowing(FFT_WIN_TYP_RECTANGLE, FFT_FORWARD); // 已手工加窗
-    fft.Compute(FFT_FORWARD);
-    fft.ComplexToMagnitude();
-
     /*
      * 幅度谱 0..N/2 均分 16 段（跳过 DC），每段取峰值，
      * 对数压缩到 0~1（经验系数：8000 ≈ 满量程）。
+     * 已手工加汉宁窗，无需再调用 windowing()（Rectangle 窗为无操作）。
      */
+    ArduinoFFT<double> fft(v_real_, v_imag_,
+                           static_cast<uint_fast16_t>(kFftSize),
+                           static_cast<double>(kSampleRate));
+    fft.compute(FFTDirection::Forward);
+    fft.complexToMagnitude();
+
     const size_t usable = kFftSize / 2 - 1;
     const size_t per_band = usable / kBandCount;
     for (size_t b = 0; b < kBandCount; ++b)
