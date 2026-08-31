@@ -3,8 +3,11 @@
  *
  * WiFi STA 连接状态机（FEATURE_DOC §7.1，阶段 06 任务 6.1）。
  *
- *   - 重连策略：每 5s 重试一次，单次连接超时 10s
- *   - BLE 模式禁止开启（stopReconnect 强制回到 Idle）
+ *   - 重连策略（阶段 07 7.6 精细化，docs/07）：
+ *       连接中每 5s 重试一次，单次超时 10s；
+ *       已连接断链后给 15s 自恢复宽限（STA 自动重连），仍未恢复则
+ *       强制重启 WiFi（mode off → 重新 begin）再走 5s 重试；
+ *     BLE 模式下 process() 整体短路（不启动任何 WiFi 活动）
  *   - 连上后触发 NTP 同步 + UDP 自动发现（经回调注入，避免循环依赖）
  *
  * 由 MainTask::loop() 周期调用 process()；WiFi 事件不使用中断回调。
@@ -15,57 +18,68 @@
 
 #include <stdint.h>
 
-namespace ekeys {
+namespace ekeys
+{
 
-class WiFiManager {
-public:
-    static WiFiManager &instance();
+    class WiFiManager
+    {
+    public:
+        static WiFiManager &instance();
 
-    WiFiManager(const WiFiManager &) = delete;
-    WiFiManager &operator=(const WiFiManager &) = delete;
+        WiFiManager(const WiFiManager &) = delete;
+        WiFiManager &operator=(const WiFiManager &) = delete;
 
-    void begin();
+        void begin();
 
-    /*
-     * 请求连接（wifi_switch=1 且非 BLE 模式才真正调度）。
-     * 配置变更 / TCP 断线 15s / 启动时调用。
-     */
-    void scheduleConnect();
+        /*
+         * 请求连接（wifi_switch=1 且非 BLE 模式才真正调度）。
+         * 配置变更 / TCP 断线 15s / 启动时调用。
+         */
+        void scheduleConnect();
 
-    /* 停止重连并断开（BLE 模式 / wifi_switch=0） */
-    void stopReconnect();
+        /* 停止重连并断开（BLE 模式 / wifi_switch=0） */
+        void stopReconnect();
 
-    /* MainTask::loop() 周期驱动 */
-    void process();
+        /* MainTask::loop() 周期驱动 */
+        void process();
 
-    bool isConnected() const;
-    /* 当前配置是否允许开启 WiFi（wifi_switch 且非 BLE 模式） */
-    bool isEnabled() const;
-    /* 已连接时的 RSSI（dBm，未连接返回 0） */
-    int rssi() const;
+        bool isConnected() const;
+        /* 当前配置是否允许开启 WiFi（wifi_switch 且非 BLE 模式） */
+        bool isEnabled() const;
+        /* 已连接时的 RSSI（dBm，未连接返回 0） */
+        int rssi() const;
 
-    void setOnConnected(void (*cb)()) { on_connected_ = cb; }
+        void setOnConnected(void (*cb)()) { on_connected_ = cb; }
 
-private:
-    WiFiManager() = default;
+    private:
+        WiFiManager() = default;
 
-    enum class State : uint8_t {
-        Idle = 0,
-        Connecting = 1,
-        Connected = 2,
-        WaitingRetry = 3,
+        enum class State : uint8_t
+        {
+            Idle = 0,
+            Connecting = 1,
+            Connected = 2,
+            WaitingRetry = 3,
+        };
+
+        void startConnect(uint32_t now);
+
+        /*
+         * 精细重连策略（阶段 07 任务 7.6）：
+         * Connected 状态断链 → 15s 宽限等 STA 自恢复；
+         * 超时未恢复 → 强制重启 WiFi 射频并回到 WaitingRetry。
+         */
+        void processWiFiReconnect(uint32_t now);
+
+        State state_ = State::Idle;
+        uint32_t state_entered_ms_ = 0;
+        uint32_t last_connect_attempt_ms_ = 0;
+        uint32_t link_lost_ms_ = 0;        // Connected 断链起始时刻（0=链路正常）
+        uint32_t last_request_serial_ = 0; // scheduleConnect 去重（配置 seq）
+        void (*on_connected_)() = nullptr;
+        bool logged_fail_ = false;
     };
 
-    void startConnect(uint32_t now);
+} // namespace ekeys
 
-    State state_ = State::Idle;
-    uint32_t state_entered_ms_ = 0;
-    uint32_t last_connect_attempt_ms_ = 0;
-    uint32_t last_request_serial_ = 0;  // scheduleConnect 去重（配置 seq）
-    void (*on_connected_)() = nullptr;
-    bool logged_fail_ = false;
-};
-
-}  // namespace ekeys
-
-#endif  // EKEYS_NETWORK_WIFI_MANAGER_H
+#endif // EKEYS_NETWORK_WIFI_MANAGER_H

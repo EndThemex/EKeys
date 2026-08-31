@@ -440,15 +440,15 @@ UI 展示在 `UI_SCREEN_PC_STATUS(_SECONDARY)`。
 
 ---
 
-## 17. 待办 / 未完成项
+## 17. 待办 / 未完成项（阶段 07 已全部补齐，联调验证待执行）
 
-| 项                                                                                                           | 状态                      | 位置                                  |
-| ------------------------------------------------------------------------------------------------------------ | ------------------------- | ------------------------------------- |
-| 2.4G 无线键盘模式                                                                                            | 未实现（仅日志警告）      | `MainTask::setWorkMode`               |
-| 麦克风频谱显示                                                                                               | 未启用（代码注释保留）    | `DisplayTask::run` 与 `AudioAnalyzer` |
-| OTA 升级类 [Upgrade](file:///D:/search/gitcode/FunModularKeyboard/firmware/FunModularKeyboard/src/Upgrade.h) | 空实现，仅占位            | `src/Upgrade.cpp`                     |
-| CMD_CONF_VERSION_SET / CMD_DEVICE_INFO_SET                                                                   | 未注册 handler            | `SerialProtocol.h`                    |
-| WiFi STA 自动重连精细策略                                                                                    | 已实现，但 BLE 模式下禁用 | `processWiFiReconnect`                |
+| 项                                                                                                           | 状态                              | 位置                                  |
+| ------------------------------------------------------------------------------------------------------------ | --------------------------------- | ------------------------------------- |
+| 2.4G 无线键盘模式                                                                                            | 已实现（硬件未到位时安全回退 USB） | `Wireless24GKeyboardImpl` + `IRadio24G` |
+| 麦克风频谱显示                                                                                               | 已实现（音乐屏可见时调度）         | `DisplayTask::updateSpectrum` 与 `AudioAnalyzer` |
+| OTA 升级类 [Upgrade](file:///D:/search/gitcode/FunModularKeyboard/firmware/FunModularKeyboard/src/Upgrade.h) | 已实现（HTTP + MD5 校验）          | `src/upgrade/Upgrade.cpp`（0x0b 携带 url/checksum 触发） |
+| CMD_CONF_VERSION_SET / CMD_DEVICE_INFO_SET                                                                   | 已注册 handler（写 DeviceSettings + INI 持久化） | `cmd_firmware.cpp` / `cmd_device_info.cpp` |
+| WiFi STA 自动重连精细策略                                                                                    | 已实现（15s 宽限后强制重启；BLE 模式整体短路） | `processWiFiReconnect`                |
 
 ---
 

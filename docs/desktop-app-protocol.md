@@ -46,22 +46,24 @@
 
 ## 2. 命令清单与实现状态
 
-| ID        | 命令                       | 方向     | 状态               | 说明                   |
-| --------- | -------------------------- | -------- | ------------------ | ---------------------- |
-| 0x01      | `CMD_CONF_VERSION_GET`     | App→设备 | 规划（阶段 07）    | 配置版本号             |
-| 0x02      | `CMD_CONF_VERSION_SET`     | App→设备 | 占位               | —                      |
-| 0x03      | `CMD_DEVICE_INFO_GET`      | App→设备 | 规划（阶段 07）    | 设备信息               |
-| 0x05      | `CMD_KEYMAP_GET`           | App→设备 | 规划（阶段 05/07） | 键映射读取             |
-| 0x06      | `CMD_KEYMAP_SET`           | App→设备 | 规划（阶段 05/07） | 键映射写入             |
-| **0x07**  | **`CMD_CONFIG_GET`**       | App→设备 | **已实现**         | 读取全部设置（§3）     |
-| **0x08**  | **`CMD_CONFIG_SET`**       | App→设备 | **已实现**         | 原子写入设置（§4）     |
-| 0x09      | `CMD_KEY_EVENT`            | 设备→App | 规划               | 按键边沿上报           |
-| **0x0a**  | **`CMD_HEARTBEAT`**        | 双向     | **已实现**         | 心跳（§5）             |
-| 0x0d      | `CMD_PC_STATUS`            | App→设备 | 规划（阶段 05）    | PC 状态位掩码推送      |
-| 0x0e/0x0f | `CMD_MUSIC_STATUS/CONTROL` | 双向     | 规划（阶段 05）    | 音乐控制               |
-| 0x10      | `CMD_PROFILE_STATE`        | 双向     | 规划               | Profile 状态           |
-| 0x11      | `CMD_PROFILE_ICON_SET`     | App→设备 | 规划               | 图标上传（PNG base64） |
-| 0x12      | `CMD_HA_STATUS`            | 设备→App | 规划（阶段 06）    | 状态聚合推送           |
+| ID        | 命令                       | 方向     | 状态                  | 说明                                                                                                     |
+| --------- | -------------------------- | -------- | --------------------- | -------------------------------------------------------------------------------------------------------- |
+| 0x01      | `CMD_CONF_VERSION_GET`     | App→设备 | **已实现**            | 配置版本号                                                                                               |
+| 0x02      | `CMD_CONF_VERSION_SET`     | App→设备 | **已实现（阶段 07）** | `data.version` 写入并持久化                                                                              |
+| 0x03      | `CMD_DEVICE_INFO_GET`      | App→设备 | **已实现**            | 设备信息                                                                                                 |
+| 0x04      | `CMD_DEVICE_INFO_SET`      | App→设备 | **已实现（阶段 07）** | `data.device_name` / `data.serial` 写入并持久化                                                          |
+| 0x05      | `CMD_KEYMAP_GET`           | App→设备 | 规划（阶段 05/07）    | 键映射读取                                                                                               |
+| 0x06      | `CMD_KEYMAP_SET`           | App→设备 | 规划（阶段 05/07）    | 键映射写入                                                                                               |
+| **0x07**  | **`CMD_CONFIG_GET`**       | App→设备 | **已实现**            | 读取全部设置（§3）                                                                                       |
+| **0x08**  | **`CMD_CONFIG_SET`**       | App→设备 | **已实现**            | 原子写入设置（§4）                                                                                       |
+| 0x09      | `CMD_KEY_EVENT`            | 设备→App | 规划                  | 按键边沿上报                                                                                             |
+| **0x0a**  | **`CMD_HEARTBEAT`**        | 双向     | **已实现**            | 心跳（§5）                                                                                               |
+| 0x0b      | `CMD_FIRMWARE_INFO`        | App→设备 | **已实现（阶段 07）** | 无 data：查询固件信息；`data.url`+`data.checksum`（MD5 hex）：触发 OTA，校验失败不覆盖固件，成功自动重启 |
+| 0x0d      | `CMD_PC_STATUS`            | App→设备 | 规划（阶段 05）       | PC 状态位掩码推送                                                                                        |
+| 0x0e/0x0f | `CMD_MUSIC_STATUS/CONTROL` | 双向     | 规划（阶段 05）       | 音乐控制                                                                                                 |
+| 0x10      | `CMD_PROFILE_STATE`        | 双向     | 规划                  | Profile 状态                                                                                             |
+| 0x11      | `CMD_PROFILE_ICON_SET`     | App→设备 | 规划                  | 图标上传（PNG base64）                                                                                   |
+| 0x12      | `CMD_HA_STATUS`            | 设备→App | 规划（阶段 06）       | 状态聚合推送                                                                                             |
 
 未注册命令会收到 `status=1, error="unknown command"`，固件不崩溃。
 
