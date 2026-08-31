@@ -76,7 +76,7 @@ namespace ekeys::protocol::commands
             SerialProtocol::instance().sendDocument(doc);
         }
 
-        /* 向 DisplayTask 投递 SETTING_UPDATE（载荷：亮度 / 主题） */
+        /* 向 DisplayTask 投递 SETTING_UPDATE（全量快照，驱动 UI + 背光） */
         void postSettingUpdate()
         {
             DeviceSettings snap;
@@ -84,8 +84,7 @@ namespace ekeys::protocol::commands
 
             DisplayMessage msg;
             msg.type = DisplayMessageType::SettingUpdate;
-            msg.payload.setting.tft_brightness = snap.tft_brightness;
-            msg.payload.setting.tft_theme = snap.tft_theme;
+            fillSettingPayload(snap, msg.setting);
             DisplayTask::instance().post(msg, 0);
         }
 

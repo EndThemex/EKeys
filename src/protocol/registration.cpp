@@ -10,14 +10,27 @@
 #include "../logging/LogManager.h"
 #include "CommandRegistry.h"
 #include "commands/cmd_config.h"
+#include "commands/cmd_device_info.h"
+#include "commands/cmd_firmware.h"
+#include "commands/cmd_keymap.h"
+#include "commands/cmd_music.h"
+#include "commands/cmd_pc_status.h"
+#include "commands/cmd_profile.h"
 
-namespace ekeys::protocol::registration {
-
-void registerAllCommandHandlers()
+namespace ekeys::protocol::registration
 {
-    commands::registerConfigHandlers();
-    LOG_INFO("REG", "all command handlers registered (%u)",
-             static_cast<unsigned>(CommandRegistry::instance().handlerCount()));
-}
 
-}  // namespace ekeys::protocol::registration
+    void registerAllCommandHandlers()
+    {
+        commands::registerConfigHandlers();
+        commands::registerKeymapHandlers();
+        commands::registerFirmwareHandlers();
+        commands::registerDeviceInfoHandlers();
+        commands::registerPcStatusHandlers();
+        commands::registerMusicHandlers();
+        commands::registerProfileHandlers();
+        LOG_INFO("REG", "all command handlers registered (%u)",
+                 static_cast<unsigned>(CommandRegistry::instance().handlerCount()));
+    }
+
+} // namespace ekeys::protocol::registration

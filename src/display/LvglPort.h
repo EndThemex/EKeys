@@ -21,7 +21,7 @@ public:
      *
      *     DisplayDriver::instance().begin();
      *     LvglPort::instance().init();
-     *     ui_minimal::create();
+     *     （11 屏 UI 由 DisplayTask::run() 内 ui_init() 创建）
      */
     void init();
 

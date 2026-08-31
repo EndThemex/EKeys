@@ -242,7 +242,7 @@ src/hardware/
 | --------- | ------------------------------ | ---------------- | ------------------------------------------------------- |
 | `LCD_BL`  | `kPinLcdBacklight = 1`         | IO1              | 背光 PWM 控制                                           |
 | `LCD_CS`  | `kPinLcdCs        = 2`         | IO2              | SPI 片选                                                |
-| `LCD_DC`  | `kPinLcdDc        = 9`         | IO9              | 数据/命令选择（DC/RS）                                  |
+| `LCD_DC`  | `kPinLcdDc        = 42`        | IO42             | 数据/命令选择（DC/RS）                                  |
 | `LCD_SDA` | `kPinLcdMosi      = 40`        | IO40             | SPI 数据（MOSI）                                        |
 | `LCD_SCL` | `kPinLcdSclk      = 41`        | IO41             | SPI 时钟（CLK）                                         |
 | `LCD_RST` | `kPinLcdRst = GFX_NOT_DEFINED` | —                | 硬件直接拉低，未分配引脚；告诉 Arduino_GFX 跳过软件复位 |

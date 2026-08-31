@@ -5,7 +5,7 @@
  *   1) 创建 KeymapRepository 并注入 Configuration 单例
  *   2) 键盘后端（USB CDC 等）
  *   3) MainTask.begin()（内部 Configuration::load() → resolver 加载键映射）
- *   4) DisplayTask.begin() / ui_minimal::create()
+ *   4) DisplayTask.begin()（run() 内 ui_init() 创建 11 屏）
  */
 
 #include "AppContext.h"
@@ -17,7 +17,6 @@
 #include "protocol/registration.h"
 #include "services/KeymapRepository.h"
 #include "tasks/DisplayTask.h"
-#include "ui/ui_minimal.h"
 
 namespace ekeys
 {
@@ -47,13 +46,10 @@ namespace ekeys
         protocol::registration::registerAllCommandHandlers();
 
         /*
-         * 先启动 DisplayTask，让它内部创建好队列；
-         * 再 create 主屏（LVGL 在 LvglPort::init() 中已经可用）。
-         * 然后把队列句柄注入 MainTask。
+         * 启动 DisplayTask：其 run() 内部调用 ui_init() 创建 11 屏
+         * （SquareLine 生成的 src/ui），并把队列句柄注入 MainTask。
          */
         DisplayTask::instance().begin();
-
-        ui_minimal::create();
 
         main_task_.setKeyboard(keyboard());
         main_task_.setDisplayQueue(DisplayTask::instance().queueHandle());

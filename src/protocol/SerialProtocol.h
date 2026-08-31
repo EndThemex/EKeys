@@ -15,69 +15,89 @@
 #include <ArduinoJson.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
-namespace ekeys {
+namespace ekeys
+{
 
-/* 命令清单（FEATURE_DOC §5.3） */
-enum CommandType : uint8_t {
-    CMD_CONF_VERSION_GET = 0x01,
-    CMD_CONF_VERSION_SET = 0x02,
-    CMD_DEVICE_INFO_GET  = 0x03,
-    CMD_DEVICE_INFO_SET  = 0x04,
-    CMD_KEYMAP_GET       = 0x05,
-    CMD_KEYMAP_SET       = 0x06,
-    CMD_CONFIG_GET       = 0x07,
-    CMD_CONFIG_SET       = 0x08,
-    CMD_KEY_EVENT        = 0x09,
-    CMD_HEARTBEAT        = 0x0a,
-    CMD_FIRMWARE_INFO    = 0x0b,
-    CMD_VOICE_TEXT       = 0x0c,
-    CMD_PC_STATUS        = 0x0d,
-    CMD_MUSIC_STATUS     = 0x0e,
-    CMD_MUSIC_CONTROL    = 0x0f,
-    CMD_PROFILE_STATE    = 0x10,
-    CMD_PROFILE_ICON_SET = 0x11,
-    CMD_HA_STATUS        = 0x12,
-};
+    /* 命令清单（FEATURE_DOC §5.3） */
+    enum CommandType : uint8_t
+    {
+        CMD_CONF_VERSION_GET = 0x01,
+        CMD_CONF_VERSION_SET = 0x02,
+        CMD_DEVICE_INFO_GET = 0x03,
+        CMD_DEVICE_INFO_SET = 0x04,
+        CMD_KEYMAP_GET = 0x05,
+        CMD_KEYMAP_SET = 0x06,
+        CMD_CONFIG_GET = 0x07,
+        CMD_CONFIG_SET = 0x08,
+        CMD_KEY_EVENT = 0x09,
+        CMD_HEARTBEAT = 0x0a,
+        CMD_FIRMWARE_INFO = 0x0b,
+        CMD_VOICE_TEXT = 0x0c,
+        CMD_PC_STATUS = 0x0d,
+        CMD_MUSIC_STATUS = 0x0e,
+        CMD_MUSIC_CONTROL = 0x0f,
+        CMD_PROFILE_STATE = 0x10,
+        CMD_PROFILE_ICON_SET = 0x11,
+        CMD_HA_STATUS = 0x12,
+    };
 
-class SerialProtocol {
-public:
-    static SerialProtocol &instance();
+    class SerialProtocol
+    {
+    public:
+        static SerialProtocol &instance();
 
-    SerialProtocol(const SerialProtocol &) = delete;
-    SerialProtocol &operator=(const SerialProtocol &) = delete;
+        SerialProtocol(const SerialProtocol &) = delete;
+        SerialProtocol &operator=(const SerialProtocol &) = delete;
 
-    /* 幂等；Serial 由 main.cpp 提前 Serial.begin(115200) */
-    void begin();
+        /* 幂等；Serial 由 main.cpp 提前 Serial.begin(115200) */
+        void begin();
 
-    /* MainTask::loop() 周期调用：流式收字节，拼成行后解析分发 */
-    void poll();
+        /* MainTask::loop() 周期调用：流式收字节，拼成行后解析分发 */
+        void poll();
 
-    /* 把构建好的响应文档序列化为 JSON 行发出 */
-    void sendDocument(JsonDocument &doc);
+        /* 把构建好的响应文档序列化为 JSON 行发出 */
+        void sendDocument(JsonDocument &doc);
 
-    /* 通用成功响应：{"cmd":cmd|0x80,"seq":N,"status":0,"data":{...}} */
-    void sendSuccessResponse(int original_cmd, int seq, JsonObject data);
+        /* 通用成功响应：{"cmd":cmd|0x80,"seq":N,"status":0,"data":{...}} */
+        void sendSuccessResponse(int original_cmd, int seq, JsonObject data);
 
-    /* 错误响应：{"cmd":cmd|0x80,"seq":N,"status":1,"error":"..."} */
-    void sendErrorResponse(int original_cmd, int seq, const char *error);
+        /* 错误响应：{"cmd":cmd|0x80,"seq":N,"status":1,"error":"..."} */
+        void sendErrorResponse(int original_cmd, int seq, const char *error);
 
-    static bool isResponseCommand(int cmd) { return (cmd & 0x80) != 0; }
+        /*
+         * 阶段 06：TCP 通道复用（Serial / TCP 双通道任一在线即生效）。
+         *   - setLineSink：TcpChannel 注册后，所有协议帧同步发到 TCP；
+         *   - handleTcpLine：TCP 收到的 JSON 行喂给同一解析分发。
+         */
+        using LineSink = void (*)(const char *line);
+        void setLineSink(LineSink sink) { line_sink_ = sink; }
+        void handleTcpLine(const char *line);
 
-private:
-    SerialProtocol() = default;
+        /* 主动推送：CMD_VOICE_TEXT（ASR 文本，FEATURE_DOC §5.3 0x0c） */
+        void sendVoiceText(const char *text);
 
-    void handleLine(char *line);
-    void sendHeartbeatResponse(int seq);
+        /* 主动推送：CMD_MUSIC_CONTROL（UI 控制按钮 → App，0x0f） */
+        void sendMusicControl(const char *action);
 
-    static constexpr size_t kLineBufferSize = 2048;
+        static bool isResponseCommand(int cmd) { return (cmd & 0x80) != 0; }
 
-    char   line_[kLineBufferSize];
-    size_t line_len_ = 0;
-    bool   overflow_ = false;  // 超长行丢弃直到换行
-    bool   begun_ = false;
-};
+    private:
+        SerialProtocol() = default;
 
-}  // namespace ekeys
+        void handleLine(char *line);
+        void sendHeartbeatResponse(int seq);
 
-#endif  // EKEYS_PROTOCOL_SERIAL_PROTOCOL_H
+        static constexpr size_t kLineBufferSize = 2048;
+
+        char line_[kLineBufferSize];
+        size_t line_len_ = 0;
+        bool overflow_ = false; // 超长行丢弃直到换行
+        bool begun_ = false;
+        LineSink line_sink_ = nullptr;
+    };
+
+} // namespace ekeys
+
+#endif // EKEYS_PROTOCOL_SERIAL_PROTOCOL_H

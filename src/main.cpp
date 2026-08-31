@@ -6,7 +6,7 @@
  *     Serial.begin → 背光 → NV3007 begin → fill black
  *                → LVGL init
  *                → SPIFFS 挂载（失败则 LOG_ERROR 死循环）
- *                → AppContext::init()（配置加载 / MainTask / DisplayTask / ui_minimal）
+ *                → AppContext::init()（配置加载 / MainTask / DisplayTask）
  *                → loop() 中只跑 MainTask::loop()（DisplayTask 接管 LVGL tick）
  *
  * 屏幕驱动代码在 src/display/ 与 src/ui/，配置层在 src/config/ 与 src/services/。

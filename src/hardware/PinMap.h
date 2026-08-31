@@ -49,9 +49,7 @@ constexpr uint8_t kPinMatrixCol3 = 8;
  *
  * 阶段 01 末按用户最新 PINOUT.md：
  *
- *     LCD_BL  = IO1   背光 PWM
- *     LCD_CS  = IO2   SPI 片选
- *     LCD_DC  = IO9   数据/命令选择
+ *     LCD_DC  = IO42  数据/命令选择
  *     LCD_SDA = IO40  SPI 数据（MOSI）
  *     LCD_SCL = IO41  SPI 时钟（CLK）
  *     LCD_RST        硬件拉低，**未分配引脚**；用 GFX_NOT_DEFINED 跳过软件复位
@@ -59,7 +57,7 @@ constexpr uint8_t kPinMatrixCol3 = 8;
  */
 constexpr int kPinLcdBacklight = 1;         // PINOUT §2.6 LCD_BL
 constexpr int kPinLcdCs = 2;                // PINOUT §2.6 LCD_CS
-constexpr int kPinLcdDc = 9;                // PINOUT §2.6 LCD_DC
+constexpr int kPinLcdDc = 42;               // PINOUT §1.1 / §2.6 LCD_DC
 constexpr int kPinLcdSclk = 41;             // PINOUT §2.6 LCD_SCL
 constexpr int kPinLcdMosi = 40;             // PINOUT §2.6 LCD_SDA
 constexpr int kPinLcdRst = GFX_NOT_DEFINED; // 硬件拉低，无引脚
@@ -67,12 +65,18 @@ constexpr int kPinLcdRst = GFX_NOT_DEFINED; // 硬件拉低，无引脚
 /*
  * ------------------------------------------------------------
  * I2S 音频（PINOUT §2.7 — 阶段 06 接入）
+ *
+ * 功放（MAX98357）：BCLK=IO10 / LRCLK=IO9 / SDOUT=IO14（I2S1 TX）
+ * 麦克风（ICS43434）：SCK=IO13 / WS=IO12 / SD=IO11（I2S0 RX）
+ *
+ * 注：IO10 标注"功放/麦克风共用"，但两套 I2S 均为主模式时
+ * 同一 GPIO 只能由一个外设驱动，故麦克风时钟走专用 MIC_SCK=IO13。
  * ------------------------------------------------------------
  */
-constexpr uint8_t kPinI2sBclkSpeaker = 16;
+constexpr uint8_t kPinI2sBclkSpeaker = 10;
 constexpr uint8_t kPinI2sLrclkSpeaker = 9;
 constexpr uint8_t kPinI2sDataSpeaker = 14;
-constexpr uint8_t kPinI2sMicBclk = 10;
+constexpr uint8_t kPinI2sMicBclk = 13; // 用 MIC_SCK 专用时钟，避免与功放 BCLK(IO10) 双驱冲突
 constexpr uint8_t kPinI2sMicWs = 12;
 constexpr uint8_t kPinI2sMicSck = 13;
 constexpr uint8_t kPinI2sMicDin = 11;
