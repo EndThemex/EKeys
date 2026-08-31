@@ -1,6 +1,6 @@
 # 阶段 06 — 网络 / 语音 / RGB / 音频
 
-> 状态：模块层代码已落盘（6.1~6.23 实现，任务调度接线未完成；编译验证待执行）
+> 状态：代码完成（6.1~6.23 实现并接线；编译验证 / 6.24 联调待执行）
 > 关联章节：[`FEATURE_DOC.md §7 / §9 / §10 / §11`](../FEATURE_DOC.md)
 > 关联目录：[`../ARCHITECTURE.md §3.8 / §3.10 / §3.11`](../ARCHITECTURE.md)
 
@@ -91,6 +91,13 @@
   - **依赖修正**：Registry 无 `schreibfaul1/ESP32-audioI2S` 条目且上游无 `3.0.11` tag，改用参考工程同款 `esphome/ESP32-audioI2S@^2.3.0`；`kosme/arduinoFFT` 无 `1.9.2` 版本，改 `@^2.0.4`。
   - **FFT 2.x 适配**：`AudioAnalyzer` 已从 1.9.x 旧 API（`arduinoFFT` / `Windowing` / `Compute`）迁移到 2.0.4 模板 API（`ArduinoFFT<double>` / `compute(FFTDirection::Forward)` / `complexToMagnitude()`，采样率参数显式转 double）。
   - **待接线（下一步）**：`main.cpp` 仍为 stage 03 初始化；`MainTask::loop()` 缺 WiFi 重连调度 / TcpChannel 轮询 / Speaker::loop() / VoiceRecognizer 后处理；`DisplayTask` 缺 RGBLightControl tick 与 AudioAnalyzer 频谱调度。接线完成后再统一勾选 6.1~6.23 并执行 6.24 / 6.25。
+- 2026-08-31：任务调度接线完成（复选框待编译验证通过后统一勾选）。
+  - **MainTask::begin()**：`WiFiManager::begin()` + 回调注入（WiFi 连上 → `NtpSync::requestSync()` + `DiscoveryService::start()`；发现 App IP → `TcpChannel::connectTo()`）+ `Speaker::begin()`；按当前配置 `isEnabled()` 决定是否 `scheduleConnect()`。`TcpChannel` 首次连接时自注册 `SerialProtocol::setLineSink`（模块内部完成，无需外部接线）。
+  - **MainTask::tick()**（每轮 loop() 调用，keyboard\_ 注入前）：`WiFiManager/NtpSync/DiscoveryService/TcpChannel process()` + `Speaker::loop()` + `VoiceRecognizer::feedCapture()`；另 2.5s 节流聚合 HA 状态（`NetDiagnostics::fillNetworkFields` + work_mode/voice 补齐）→ `HaStatus` 消息投递 HA 屏。
+  - **1s TimeUpdate**：NTP 已同步用 `NtpSync::getLocalTimeStr()`，未同步回退 millis() 推算。
+  - **DisplayTask**：`run()` 启动快照 + `applySetting()`（SettingUpdate 路径）调用 `RGBLightControl::applySettings()`（LED 写入统一收口 DisplayTask 上下文）；主循环 `RGBLightControl::tick(delta)`（内部 30ms 帧节流）。AudioAnalyzer 频谱调度按计划留在阶段 07（6.9 约定只编译）。
+  - **设置变更副作用**：`cmd_config`（wifi_changed → `scheduleConnect()`，any_changed → `Speaker::applyDeviceVolume()`）；`MainTask::applyUiSettingsSnapshot`（work_mode 变更 → `applyWorkMode` + `scheduleConnect()`，音量 → `applyDeviceVolume()`）。`scheduleConnect()` 内部以 `isEnabled()`（wifi_switch 且非 BLE）统一处理启停，两条路径无需重复判断。
+  - **main.cpp**：注释与启动日志更新为 stage 06（服务初始化已由 `MainTask::begin()` 承担，main.cpp 结构不变）。
 
 ## 备注
 

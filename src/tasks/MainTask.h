@@ -7,7 +7,9 @@
  *   - 消费设置屏反向同步请求（ui_settings_request_apply/save）
  *     → 写回 DeviceSettings + 持久化 + 副作用（docs/05 §5.8）
  *   - 键映射加载后投递 KEYMAP_PROFILE_UPDATE（11 键标签）
- *   - 1s  tick：TIME_UPDATE（millis() 推算 HH:MM:SS；阶段 06 换 NTP）
+ *   - 1s  tick：TIME_UPDATE（NTP 优先，未同步用 millis() 推算）
+ *
+ * 阶段 06：tick() 周期调度 WiFi / NTP / 发现 / TCP / 扬声器 / ASR。
  */
 
 #ifndef EKEYS_TASKS_MAIN_TASK_H
@@ -55,6 +57,7 @@ namespace ekeys
         void loop();
 
     private:
+        /* 阶段 06 服务调度（WiFi/NTP/发现/TCP/扬声器/ASR + HA 状态节流） */
         void tick();
 
         /* 向 DisplayTask 投递（display_queue_ 为空时忽略） */
@@ -77,6 +80,7 @@ namespace ekeys
         void *display_queue_; // FreeRTOS QueueHandle_t（避免强引用）
         uint32_t last_tick_ms_;
         uint32_t last_time_post_ms_;
+        uint32_t last_ha_status_ms_{0};
         bool keymap_ui_pending_{false};
     };
 

@@ -23,6 +23,7 @@
 #include "display/LvglPort.h"
 #include "logging/LogManager.h"
 #include "message_types.h"
+#include "rgb/RGBLightControl.h"
 #include "ui/ui.h"
 #include "ui/ui_HaScreenSecondary.h"
 #include "ui/ui_KeyMappedSecondary.h"
@@ -149,6 +150,8 @@ namespace ekeys
         {
             DeviceSettings snap;
             Configuration::instance().snapshot(snap);
+            /* RGB 灯效初始化（RGBDriver::begin 在 DisplayTask 上下文统一驱动） */
+            RGBLightControl::instance().applySettings(snap);
             DisplayMessage msg;
             msg.type = DisplayMessageType::SettingUpdate;
             fillSettingPayload(snap, msg.setting);
@@ -161,7 +164,10 @@ namespace ekeys
             uint32_t now = millis();
             if (now != last)
             {
-                LvglPort::instance().tick(now - last);
+                const uint32_t delta = now - last;
+                LvglPort::instance().tick(delta);
+                /* RGB 动画 tick（内部 30ms 帧节流，docs/06 6.15） */
+                RGBLightControl::instance().tick(delta);
                 last = now;
             }
 
@@ -257,6 +263,13 @@ namespace ekeys
         /* 背光即时生效 */
         Backlight::instance().setDuty(
             static_cast<uint8_t>(s.tft_brightness));
+
+        /* RGB 灯效即时生效（以配置层权威值为准，DisplayTask 上下文统一驱动） */
+        {
+            DeviceSettings snap;
+            Configuration::instance().snapshot(snap);
+            RGBLightControl::instance().applySettings(snap);
+        }
 
         /* 状态条：工作模式 + 音量 */
         status_bar_set_working_mode(s.work_mode);

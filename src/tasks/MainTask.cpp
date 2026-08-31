@@ -7,7 +7,12 @@
  *   - 设置屏反向同步：ui_settings_request_apply/save（LVGL 回调 →
  *     临界区暂存）→ 本任务 loop() 消费 → DeviceSettings + 持久化
  *   - 键映射加载后投递 KEYMAP_PROFILE_UPDATE（队列就绪后惰性发送）
- *   - 1s  tick：TIME_UPDATE（millis() 推算；阶段 06 换 NTP）
+ *   - 1s  tick：TIME_UPDATE（NTP 已同步用真实时间，否则 millis() 推算）
+ *
+ * 阶段 06（tick()）：
+ *   - WiFi 重连状态机 / NTP 完成检测 / UDP 发现 / TCP 收发
+ *   - 扬声器解码喂流 / ASR 录音攒流
+ *   - HA 状态聚合（NetDiagnostics → HA 屏，2.5s 节流）
  */
 
 #include "MainTask.h"
@@ -18,11 +23,18 @@
 #include <stdio.h>
 
 #include "app/AppContext.h"
+#include "audio/Speaker.h"
 #include "config/Configuration.h"
 #include "logging/LogManager.h"
 #include "message_types.h"
+#include "network/DiscoveryService.h"
+#include "network/NetDiagnostics.h"
+#include "network/NtpSync.h"
+#include "network/TcpChannel.h"
+#include "network/WiFiManager.h"
 #include "output/IKeyboard.h"
 #include "protocol/SerialProtocol.h"
+#include "voice/VoiceRecognizer.h"
 
 namespace ekeys
 {
@@ -32,10 +44,10 @@ namespace ekeys
 
         constexpr uint32_t kMainTaskTickPeriodMs = 5;
         constexpr uint32_t kMainTaskTimePostPeriodMs = 1000;
+        constexpr uint32_t kHaStatusPeriodMs = 2500;
 
         /*
-         * 把 millis() 换算成 "HH:MM:SS"。不依赖 NTP；阶段 06 替换为
-         * NtpSync::epochSeconds() 等接口。
+         * 把 millis() 换算成 "HH:MM:SS"。NTP 未同步时作为兜底显示。
          */
         void formatUptimeString(char *out, size_t cap, uint32_t now_ms)
         {
@@ -130,8 +142,30 @@ namespace ekeys
                              { sendDisplayAction(key); });
         keymap_ui_pending_ = true;
 
+        /*
+         * 阶段 06 服务初始化（宿主 = MainTask，各模块头文件约定）：
+         *   - WiFi 状态机（BLE 模式 / wifi_switch=0 时保持关闭）
+         *   - WiFi 连上 → NTP 同步 + UDP 发现；发现 App IP → TCP 连接
+         *   - I2S 扬声器（幂等 begin，后续 tick() 喂流）
+         *   - 启动时按当前配置调度 WiFi 连接
+         */
+        WiFiManager::instance().begin();
+        WiFiManager::instance().setOnConnected([]()
+                                               {
+            NtpSync::instance().requestSync();
+            DiscoveryService::instance().start(); });
+        DiscoveryService::instance().setOnDiscovered(
+            [](const char *ip)
+            { TcpChannel::instance().connectTo(ip); });
+        Speaker::instance().begin();
+        if (WiFiManager::instance().isEnabled())
+        {
+            WiFiManager::instance().scheduleConnect();
+        }
+
         last_tick_ms_ = millis();
         last_time_post_ms_ = last_tick_ms_;
+        last_ha_status_ms_ = last_tick_ms_;
         LOG_INFO("MAIN", "MainTask started");
     }
 
@@ -183,6 +217,9 @@ namespace ekeys
             keymap_ui_pending_ = false;
         }
 
+        /* 阶段 06 服务调度（网络 / 扬声器 / ASR，不依赖 keyboard_ 注入） */
+        tick();
+
         if (keyboard_ == nullptr)
         {
             return;
@@ -212,14 +249,18 @@ namespace ekeys
             }
         }
 
-        /* 1s tick：投递 TIME_UPDATE */
+        /* 1s tick：投递 TIME_UPDATE（NTP 已同步用真实时间，否则开机时长） */
         if ((now - last_time_post_ms_) >= kMainTaskTimePostPeriodMs)
         {
             last_time_post_ms_ = now;
             DisplayMessage msg;
             msg.type = DisplayMessageType::TimeUpdate;
-            formatUptimeString(msg.time_text,
-                               sizeof(msg.time_text), now);
+            if (!NtpSync::instance().getLocalTimeStr(
+                    msg.time_text, sizeof(msg.time_text)))
+            {
+                formatUptimeString(msg.time_text,
+                                   sizeof(msg.time_text), now);
+            }
             postMessage(msg);
         }
     }
@@ -419,6 +460,11 @@ namespace ekeys
         if (workModeChanged)
         {
             AppContext::instance().applyWorkMode(newWorkMode);
+            /*
+             * 按新模式重调 WiFi：BLE → isEnabled()=false 内部停机；
+             * 其余模式按新配置调度连接。
+             */
+            WiFiManager::instance().scheduleConnect();
         }
         if (profileChanged)
         {
@@ -428,6 +474,10 @@ namespace ekeys
         /* 刷新显示（背光 / 状态条 / 设置屏快照），以配置层权威值为准 */
         DeviceSettings snap;
         config.snapshot(snap);
+
+        /* 音量即时生效（Speaker::loop 与本任务同上下文） */
+        Speaker::instance().applyDeviceVolume(snap.device_volume);
+
         DisplayMessage msg;
         msg.type = DisplayMessageType::SettingUpdate;
         fillSettingPayload(snap, msg.setting);
@@ -437,8 +487,37 @@ namespace ekeys
     void MainTask::tick()
     {
         /*
-         * 阶段 06 后会在此处调度 WiFi / BLE / ASR 等异步子模块。
+         * 阶段 06 服务调度（每轮 loop() 调用，各模块内部自行节流）：
+         * WiFi 重连状态机 / NTP 同步完成检测 / UDP 发现 / TCP 收发 /
+         * 扬声器解码喂流 / ASR 录音攒流。
          */
+        WiFiManager::instance().process();
+        NtpSync::instance().process();
+        DiscoveryService::instance().process();
+        TcpChannel::instance().process();
+        Speaker::instance().loop();
+        VoiceRecognizer::instance().feedCapture();
+
+        /* HA 状态聚合 → HA 屏 / 状态条（2.5s 节流，与参考工程一致） */
+        const uint32_t now = millis();
+        if ((now - last_ha_status_ms_) >= kHaStatusPeriodMs)
+        {
+            last_ha_status_ms_ = now;
+
+            HaStatusInfo ha;
+            NetDiagnostics::fillNetworkFields(ha);
+
+            DeviceSettings snap;
+            Configuration::instance().snapshot(snap);
+            ha.work_mode = snap.work_mode;
+            ha.voice_enabled = (snap.voice_enable != 0) && (snap.work_mode == 0);
+            ha.voice_recording = VoiceRecognizer::instance().isCapturing();
+
+            DisplayMessage msg;
+            msg.type = DisplayMessageType::HaStatus;
+            msg.ha_status = ha;
+            postMessage(msg);
+        }
     }
 
 } // namespace ekeys

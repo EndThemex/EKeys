@@ -16,10 +16,12 @@
 #include <ArduinoJson.h>
 
 #include "app/AppContext.h"
+#include "audio/Speaker.h"
 #include "config/Configuration.h"
 #include "config/parseConfigSetCommand.h"
 #include "logging/LogManager.h"
 #include "message_types.h"
+#include "network/WiFiManager.h"
 #include "services/ConfigStore.h"
 #include "tasks/DisplayTask.h"
 #include "../CommandRegistry.h"
@@ -127,12 +129,20 @@ namespace ekeys::protocol::commands
             }
             if (result.wifi_changed)
             {
-                /* network::WiFiManager 于阶段 06 接入，当前仅记录 */
-                LOG_INFO("CFG_CMD", "wifi setting changed (WiFi stack in stage 06)");
+                /*
+                 * 阶段 06：WiFi 状态机已接入。禁用 / BLE 模式 →
+                 * isEnabled()=false 内部停机；其余按新配置调度连接。
+                 */
+                WiFiManager::instance().scheduleConnect();
+                LOG_INFO("CFG_CMD", "wifi setting changed, reconnect scheduled");
             }
 
             if (result.any_changed)
             {
+                DeviceSettings snap;
+                Configuration::instance().snapshot(snap);
+                /* 音量即时生效（cmd handler 与 Speaker::loop 同在 MainTask 上下文） */
+                Speaker::instance().applyDeviceVolume(snap.device_volume);
                 postSettingUpdate();
                 sendConfigSnapshot(0);
             }

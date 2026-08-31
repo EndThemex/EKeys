@@ -1,12 +1,12 @@
 /*
  * main.cpp
  *
- * 阶段 03 入口：
- *
+ * 启动顺序：
  *     Serial.begin → 背光 → NV3007 begin → fill black
  *                → LVGL init
  *                → SPIFFS 挂载（失败则 LOG_ERROR 死循环）
- *                → AppContext::init()（配置加载 / MainTask / DisplayTask）
+ *                → AppContext::init()（配置加载 / MainTask / DisplayTask；
+ *                  阶段 06 服务（WiFi/NTP/TCP/扬声器）由 MainTask::begin() 初始化）
  *                → loop() 中只跑 MainTask::loop()（DisplayTask 接管 LVGL tick）
  *
  * 屏幕驱动代码在 src/display/ 与 src/ui/，配置层在 src/config/ 与 src/services/。
@@ -26,7 +26,7 @@ void setup()
     Serial.begin(115200);
     delay(200);
 
-    LOG_INFO("MAIN", "===== EKeys boot (stage 03) =====");
+    LOG_INFO("MAIN", "===== EKeys boot (stage 06) =====");
 
     ekeys::Backlight::instance().begin();
 
