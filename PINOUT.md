@@ -36,7 +36,8 @@
 | IO21 | LED_PWR_CTRL | 输出 | RGB LED  | LED 供电使能                       |
 | IO38 | ROW2         | 输入 | 按键矩阵 | 行 2                               |
 | IO39 | ROW1         | 输入 | 按键矩阵 | 行 1                               |
-| IO41 | LCD_SDA      | 双向 | LCD 屏幕 | SPI 数据（MOSI）                   |
+| IO40 | LCD_SDA      | 双向 | LCD 屏幕 | SPI 数据（MOSI）                   |
+| IO41 | LCD_SCL      | 输出 | LCD 屏幕 | SPI 时钟（CLK）                    |
 | IO42 | LCD_DC       | 输出 | LCD 屏幕 | 数据/命令选择                      |
 | IO45 | INT          | 输入 | 扩展接口 | 中断输入                           |
 | IO46 | ROW0         | 输入 | 按键矩阵 | 行 0                               |
@@ -111,14 +112,16 @@
 
 ### 2.6 LCD 屏幕（SPI）
 
-| 引脚 | 信号名  | 方向 | 说明                   |
-| :--: | :------ | :--: | :--------------------- |
-| IO1  | LCD_BL  | 输出 | 背光 PWM 控制          |
-| IO2  | LCD_CS  | 输出 | SPI 片选               |
-| IO42 | LCD_DC  | 输出 | 数据/命令选择（DC/RS） |
-| IO41 | LCD_SDA | 输出 | SPI 数据（MOSI）       |
+| 引脚 | 信号名  | 方向 | 说明                         |
+| :--: | :------ | :--: | :--------------------------- |
+| IO1  | LCD_BL  | 输出 | 背光 PWM 控制                |
+| IO2  | LCD_CS  | 输出 | SPI 片选                     |
+| IO9  | LCD_DC  | 输出 | 数据/命令选择（DC/RS）       |
+| IO40 | LCD_SDA | 输出 | SPI 数据（MOSI）             |
+| IO41 | LCD_SCL | 输出 | SPI 时钟（CLK）              |
+|  —   | LCD_RST |  —   | 硬件直接拉低，**未分配引脚** |
 
-> **注意**：LCD 屏幕的 RST 信号直接硬件拉低，**未分配引脚控制**。
+> **注意**：阶段 01 末 `kPinLcdRst = GFX_NOT_DEFINED`，Arduino_GFX 在 `begin()` 时跳过 RST 操作。如果未来硬件改造需要软件复位，请在 `src/hardware/PinMap.h` 中重新指派引脚并同步本表。
 
 ### 2.7 I2S 音频
 

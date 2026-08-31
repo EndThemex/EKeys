@@ -28,8 +28,8 @@ EKeys/
 ├── PINOUT.md                   # 硬件引脚文档
 ├── ARCHITECTURE.md             # 本文件：项目结构设计
 │
-├── include/                    # 全局包含路径（lv_conf_local.h 等覆盖配置）
-│   └── lv_conf_local.h
+├── include/                    # 全局包含路径（lv_conf.h 等覆盖配置）
+│   └── lv_conf.h
 │
 ├── lib/                        # PlatformIO 本地库（不放入 src 的第三方/复用代码）
 │   └── README                  # 本地库占位说明
@@ -74,8 +74,8 @@ src/
 
 - `main.cpp` **禁止**放业务逻辑，只负责：
   1. 创建 `AppContext`；
-  2. 调用 `BootStage::runAll()`；
-  3. 在 `loop()` 中执行 LVGL tick。
+  2. 调用 `BootStage::runAll()`（阶段 02 之后引入）；
+  3. 阶段 01 末：在 `setup()` 中调用 `Backlight::begin` → `DisplayDriver::begin` → `LvglPort::init` → `AppContext::init`；占位主屏 `ui_minimal::create()` 已删除；在 `loop()` 中按 5ms 跑 `MainTask::loop()`，LVGL tick 仍在 `loop()` 内调用 `LvglPort::tick()`（阶段 02 后移交 DisplayTask）。
 - 业务编排集中在 `MainTask::begin()` 与 `DisplayTask::begin()`。
 
 ### 3.2 任务层（FreeRTOS Tasks）
@@ -192,24 +192,79 @@ src/network/
 
 ### 3.9 显示与 UI（FEATURE_DOC §8）
 
+#### 3.9.1 驱动 / 端口层（自研代码，放在 `src/display/` 与 `src/ui/`）
+
 ```
 src/display/
-├── DisplayDriver.h/.cpp        # 包装 Arduino_GFX（NV3007）+ LVGL flush
-├── LvglPort.h/.cpp             # lv_init / lv_disp_draw_buf / lv_tick
-├── ThemePalette.h             # 主题色板（tft_theme）
-└── Backlight.h/.cpp           # LCD_BL PWM 控制
+├── DisplayDriver.h/.cpp        # 包装 Arduino_GFX（NV3007）初始化、fill、bitmap draw
+├── LvglPort.h/.cpp             # lv_init / lv_disp_draw_buf / flush_cb / tick
+├── ThemePalette.h              # 主题色板（tft_theme，阶段 05）
+└── Backlight.h/.cpp            # LCD_BL 控制（阶段 01 GPIO；阶段 05 改 LEDC PWM）
 ```
 
 ```
-src/ui/                          # SquareLine Studio 输出 + 自定义辅助
-├── ui.h/.cpp                    # SquareLine 生成（勿手工改）
-├── ui_events.h/.cpp             # SquareLine 生成
-├── ui_helpers.h/.cpp            # 自定义辅助：StatusBar 更新 / 设置屏反向同步
-├── ui_StatusBar.h/.cpp          # 状态条实现（FEATURE_DOC §8.2）
-└── screens/                      # 若 SquareLine 按屏输出文件，可分子目录
+src/ui/
+├── ui_minimal.h/.cpp           # 占位主屏空实现（阶段 01 末已删除 demo UI 内容；
+│                               #  阶段 02 后 DisplayTask 默认显示黑屏 / 阶段 05 由 SquareLine 接管）
+├── ui.h/.cpp                   # SquareLine Studio 生成（勿手工改，阶段 05 启用）
+├── ui_events.h/.cpp            # SquareLine 生成
+├── ui_helpers.h/.cpp           # 自定义辅助：StatusBar 更新 / 设置屏反向同步
+├── ui_StatusBar.h/.cpp         # 状态条实现（FEATURE_DOC §8.2）
+└── screens/                    # 若 SquareLine 按屏输出文件，可分子目录
 ```
 
-- `src/main.cpp` 中现有 NV3007 + LVGL 初始化代码应迁入 `display/` 与 `ui/`；`main.cpp` 只剩"启动 DisplayDriver + 装载 ui"。
+```
+src/hardware/
+└── PinMap.h                    # 集中所有 IO 定义；LCD 引脚按 PINOUT.md §2.6
+```
+
+#### 3.9.2 阶段 01 提前落地的"屏幕代码"
+
+为避免阶段 02 时再次回炉屏幕驱动，**阶段 01 已经把原 `src/main.cpp` 中 NV3007 + LVGL 的代码迁出**，搬迁关系如下：
+
+| 原 `src/main.cpp` 内容                                 | 阶段 01 新位置                                     | 变更说明                         |
+| ------------------------------------------------------ | -------------------------------------------------- | -------------------------------- |
+| `TFT_BL/CS/MOSI/SCLK/DC/RST` 等引脚宏                  | `src/hardware/PinMap.h`（`kPinLcd*`）              | —                                |
+| `gfx / bus` 创建、`nv3007_279_init_operations`         | `src/display/DisplayDriver.{h,cpp}`                | —                                |
+| `lvgl_display_init` / `my_disp_flush` / `lvgl_tick_cb` | `src/display/LvglPort.{h,cpp}`                     | —                                |
+| 背光 `pinMode(TFT_BL) / digitalWrite(HIGH)`            | `src/display/Backlight.{h,cpp}`                    | —                                |
+| `create_ui()`                                          | ~~`src/ui/ui_minimal.{h,cpp}`~~（已移除 / 空实现） | **已移除**：阶段 01 末删除占位屏 |
+
+落地后，`src/main.cpp` 不再含任何 NV3007 / LVGL 细节。**原 demo 的占位主屏（NV3007 标题 / 428x142 / ESP32-S3 + LVGL / TEST 按钮）已在阶段 01 末删除**，阶段 02 DisplayTask 接管后默认显示黑屏（背光常亮）；阶段 05 由 SquareLine 接管。
+
+#### 3.9.3 引脚约定
+
+按项目规则（`.trae/rules/rules.md`：引脚以 `PINOUT.md` 为准）。
+
+阶段 01 末按用户最新 `PINOUT.md §2.6` 校正 LCD 引脚：
+
+| 信号      | `PinMap.h` 常量                | `PINOUT.md` 引脚 | 说明                                                    |
+| --------- | ------------------------------ | ---------------- | ------------------------------------------------------- |
+| `LCD_BL`  | `kPinLcdBacklight = 1`         | IO1              | 背光 PWM 控制                                           |
+| `LCD_CS`  | `kPinLcdCs        = 2`         | IO2              | SPI 片选                                                |
+| `LCD_DC`  | `kPinLcdDc        = 9`         | IO9              | 数据/命令选择（DC/RS）                                  |
+| `LCD_SDA` | `kPinLcdMosi      = 40`        | IO40             | SPI 数据（MOSI）                                        |
+| `LCD_SCL` | `kPinLcdSclk      = 41`        | IO41             | SPI 时钟（CLK）                                         |
+| `LCD_RST` | `kPinLcdRst = GFX_NOT_DEFINED` | —                | 硬件直接拉低，未分配引脚；告诉 Arduino_GFX 跳过软件复位 |
+
+> 校正历史：
+>
+> 1. 阶段 01 初版 `PinMap.h` 沿用了原 demo 引脚（`BL=2 / CS=10 / MOSI=11 / SCLK=12`），与 `PINOUT.md §2.6` 不符；
+> 2. 阶段 01 中期按 PINOUT 校正到 `BL=1 / CS=2 / DC=42 / MOSI=41 / SCLK=12 / RST=21`，但 `SCLK=12` 与 `PINOUT.md` 的 `IO41` 冲突；
+> 3. 用户最新提供：IO40 = `LCD_SDA`、IO41 = `LCD_SCL`；
+> 4. 阶段 01 末用户确认 `LCD_RST` 硬件拉低、未接 GPIO，`PinMap.h` 改为 `kPinLcdRst = GFX_NOT_DEFINED`，Arduino_GFX 在 `begin()` 时跳过 RST 操作。
+
+#### 3.9.4 阶段 02 接管点
+
+阶段 02 后续工作：
+
+- `src/tasks/DisplayTask.{h,cpp}` 在 Core 0 创建 `xTaskCreatePinnedToCore`；
+- `LvglPort::tick(delta_ms)` 不再由 `loop()` 调用，改为 `DisplayTask::loop()` 内部调用；
+- `src/ui/ui_minimal` 升级为含时间标签的版本；
+- `src/message_types.h` 引入 `DisplayMessage` 队列，作为 MainTask → DisplayTask 的唯一通道。
+
+详见 [`docs/02-display-lvgl-port.md`](./docs/02-display-lvgl-port.md)。
+
 - `ui_helpers.cpp` 暴露 `ui_settings_request_apply()` / `ui_settings_request_save()`，对应 FEATURE_DOC §8.4。
 
 ### 3.10 RGB 灯光（FEATURE_DOC §9）
@@ -296,7 +351,7 @@ src/upgrade/
 | §5 私有协议       | `src/protocol/`                                                                                                                                                                                        |
 | §6 CMD_CONFIG_SET | `src/config/parseConfigSetCommand.cpp`                                                                                                                                                                 |
 | §7 网络           | `src/network/`                                                                                                                                                                                         |
-| §8 显示与 UI      | `src/display/`、`src/ui/`                                                                                                                                                                              |
+| §8 显示与 UI      | `src/display/{DisplayDriver,LvglPort,Backlight}.cpp`、`src/ui/{ui_minimal,ui,ui_events,ui_helpers,ui_StatusBar}.cpp`、`src/hardware/PinMap.h`（LCD 引脚）；详见 §3.9。                                 |
 | §9 RGB            | `src/rgb/`                                                                                                                                                                                             |
 | §10 音频          | `src/audio/`                                                                                                                                                                                           |
 | §11 语音          | `src/voice/`                                                                                                                                                                                           |
@@ -327,9 +382,16 @@ src/upgrade/
 ## 6. 构建与烧录相关文件
 
 - `platformio.ini`：`build_flags` 区域追加 LVGL 编译选项（`-DLV_CONF_INCLUDE_SIMPLE` 等）以及 `ARDUINO_USB_MODE=1` 的开关（FEATURE_DOC §1.1）。
-- `include/lv_conf_local.h`：覆盖 LVGL 默认配置（颜色深度、主题、字体子集）。
+- `include/lv_conf.h`：覆盖 LVGL 默认配置（颜色深度、主题、字体子集）。`build_flags` 同步追加 `-DLV_CONF_INCLUDE_SIMPLE` 与 `-I include`。
 - `partitions-16MB.csv`：当前 16 MB 分区已划分；SPIFFS 占用 3.875 MB，可容纳 8 套 keymap + 音频 + 字体 + Profile 图标。
 - `tools/`：打包 SPIFFS 前的预处理（如 PNG → base64 编码、keymap 校验）。
+
+### 屏幕驱动构建要点（阶段 01 现状）
+
+- `lib/GFX Library for Arduino/`：继续保留 1.6.0，作为 `DisplayDriver` 唯一依赖（`Arduino_ESP32SPI` / `Arduino_NV3007` / `nv3007_279_init_operations`）。
+- LVGL 缓冲区 20 行 × 428 px × 2 B ≈ 17 KB（参见 `src/display/LvglPort.cpp::kLvglBufferLines`）。
+- `LV_COLOR_16_SWAP`：默认 0；通过 `#if LV_COLOR_16_SWAP != 0` 分支，保证与 LVGL 不同 swap 配置兼容。
+- `lib_deps` 暂不增加 `lvgl/lvgl@8.3.11` 之外的任何屏幕相关依赖；阶段 05 后再评估是否切到 `lvgl@9.x`。
 
 ---
 
@@ -359,14 +421,19 @@ src/upgrade/
 
 ## 9. 与现有 demo 的迁移清单
 
-当前 `src/main.cpp` 内已实现的内容需迁移到目标目录：
+> **阶段 01 状态**：屏幕相关的迁移已经完成；下面表为现状。
 
-| 现有位置（`src/main.cpp`）           | 目标位置                                                             |
-| ------------------------------------ | -------------------------------------------------------------------- |
-| `TFT_*` 引脚宏 / `gfx` / `bus`       | `src/display/DisplayDriver.cpp`                                      |
-| `lvgl_display_init` / `lvgl_tick_cb` | `src/display/LvglPort.cpp`                                           |
-| `create_ui()` 占位                   | `src/ui/ui.cpp`（SquareLine 接管）+ `src/ui/ui_helpers.cpp` 启动钩子 |
-| `setup()` 中的"启动顺序"             | `src/app/BootStage.cpp`                                              |
-| `loop()` 中 LVGL tick                | `src/tasks/DisplayTask.cpp`（DisplayTask 接管 tick）                 |
+| 原 `src/main.cpp` 内容                | 现位置                                                                                                    | 阶段 01 状态                                                |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `TFT_*` 引脚宏                        | `src/hardware/PinMap.h`                                                                                   | ✅ 已落地                                                   |
+| `gfx / bus` / `nv3007_279_init_ops`   | `src/display/DisplayDriver.cpp`                                                                           | ✅ 已落地                                                   |
+| `lvgl_display_init` / `my_disp_flush` | `src/display/LvglPort.cpp`                                                                                | ✅ 已落地                                                   |
+| `lvgl_tick_cb`                        | `src/display/LvglPort.cpp::tick()`                                                                        | ✅ 已落地（仍在 `loop()` 中调用，阶段 02 移交 DisplayTask） |
+| 背光 `pinMode / digitalWrite`         | `src/display/Backlight.cpp`                                                                               | ✅ 已落地                                                   |
+| `create_ui()` 占位                    | `src/ui/ui_minimal.cpp`（空实现；阶段 01 末删除 demo UI 内容）                                            | ✅ 已删除                                                   |
+| `setup()` 中的"启动顺序"              | `src/app/BootStage.cpp`（计划中，阶段 02 之后引入）                                                       | ⏳ 待落地                                                   |
+| `loop()` 中 LVGL tick                 | `src/tasks/DisplayTask.cpp`（阶段 02 接 tick）                                                            | ⏳ 阶段 02                                                  |
+| 双任务拆分（MainTask + DisplayTask）  | `src/tasks/{MainTask,DisplayTask}.cpp`                                                                    | 🟡 MainTask 已落地，DisplayTask 待阶段 02                   |
+| `AppContext::init()` 编排             | `src/main.cpp`（阶段 01 末改为串接 `Backlight→DisplayDriver→LvglPort→AppContext`，不再调用 `ui_minimal`） | ✅ 已在 `main.cpp` 中串联                                   |
 
-迁移完成后，`src/main.cpp` 仅保留约 30 行：`Serial.begin` → `AppContext::init()` → `MainTask::begin()` / `DisplayTask::begin()`。
+迁移完成后，`src/main.cpp` 仅保留约 60 行：`Serial.begin` → `Backlight.begin` → `DisplayDriver.begin` → `LvglPort.init` → `AppContext.init` → 阶段 02 后改为 `DisplayTask.begin`。
