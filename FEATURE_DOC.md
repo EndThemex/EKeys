@@ -54,7 +54,7 @@
 
 ### 2.2 旋钮（板载 EC11）\[RotaryEncoder]
 
-- 引脚：`CLK=5, DT=21, SW=9`（使用 `ESP32Encoder` PCNT + `OneButton`）
+- 引脚：`CLK=6, DT=7, SW=5`（使用 `ESP32Encoder` PCNT + `OneButton`）
 - 旋转阈值：`ENCODER_STEP_THRESOLD=2`，旋转超时 `ROTATION_TIMEOUT=500ms`
 - 按键事件：`Click` / `DoubleClick`
 - 用途：**仅用于本机屏幕导航**（不进键映射）：
@@ -164,7 +164,7 @@
 ### 5.1 传输层 \[SerialProtocol]
 
 - 双通道：USB CDC Serial + TCP（自动发现）
-- 上电后 115200 波特率
+- USB CDC 115200 波特率（UART0 已不再承担日志，仅作烧录用）
 - 命令按 JSON 行解析
 - 响应命令约定：`cmd | 0x80` 为响应包
 
@@ -331,7 +331,7 @@
 
 ### 10.2 麦克风 \[Mic]
 
-- I2S 引脚：BCLK=11, WS=17, DATA=18（INMP441）
+- I2S 引脚：BCLK=IO10, WS=IO12, SCK=IO13, SDOUT(到 ESP32)=IO11（ICS43434）
 - 采样率 16kHz，缓冲 512 samples
 - 当前 main 循环未启用麦克风读取（代码注释保留）
 - 语音识别所需的麦克风由 [VoiceRecognizer](#111-语音识别) 自行管理（使用同一 Mic 通道）
