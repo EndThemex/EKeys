@@ -11,6 +11,7 @@
 
 #include <array>
 
+#include "input/MatrixScanner.h" // kMatrixKeyCount
 #include "output/IKeyboard.h"
 #include "utils/keymap_types.h"
 
@@ -53,7 +54,7 @@ namespace ekeys
          */
         void notifyLedEdge(uint8_t keyId, bool pressed);
 
-        Configuration &config_;  // 不持有所有权
+        Configuration &config_;                           // 不持有所有权
         std::array<KeyMapping, kMatrixKeyCount + 1> map_; // 下标 1~11
     };
 

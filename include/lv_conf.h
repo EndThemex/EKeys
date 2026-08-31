@@ -96,6 +96,9 @@
 #define LV_FONT_MONTSERRAT_20_COMPRESSED 0
 #define LV_FONT_MONTSERRAT_28_COMPRESSED 0
 
+/* 默认字体：14 已关闭，指向已启用的 20，否则编译报 undeclared */
+#define LV_FONT_DEFAULT &lv_font_montserrat_20
+
 /*====================
    Demo / 示例
  *====================*/
