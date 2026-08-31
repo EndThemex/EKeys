@@ -35,7 +35,7 @@ namespace ekeys
   /*
    * 时间载荷：单字符串（"HH:MM:SS"），避免每个组件各自管理 buffer。
    *
-   * 阶段 02 之后会扩展其它 union 字段（SettingUpdateSettingsSnapshot 等）。
+   * 阶段 04：SettingUpdate 载荷为亮度 / 主题（CMD_CONFIG_SET 后刷新）。
    */
   struct DisplayMessage
   {
@@ -43,6 +43,11 @@ namespace ekeys
     union
     {
       char time_text[16]; /* "HH:MM:SS" + '\0' */
+      struct
+      {
+        uint8_t tft_brightness; /* 0~100 */
+        uint8_t tft_theme;
+      } setting;
     } payload;
   };
 

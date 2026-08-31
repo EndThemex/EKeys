@@ -38,6 +38,11 @@ namespace ekeys
         void setDisplayQueue(void *queue_handle) { display_queue_ = queue_handle; }
 
         /*
+         * active_keymap_profile 变更后重新加载键映射（阶段 04 任务 4.8）。
+         */
+        void reloadKeymap() { resolver_.begin(); }
+
+        /*
          * 由 Arduino loop() 调用，约 5ms 一次。
          */
         void loop();

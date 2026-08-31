@@ -28,8 +28,7 @@ void setup()
 
     LOG_INFO("MAIN", "===== EKeys boot (stage 03) =====");
 
-    ekeys::Backlight backlight;
-    backlight.begin();
+    ekeys::Backlight::instance().begin();
 
     if (!ekeys::DisplayDriver::instance().begin(10000000))
     {

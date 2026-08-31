@@ -14,6 +14,12 @@
 | 06   | [06-network-voice-rgb-audio.md](./06-network-voice-rgb-audio.md) | WiFi / BLE / 语音 / RGB / 音频         | 04    |
 | 07   | [07-placeholder-completion.md](./07-placeholder-completion.md)   | 2.4G / 频谱 / OTA / 占位命令补齐       | 06    |
 
+## 其他文档
+
+| 文档 | 说明 |
+| ---- | ---- |
+| [desktop-app-protocol.md](./desktop-app-protocol.md) | 桌面 App 开发对接：通信协议、命令与字段约定 |
+
 ## 使用方式
 
 1. 阅读 `../FEATURE_DOC.md` 了解整体功能背景。

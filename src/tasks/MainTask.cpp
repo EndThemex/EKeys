@@ -19,6 +19,7 @@
 #include "config/Configuration.h"
 #include "message_types.h"
 #include "output/IKeyboard.h"
+#include "protocol/SerialProtocol.h"
 
 namespace ekeys
 {
@@ -75,6 +76,9 @@ namespace ekeys
 
     void MainTask::loop()
     {
+        /* 协议层轮询（CDC JSON 行收发），不依赖 keyboard_ 注入 */
+        SerialProtocol::instance().poll();
+
         if (keyboard_ == nullptr)
         {
             return;

@@ -37,6 +37,12 @@ namespace ekeys
             keyboard_ = std::move(kb);
         }
 
+        /*
+         * work_mode 变更时重建键盘实例（阶段 04 任务 4.8；
+         * KeyboardFactory::recreate() 语义：create + setKeyboard）。
+         */
+        void applyWorkMode(uint8_t mode);
+
     private:
         AppContext() = default;
 
