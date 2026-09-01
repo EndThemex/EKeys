@@ -101,26 +101,20 @@ namespace ekeys
     static inline lv_color_t cellNormalFg() { return lv_color_hex(0xC0C8D4); }
     static inline lv_color_t cellActiveFg() { return lv_color_hex(0xFFFFFF); }
 
-    /* 3×3 矩阵在屏幕上的位置参数（与 KeyScanConfig.h 的梯形布局保持视觉一致）。
-     * 屏幕 428x142，可用区域 y=58..118（高度 60），x=8..420（宽度 412）。
-     * 单元格：宽 ≈ 412/3 ≈ 137，高 ≈ 60/3 = 20（但每行多塞点空隙，留 18）。
-     * 实际渲染 cell label 居中在格内；这里只用 (x0,y0,w,h) 算 9 个格子的中心。
-     *
-     * 物理键布局（KeyScanConfig.h::keyMap）：
-     *   ROW0: COL0=1, COL1=2               → 1 2 . .
-     *   ROW1: COL1=3, COL2=4, COL3=5       → . 3 4 5
-     *   ROW2: COL0=6, COL1=7, COL2=8, COL3=9 → 6 7 8 9
+    /* 3×3 矩阵在屏幕上的位置参数。
+     * 屏幕 428x142：
+     *   y=58..122 高度 64；x=8..420 宽度 412。
+     *   cellW = (412 - 4*2) / 3 = 134
+     *   cellH = (64  - 4*2) / 3 = 18  ← 14pt 行高约 18~20，留 2px 内边距刚刚好
      *
      * 视觉上我们把 9 个键画成规整的 3×3（按 keyId 排序），左到右、上到下：
      *   1 2 3
      *   4 5 6
-     *   7 8 9
-     * 视觉一致比"严格梯形"更易读，物理梯形只是给人操作的位置提示，不需要
-     * 在 UI 里复刻。 */
+     *   7 8 9 */
     static constexpr int16_t MATRIX_X0 = 8;
-    static constexpr int16_t MATRIX_Y0 = 60;
+    static constexpr int16_t MATRIX_Y0 = 58;
     static constexpr int16_t MATRIX_W = 412;
-    static constexpr int16_t MATRIX_H = 60;
+    static constexpr int16_t MATRIX_H = 64;
     static constexpr int16_t CELL_GAP = 4;
 
     static inline int16_t cellX(uint8_t i)
@@ -149,32 +143,49 @@ namespace ekeys
         lv_obj_t *root_obj = root();
         lv_obj_set_style_bg_opa(root_obj, LV_OPA_TRANSP, LV_PART_MAIN);
 
-        /* 标题 */
+        /* ---- y=0..26 标题区 ---- */
         lv_obj_t *title = lv_label_create(root_obj);
         lv_label_set_text(title, "KeyMap");
         lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
         lv_obj_set_style_text_font(title, &lv_font_montserrat_20, LV_PART_MAIN);
-        lv_obj_align(title, LV_ALIGN_TOP_LEFT, 8, 4);
+        lv_obj_align(title, LV_ALIGN_TOP_LEFT, 8, 2);
 
-        /* 标题右侧 profile 文本 */
+        /* 标题右侧 profile 文本（[1/4] Numpad 等） */
         profile_label_ = lv_label_create(root_obj);
         lv_obj_set_style_text_color(profile_label_, lv_color_hex(0x4DA3FF), LV_PART_MAIN);
         lv_obj_set_style_text_font(profile_label_, &lv_font_montserrat_14, LV_PART_MAIN);
-        lv_obj_align(profile_label_, LV_ALIGN_TOP_RIGHT, -8, 8);
+        lv_obj_align(profile_label_, LV_ALIGN_TOP_RIGHT, -8, 6);
 
-        /* 分割线 */
-        lv_obj_t *line = lv_obj_create(root_obj);
-        lv_obj_set_size(line, SCREEN_W_PX - 16, 1);
-        lv_obj_set_style_bg_color(line, lv_color_hex(0x404040), LV_PART_MAIN);
-        lv_obj_set_style_border_width(line, 0, LV_PART_MAIN);
-        lv_obj_align(line, LV_ALIGN_TOP_MID, 0, 28);
+        /* ---- y=28 分割线 ---- */
+        lv_obj_t *line1 = lv_obj_create(root_obj);
+        lv_obj_remove_style_all(line1);
+        lv_obj_set_size(line1, SCREEN_W_PX - 16, 1);
+        lv_obj_set_style_bg_color(line1, lv_color_hex(0x404040), LV_PART_MAIN);
+        lv_obj_set_style_bg_opa(line1, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_pos(line1, 8, 28);
 
-        /* 3x3 网格 */
+        /* ---- y=32..52 当前选中键详情 ---- */
+        selected_label_ = lv_label_create(root_obj);
+        lv_obj_set_style_text_color(selected_label_, lv_color_hex(0xFFCC00), LV_PART_MAIN);
+        lv_obj_set_style_text_font(selected_label_, &lv_font_montserrat_14, LV_PART_MAIN);
+        lv_obj_align(selected_label_, LV_ALIGN_TOP_LEFT, 8, 34);
+
+        /* ---- y=54 分割线 ---- */
+        lv_obj_t *line2 = lv_obj_create(root_obj);
+        lv_obj_remove_style_all(line2);
+        lv_obj_set_size(line2, SCREEN_W_PX - 16, 1);
+        lv_obj_set_style_bg_color(line2, lv_color_hex(0x404040), LV_PART_MAIN);
+        lv_obj_set_style_bg_opa(line2, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_pos(line2, 8, 54);
+
+        /* ---- y=58..122 3×3 矩阵 ----
+         * cellH = 18 px 放下 14pt 行高，label = cell 同位同尺寸 + 居中样式
+         * 文本内容由 refresh() 写入 */
         const int16_t w = cellWpx();
         const int16_t h = cellHpx();
         for (uint8_t i = 0; i < 9; ++i)
         {
-            /* 背景 */
+            /* cell 背景框 */
             lv_obj_t *bg = lv_obj_create(root_obj);
             lv_obj_remove_style_all(bg);
             lv_obj_set_size(bg, w, h);
@@ -184,33 +195,32 @@ namespace ekeys
             lv_obj_set_style_radius(bg, 4, LV_PART_MAIN);
             cell_bg_[i + 1] = bg;
 
-            /* 数字 + 标签：上面 keyId，下面短标签
-             * 用 2 个 label 叠加（keyId 用 14pt 小字灰，映射标签用 14pt 白）。
-             * 简洁起见合并到一个 label："1→A" 这种格式。 */
+            /* 文字 label：cell 大小 = label 大小，文本居中样式由样式保证
+             * cellH=18 足够放下 14pt 行高（~16~18px）；label 设置与 cell 同位同尺寸，
+             * 内部 LV_TEXT_ALIGN_CENTER 让文字水平居中、LVGL 默认基线对齐自动垂直居中。
+             * 这样不依赖硬编码 -6/-7 偏移，文本长度变化也能居中。 */
             lv_obj_t *lab = lv_label_create(root_obj);
             lv_obj_set_style_text_color(lab, cellNormalFg(), LV_PART_MAIN);
             lv_obj_set_style_text_font(lab, &lv_font_montserrat_14, LV_PART_MAIN);
-            /* 把 label 居中放在 cell 内 */
-            lv_obj_align(lab, LV_ALIGN_CENTER, 0, 0);
-            /* LVGL 8.3 label 默认以左上角为锚点居中到 cell，需要给 cell 同样的
-             * 中心坐标。我们直接给绝对坐标 + 文本宽度补偿麻烦，所以采用：
-             * 先 set 文本，再 set 坐标为 cell 中心，然后 update_layout 取宽高，
-             * 再用 set_x 减半宽微调。 */
-            char buf[8];
-            snprintf(buf, sizeof(buf), "%u", i + 1);
-            lv_label_set_text(lab, buf);
-            lv_obj_set_pos(lab,
-                           cellX(i) + w / 2 - 6,
-                           cellY(i) + h / 2 - 7);
+            lv_obj_set_style_text_align(lab, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+            lv_obj_set_size(lab, w, h);
+            lv_obj_set_pos(lab, cellX(i), cellY(i));
+            /* 文本内容由 refresh() 写入 */
             cell_labels_[i + 1] = lab;
         }
 
-        /* 底部 hint */
-        lv_obj_t *hint = lv_label_create(root_obj);
-        lv_label_set_text(hint, "KNOB pick  K2 profile  K1 back");
-        lv_obj_set_style_text_color(hint, lv_color_hex(0x6B7280), LV_PART_MAIN);
-        lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, LV_PART_MAIN);
-        lv_obj_align(hint, LV_ALIGN_BOTTOM_RIGHT, -8, -4);
+        /* ---- y=120..138 底部 hint 区 ---- */
+        lv_obj_t *hint_left = lv_label_create(root_obj);
+        lv_label_set_text(hint_left, "K2 next");
+        lv_obj_set_style_text_color(hint_left, lv_color_hex(0x6B7280), LV_PART_MAIN);
+        lv_obj_set_style_text_font(hint_left, &lv_font_montserrat_14, LV_PART_MAIN);
+        lv_obj_align(hint_left, LV_ALIGN_BOTTOM_LEFT, 8, -4);
+
+        lv_obj_t *hint_right = lv_label_create(root_obj);
+        lv_label_set_text(hint_right, "KNOB pick  K1 back");
+        lv_obj_set_style_text_color(hint_right, lv_color_hex(0x6B7280), LV_PART_MAIN);
+        lv_obj_set_style_text_font(hint_right, &lv_font_montserrat_14, LV_PART_MAIN);
+        lv_obj_align(hint_right, LV_ALIGN_BOTTOM_RIGHT, -8, -4);
 
         refresh();
     }
@@ -218,6 +228,7 @@ namespace ekeys
     void KeyMapPage::teardownUi()
     {
         profile_label_ = nullptr;
+        selected_label_ = nullptr;
         for (uint8_t i = 0; i < 10; ++i)
         {
             cell_labels_[i] = nullptr;
@@ -282,6 +293,16 @@ namespace ekeys
                  p.name);
         lv_label_set_text(profile_label_, profBuf);
 
+        /* 当前选中键的详细映射（顶栏黄色文本） */
+        if (selected_label_ != nullptr)
+        {
+            char lbl[8];
+            labelForKeyId(selectedKeyId_, lbl, sizeof(lbl));
+            char selBuf[32];
+            snprintf(selBuf, sizeof(selBuf), "KEY%u = %s", (unsigned)selectedKeyId_, lbl);
+            lv_label_set_text(selected_label_, selBuf);
+        }
+
         /* 矩阵单元：刷新背景色 + 文本 */
         for (uint8_t i = 1; i <= 9; ++i)
         {
@@ -292,9 +313,9 @@ namespace ekeys
                                           LV_PART_MAIN);
             if (cell_labels_[i] != nullptr)
             {
-                /* 重画文本为 "keyId→<label>" */
-                char mapTxt[8];
-                char lbl[5];
+                /* 重画文本为 "keyId><label>" */
+                char mapTxt[12];
+                char lbl[8];
                 labelForKeyId(i, lbl, sizeof(lbl));
                 snprintf(mapTxt, sizeof(mapTxt), "%u>%s", i, lbl);
                 lv_label_set_text(cell_labels_[i], mapTxt);

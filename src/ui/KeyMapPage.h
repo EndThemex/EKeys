@@ -10,18 +10,16 @@ namespace ekeys
      *
      * 功能：
      *   - 旋钮：切换当前编辑的物理按键（1..9）
-     *   - KEY2：选中"profile 行" → 进入下一项：选 profile（4 个预设循环）
-     *   - KEY3..KEY9：直接跳到对应物理键，进入单键编辑（按一下切换该键
-     *     在"当前 profile"里的下一个候选 HID 码）
+     *   - KEY2：切到下一个 profile（4 个预设循环）
+     *   - KEY3..KEY9：直接跳到对应物理键（高亮选中）
      *
-     * 屏幕 428x142 布局：
-     *   y=4    标题 "KeyMap"
-     *   y=24   分割线
-     *   y=30   Profile: <name>   <active>
-     *   y=50   分割线
-     *   y=58..118  3x3 矩阵：keyId 1..9 映射的小标签
-     *                  选中行高亮
-     *   y=124  hint: KNOB pick  KEY2 profile  K1 back
+     * 屏幕 428x142 布局（垂直分区）：
+     *   y=0..26    标题 "KeyMap"              右上 "[i/4] <profile 名>"
+     *   y=28       分割线
+     *   y=32..50   当前选中键详情  "KEY<n>: <label>"  （左侧高亮黄）
+     *   y=54       分割线
+     *   y=58..122  3×3 矩阵  高 64，cell 高 18，14pt 字体 + 居中样式
+     *   y=126..138 hint 行  左：K2 next  右：KNOB pick  K1 back
      *
      * 单击旋钮 = 等价 KEY2（profile 行循环切预设）
      */
@@ -53,6 +51,7 @@ namespace ekeys
 
         /* UI 对象指针 */
         lv_obj_t *profile_label_{nullptr};
+        lv_obj_t *selected_label_{nullptr};   // 当前选中键的详细映射
         lv_obj_t *cell_labels_[10]{nullptr}; // index 0 占位
         lv_obj_t *cell_bg_[10]{nullptr};     // 高亮底色
     };
