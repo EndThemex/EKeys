@@ -45,6 +45,14 @@ public:
     LightEffect currentEffect() const { return currentEffect_; }
     static const char* effectName(LightEffect e);
 
+    // 亮度（0~255）。番茄钟等外部模块可读 / 写。
+    uint8_t brightness() const { return brightness_; }
+    void    setBrightnessLevel(uint8_t b);  // 仅写 _brightness，不立即生效；外部负责 tick()
+
+    // 直接访问 LED 缓冲区（番茄钟等需要临时覆盖颜色时使用）。
+    CRGB    *leds()       { return leds_; }
+    void     show();      // 立即 flush 到 LED
+
     // 每帧推进：动态灯效（Rainbow/Wave/Pulse）每 30ms 调一次。
     // 静态灯效不需要推进。
     void tick();
@@ -54,6 +62,7 @@ private:
     CRGB leds_[NUM_LEDS];
     bool enabled_ = false;
     LightEffect currentEffect_ = LightEffect::Off;
+    uint8_t brightness_ = 80;
 };
 
 }  // namespace ekeys

@@ -10,10 +10,19 @@ void RGBLightControl::begin() {
     digitalWrite(LED_VCC_CTRL, LOW);
 
     FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds_, NUM_LEDS);
-    FastLED.setBrightness(80);  // 0~255，80 较温和
+    FastLED.setBrightness(brightness_);  // 0~255，80 较温和
     FastLED.clear(true);        // 上电全灭
     enabled_ = false;
     currentEffect_ = LightEffect::Off;
+}
+
+void RGBLightControl::setBrightnessLevel(uint8_t b) {
+    brightness_ = b;
+    FastLED.setBrightness(brightness_);
+}
+
+void RGBLightControl::show() {
+    FastLED.show();
 }
 
 void RGBLightControl::turnOffAll() {

@@ -13,6 +13,8 @@
 - [04-key-event-dispatcher.md](04-key-event-dispatcher.md) — 事件结构与派发
 - [05-keyscan-manager.md](05-keyscan-manager.md) — 顶层 FreeRTOS 任务
 - [06-interface-contract.md](06-interface-contract.md) — 对外接口契约与配置
+- [07-pinout.md](07-pinout.md) — 引脚分配表
+- [08-menu-highlight-jitter.md](08-menu-highlight-jitter.md) — MenuPage 高亮条"断层"问题排查与修复
 
 ## 关键决策一览
 

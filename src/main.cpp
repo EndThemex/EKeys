@@ -7,6 +7,14 @@
 #include "keyscan/MatrixScanner.h"
 #include "keyscan/RotaryEncoder.h"
 #include "rgb/RGBLightControl.h"
+#include "ble/BleKeyboardSink.h"
+#include "ui/Pages.h"
+#include "ui/PageManager.h"
+#include "ui/MenuPage.h"
+#include "ui/RgbPage.h"
+#include "ui/TomatoPage.h"
+#include "ui/StatusPage.h"
+#include "ui/BlePage.h"
 
 using namespace ekeys;
 
@@ -25,30 +33,33 @@ using namespace ekeys;
  * ------------------------------------------------------------
  */
 
-/* Handle to the on-screen "currently pressed key" label */
-static lv_obj_t *g_key_label = NULL;
-static lv_obj_t *g_encoder_label = NULL;
-static lv_obj_t *g_rgb_label = NULL;
+/* Serial 日志串行化。不能用 portENTER_CRITICAL（关中断）包住 Serial.printf：
+ * uart 驱动在 TX FIFO 满时会等待 UART 中断释放信号量，关中断期间中断无法响应，
+ * printf 永久阻塞 -> CPU 中断看门狗超时（Interrupt wdt timeout）。
+ * 改用 FreeRTOS 互斥量：阻塞时可正常调度，UART 中断不受影响。
+ * 先 vsnprintf 到栈缓冲再写入，保证单行原子且持锁时间短。 */
+#include <stdarg.h>
+#include <stdio.h>
+static SemaphoreHandle_t g_serialMutex = nullptr;
+static void serialPrintf(const char *fmt, ...)
+{
+    char buf[256];
+    va_list args;
+    va_start(args, fmt);
+    int n = vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    if (n <= 0)
+        return;
+    if (n >= (int)sizeof(buf))
+        n = sizeof(buf) - 1;
+    bool locked = (g_serialMutex != nullptr &&
+                   xSemaphoreTake(g_serialMutex, pdMS_TO_TICKS(2000)) == pdTRUE);
+    Serial.write((const uint8_t *)buf, (size_t)n);
+    if (locked)
+        xSemaphoreGive(g_serialMutex);
+}
+#define SERIAL_PRINTF(...) serialPrintf(__VA_ARGS__)
 
-/* RGB 灯：单例。开始 Off，按 keyId=2 单击开/关；旋钮旋转切灯效。 */
-static RGBLightControl g_rgb;
-
-/* Thread-safe Serial.printf wrapper. Both the Arduino main loop() (Core 1)
-   and the keyscan task (Core 0) may print, so guard against interleaved
-   bytes in the same line. Must be defined before halt() uses it. */
-static portMUX_TYPE g_serialMux = portMUX_INITIALIZER_UNLOCKED;
-#define SERIAL_PRINTF(fmt, ...)            \
-    do                                     \
-    {                                      \
-        portENTER_CRITICAL(&g_serialMux);  \
-        Serial.printf(fmt, ##__VA_ARGS__); \
-        portEXIT_CRITICAL(&g_serialMux);   \
-    } while (0)
-
-/*
- * Fatal error: print once, then halt silently so the message is not
- * drowned out by repeated output.
- */
 static void halt(const char *msg)
 {
     SERIAL_PRINTF("[FATAL] %s\n", msg);
@@ -59,12 +70,6 @@ static void halt(const char *msg)
     }
 }
 
-/*
- * Allocation helper: returns NULL on OOM after halting. Lets the call
- * sites stay tidy:
- *
- *     Arduino_GFX *gfx = alloc(new Arduino_NV3007(...));
- */
 template <typename T>
 static T *alloc(T *p)
 {
@@ -79,19 +84,10 @@ static T *alloc(T *p)
  * ------------------------------------------------------------
  * Display configuration
  * ------------------------------------------------------------
- *
- * Native:
- *
- *     142 x 428
- *
- * After rotation 1:
- *
- *     428 x 142
  */
 #define TFT_WIDTH 142
 #define TFT_HEIGHT 428
-#define SCREEN_WIDTH 428
-#define SCREEN_HEIGHT 142
+/* 旋转 1 后：428 x 142，与 ui/Pages.h 里的 SCREEN_W_PX/SCREEN_H_PX 一致 */
 
 /*
  * ------------------------------------------------------------
@@ -126,48 +122,76 @@ Arduino_GFX *gfx = alloc(new Arduino_NV3007(
  * LVGL configuration
  * ------------------------------------------------------------
  */
-
 static lv_disp_draw_buf_t draw_buf;
-
-/*
- * 428 x 20 x RGB565
- *
- * Approximately:
- *
- *     428 * 20 * 2 = 17.1 KB
- *
- * Using partial rendering keeps RAM usage low.
- */
 #define LVGL_BUFFER_LINES 20
-
-static lv_color_t lv_buf1[SCREEN_WIDTH * LVGL_BUFFER_LINES];
-static lv_color_t lv_buf2[SCREEN_WIDTH * LVGL_BUFFER_LINES];
-
-/*
- * ------------------------------------------------------------
- * Display flush
- * ------------------------------------------------------------
- */
+static lv_color_t lv_buf1[SCREEN_W_PX * LVGL_BUFFER_LINES];
+static lv_color_t lv_buf2[SCREEN_W_PX * LVGL_BUFFER_LINES];
 
 static void my_disp_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
 {
     uint32_t width = (area->x2 - area->x1 + 1);
     uint32_t height = (area->y2 - area->y1 + 1);
-
-    /*
-     * LVGL RGB565 byte order
-     *
-     * LV_COLOR_16_SWAP = 0
-     *
-     * Therefore use draw16bitRGBBitmap().
-     */
 #if LV_COLOR_16_SWAP != 0
     gfx->draw16bitBeRGBBitmap(area->x1, area->y1, (uint16_t *)&color_p->full, width, height);
 #else
     gfx->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t *)&color_p->full, width, height);
 #endif
-
     lv_disp_flush_ready(disp_drv);
+}
+
+static bool lvgl_display_init()
+{
+    lv_disp_draw_buf_init(&draw_buf, lv_buf1, lv_buf2, SCREEN_W_PX * LVGL_BUFFER_LINES);
+
+    static lv_disp_drv_t disp_drv;
+    lv_disp_drv_init(&disp_drv);
+    disp_drv.hor_res = SCREEN_W_PX;
+    disp_drv.ver_res = SCREEN_H_PX;
+    /* 必须手动挂上 draw_buf：lv_disp_drv_register() 不会自动赋值，
+     * 漏掉会导致注册的驱动 draw_buf==NULL，首次刷新在
+     * lv_refr.c:608 (draw_buf->last_area) 空指针崩溃 (LoadProhibited, EXCVADDR=0x18)。 */
+    disp_drv.draw_buf = &draw_buf;
+    disp_drv.flush_cb = my_disp_flush;
+
+    lv_disp_t *disp = lv_disp_drv_register(&disp_drv);
+    if (disp == NULL)
+    {
+        halt("lv_disp_drv_register() returned NULL");
+    }
+
+    /* LVGL 默认把屏幕背景色硬编码为 lv_color_white()，
+     * 主题 (LV_USE_THEME_DEFAULT) 也会给屏幕应用浅色背景。
+     * 必须在 lv_disp_drv_register() 之后立即把屏幕背景改成深色，
+     * 否则在没有其他对象覆盖的区域会出现全白屏幕。 */
+    lv_obj_t *scr = lv_scr_act();
+    lv_obj_set_style_bg_color(scr, lv_color_hex(0x101820), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
+
+    return true;
+}
+
+/*
+ * ------------------------------------------------------------
+ * PageManager + Pages
+ * ------------------------------------------------------------
+ */
+static RGBLightControl g_rgb;
+static BleKeyboardSink g_bleKbd;
+static MenuPage g_menu;
+static RgbPage g_rgb_page{g_rgb};
+static TomatoPage g_tomato_page{g_rgb};
+static StatusPage g_status_page{g_rgb};
+static BlePage g_ble_page{g_bleKbd};
+
+static PageManager g_pm;
+
+static void registerAllPages()
+{
+    g_pm.registerPage(&g_menu);
+    g_pm.registerPage(&g_rgb_page);
+    g_pm.registerPage(&g_tomato_page);
+    g_pm.registerPage(&g_status_page);
+    g_pm.registerPage(&g_ble_page);
 }
 
 /*
@@ -176,8 +200,6 @@ static void my_disp_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_col
  * ------------------------------------------------------------
  */
 
-/* Destructively drain a FreeRTOS queue, invoking fn(value) for each item.
-   The template lets the caller keep the queue element type private. */
 template <typename T, typename Fn>
 static void drainQueue(QueueHandle_t q, Fn &&fn)
 {
@@ -196,37 +218,28 @@ static void drainQueue(QueueHandle_t q, Fn &&fn)
  * ------------------------------------------------------------
  *
  * 单独的 FreeRTOS 任务跑 1ms 周期的矩阵扫描，
- * 事件直接通过 Serial 打印，方便硬件验证。
+ * 事件直接通过 Serial 打印，并按事件类型分发到 PageManager / RGB。
  */
-
 static KeyScanConfig g_keyCfg{};
 static MatrixScanner g_matrix{g_keyCfg};
 static RotaryEncoder g_encoder;
-/* Polled in order every cycle. Initializer-list ctor requires implicit
-   base-class pointer conversion, which std::initializer_list<T*> does not
-   perform — build the vector element-by-element instead. */
 static std::vector<IKeySource *> g_sources{static_cast<IKeySource *>(&g_matrix),
                                            static_cast<IKeySource *>(&g_encoder)};
 static KeyEventList g_eventBuf;
 static TaskHandle_t g_scanTaskHandle = nullptr;
 
-/* keyId=2 (ROW0/COL1) 的"按下"事件从 keyscan 任务传给主循环。
-   volatile bool 即可，1ms 周期下 set/clear 自然同步。 */
-static volatile bool g_toggleRgbFlag = false;
+/* 路由队列：scanTask 写入，main loop 消费 */
+static QueueHandle_t g_keyPressQueue = nullptr;      // 按下：uint8_t keyId
+static QueueHandle_t g_keyReleaseQueue = nullptr;    // 释放：uint8_t keyId
+static QueueHandle_t g_encoderRotateQueue = nullptr; // 旋转：int8_t delta
+static QueueHandle_t g_encoderClickQueue = nullptr;  // 单击：空消息（占位）
+static QueueHandle_t g_encoderUiQueue = nullptr;     // 单击/双击/长按（统一 UI 用）
 
-/* Scan task pushes the currently-pressed key id (0 = none) to this queue.
-   The UI loop drains it to refresh the on-screen label.
-   容量 4 足够 —— 同一时刻最多一个键按下，1ms tick 下基本只装 1 条。 */
-static QueueHandle_t g_pressedKeyQueue = nullptr;
-
-/* 编码器事件专用队列：UI 单独消费 → 显示 "ENC: +1" / "ENC: click" 等。
-   容量 8：旋转一帧可能产生 1-4 步；单击/双击互不同时。 */
 struct EncoderUiMsg
 {
-    uint8_t kind; // 1 = rotate, 2 = click, 3 = double, 4 = long
-    int8_t delta; // ±1 / kind=rotate 时有意义
+    uint8_t kind; // 1=rotate, 2=click, 3=double, 4=long
+    int8_t delta; // 仅 rotate
 };
-static QueueHandle_t g_encoderQueue = nullptr;
 
 static void scanTaskEntry(void * /*arg*/)
 {
@@ -235,10 +248,9 @@ static void scanTaskEntry(void * /*arg*/)
     g_eventBuf.reserve(32);
     SERIAL_PRINTF("[KeyScan] task started, 1ms tick, 5ms debounce\n");
 
-    uint8_t lastReportedKeyId = 0; // 0 = 无按键
-
     const TickType_t period = pdMS_TO_TICKS(SCAN_INTERVAL_MS);
     TickType_t lastWake = xTaskGetTickCount();
+
     while (true)
     {
         g_eventBuf.clear();
@@ -249,65 +261,53 @@ static void scanTaskEntry(void * /*arg*/)
         {
             SERIAL_PRINTF("[KeyScan] %s\n", ev.toString().c_str());
 
-            // keyId=2 的"按下"事件：用于切换 RGB 灯总开关
-            if (ev.type == KeyEventType::Press && ev.keyId == 2)
+            switch (ev.type)
             {
-                g_toggleRgbFlag = true;
-            }
-
-            // 编码器事件另外入 UI 队列
-            if (g_encoderQueue != nullptr)
-            {
-                EncoderUiMsg msg{};
-                if (ev.type == KeyEventType::EncoderRotate)
+            case KeyEventType::Press:
+                if (ev.keyId >= 1 && ev.keyId <= 9 && g_keyPressQueue != nullptr)
                 {
-                    msg.kind = 1; // rotate
-                    msg.delta = ev.encoderDelta;
-                    xQueueSend(g_encoderQueue, &msg, 0);
+                    uint8_t k = ev.keyId;
+                    xQueueSend(g_keyPressQueue, &k, 0);
                 }
-                else if (ev.type == KeyEventType::EncoderClick)
+                break;
+            case KeyEventType::Release:
+                if (ev.keyId >= 1 && ev.keyId <= 9 && g_keyReleaseQueue != nullptr)
                 {
-                    // RotaryEncoder::poll() 中：
-                    //   单击 → encoderDelta = 1
-                    //   双击 → encoderDelta = 2
-                    //   长按 → encoderDelta = 3
-                    // 映射到 UI 协议的 2/3/4（1 留给 rotate）。
-                    switch (ev.encoderDelta)
-                    {
-                    case 1:
-                        msg.kind = 2;
-                        break; // click
-                    case 2:
-                        msg.kind = 3;
-                        break; // double
-                    case 3:
-                        msg.kind = 4;
-                        break; // long
-                    default:
-                        continue; // 未知值，丢弃
-                    }
-                    msg.delta = 0;
-                    xQueueSend(g_encoderQueue, &msg, 0);
+                    uint8_t k = ev.keyId;
+                    xQueueSend(g_keyReleaseQueue, &k, 0);
                 }
-            }
-        }
-
-        /* 计算当前按下的键（按 keyId 升序取第一个）；只在变化时上报
-           —— 避免每毫秒重复写队列导致 UI 反复重绘。 */
-        const uint32_t mask = g_matrix.stableMask();
-        uint8_t currentKeyId = 0;
-        for (uint8_t k = 1; k <= KEY_NUM; ++k)
-        {
-            if (mask & (1UL << (k - 1)))
-            {
-                currentKeyId = k;
+                break;
+            case KeyEventType::EncoderRotate:
+                if (g_encoderRotateQueue != nullptr)
+                {
+                    int8_t d = ev.encoderDelta;
+                    xQueueSend(g_encoderRotateQueue, &d, 0);
+                }
+                if (g_encoderUiQueue != nullptr)
+                {
+                    EncoderUiMsg m{1, ev.encoderDelta};
+                    xQueueSend(g_encoderUiQueue, &m, 0);
+                }
+                break;
+            case KeyEventType::EncoderClick:
+                if (g_encoderUiQueue != nullptr)
+                {
+                    EncoderUiMsg m{};
+                    if (ev.encoderDelta == 1)
+                        m.kind = 2;
+                    else if (ev.encoderDelta == 2)
+                        m.kind = 3;
+                    else if (ev.encoderDelta == 3)
+                        m.kind = 4;
+                    xQueueSend(g_encoderUiQueue, &m, 0);
+                }
+                if (ev.encoderDelta == 1 && g_encoderClickQueue != nullptr)
+                {
+                    uint8_t dummy = 1;
+                    xQueueSend(g_encoderClickQueue, &dummy, 0);
+                }
                 break;
             }
-        }
-        if (currentKeyId != lastReportedKeyId && g_pressedKeyQueue != nullptr)
-        {
-            xQueueSend(g_pressedKeyQueue, &currentKeyId, 0);
-            lastReportedKeyId = currentKeyId;
         }
 
         vTaskDelayUntil(&lastWake, period);
@@ -316,15 +316,16 @@ static void scanTaskEntry(void * /*arg*/)
 
 static void startKeyScanTask()
 {
-    g_pressedKeyQueue = xQueueCreate(4, sizeof(uint8_t));
-    if (g_pressedKeyQueue == nullptr)
+    g_keyPressQueue = xQueueCreate(8, sizeof(uint8_t));
+    g_keyReleaseQueue = xQueueCreate(8, sizeof(uint8_t));
+    g_encoderRotateQueue = xQueueCreate(8, sizeof(int8_t));
+    g_encoderClickQueue = xQueueCreate(4, sizeof(uint8_t));
+    g_encoderUiQueue = xQueueCreate(16, sizeof(EncoderUiMsg));
+    if (!g_keyPressQueue || !g_keyReleaseQueue ||
+        !g_encoderRotateQueue || !g_encoderClickQueue ||
+        !g_encoderUiQueue)
     {
-        halt("[KeyScan] failed to create pressed-key queue");
-    }
-    g_encoderQueue = xQueueCreate(8, sizeof(EncoderUiMsg));
-    if (g_encoderQueue == nullptr)
-    {
-        halt("[KeyScan] failed to create encoder queue");
+        halt("[KeyScan] failed to create queues");
     }
 
     BaseType_t ok = xTaskCreatePinnedToCore(
@@ -337,156 +338,26 @@ static void startKeyScanTask()
 
 /*
  * ------------------------------------------------------------
- * LVGL display initialization
+ * Main loop: 消费队列 → 路由到 PageManager → 推进 LVGL
  * ------------------------------------------------------------
  */
 
-static bool lvgl_display_init()
-{
-    /* Initialize draw buffers */
-    lv_disp_draw_buf_init(&draw_buf, lv_buf1, lv_buf2, SCREEN_WIDTH * LVGL_BUFFER_LINES);
-
-    /* Initialize display driver */
-    static lv_disp_drv_t disp_drv;
-    lv_disp_drv_init(&disp_drv);
-
-    /* Logical resolution */
-    disp_drv.hor_res = SCREEN_WIDTH;
-    disp_drv.ver_res = SCREEN_HEIGHT;
-
-    /* Partial rendering buffer */
-    disp_drv.draw_buf = &draw_buf;
-
-    /* Flush callback */
-    disp_drv.flush_cb = my_disp_flush;
-
-    /* Register LVGL display */
-    lv_disp_t *disp = lv_disp_drv_register(&disp_drv);
-    if (disp == NULL)
-    {
-        halt("lv_disp_drv_register() returned NULL");
-    }
-    return true;
-}
-
-/*
- * ------------------------------------------------------------
- * Create LVGL UI
- * ------------------------------------------------------------
- */
-
-static void create_ui()
-{
-    lv_obj_t *screen = lv_scr_act();
-    lv_obj_set_style_bg_color(screen, lv_color_hex(0x101820), LV_PART_MAIN);
-
-    /*
-     * 屏幕: SCREEN_WIDTH × SCREEN_HEIGHT (横屏 428 × 142)
-     * 4 行标签全部用 LV_ALIGN_LEFT_MID 相对屏幕垂直中线均匀分布，
-     * 边距固定 PAD_X = 8，Y 偏移按行数算：
-     *   行 0 (Title): -3*ROW_H/2
-     *   行 1 (KEY):  -1*ROW_H/2
-     *   行 2 (ENC):  +1*ROW_H/2
-     *   行 3 (RGB):  +3*ROW_H/2
-     * 改分辨率/字体时只要改 ROW_H，整个布局自动适应。
-     */
-    constexpr int16_t PAD_X = 8;
-    constexpr int16_t ROW_H = 28; // 行间距 = 字体高 + 8 padding
-    const int16_t y_title = -(3 * ROW_H) / 2;
-    const int16_t y_key = -(1 * ROW_H) / 2;
-    const int16_t y_enc = +(1 * ROW_H) / 2;
-    const int16_t y_rgb = +(3 * ROW_H) / 2;
-
-    /* Title */
-    lv_obj_t *title = lv_label_create(screen);
-    lv_label_set_text(title, "EKeys");
-    lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_20, LV_PART_MAIN);
-    lv_obj_align(title, LV_ALIGN_LEFT_MID, PAD_X, y_title);
-
-    /* Currently pressed key: "--" means idle, otherwise "KEY<n>".
-       Updated from the keyscan task via a FreeRTOS queue. */
-    lv_obj_t *key_label = lv_label_create(screen);
-    lv_label_set_text(key_label, "KEY: --");
-    lv_obj_set_style_text_color(key_label, lv_color_hex(0x00FFCC), LV_PART_MAIN);
-    lv_obj_set_style_text_font(key_label, &lv_font_montserrat_20, LV_PART_MAIN);
-    lv_obj_align(key_label, LV_ALIGN_LEFT_MID, PAD_X, y_key);
-
-    /* Encoder status: shows last rotate/click event; idle = "--" */
-    lv_obj_t *enc_label = lv_label_create(screen);
-    lv_label_set_text(enc_label, "ENC: --");
-    lv_obj_set_style_text_color(enc_label, lv_color_hex(0xFFCC00), LV_PART_MAIN);
-    lv_obj_set_style_text_font(enc_label, &lv_font_montserrat_20, LV_PART_MAIN);
-    lv_obj_align(enc_label, LV_ALIGN_LEFT_MID, PAD_X, y_enc);
-
-    /* RGB status: 当前灯效名。Off=灯全灭。 */
-    lv_obj_t *rgb_label = lv_label_create(screen);
-    lv_label_set_text(rgb_label, "RGB: Off");
-    lv_obj_set_style_text_color(rgb_label, lv_color_hex(0xFF66CC), LV_PART_MAIN);
-    lv_obj_set_style_text_font(rgb_label, &lv_font_montserrat_20, LV_PART_MAIN);
-    lv_obj_align(rgb_label, LV_ALIGN_LEFT_MID, PAD_X, y_rgb);
-
-    g_key_label = key_label;
-    g_encoder_label = enc_label;
-    g_rgb_label = rgb_label;
-}
-
-/*
- * ------------------------------------------------------------
- * Arduino setup
- * ------------------------------------------------------------
- */
-
-void setup()
-{
-    Serial.begin(115200);
-    delay(500);
-
-    SERIAL_PRINTF("\n=== EKeys ===\n");
-
-    /* Backlight (active-LOW module: LOW = on, HIGH = off) */
-    pinMode(TFT_BL, OUTPUT);
-    digitalWrite(TFT_BL, LOW);
-
-    if (!gfx->begin(SPI_FAST_HZ))
-    {
-        halt("gfx->begin() failed");
-    }
-
-    /* Initialize LVGL */
-    lv_init();
-    if (!lvgl_display_init())
-    {
-        halt("LVGL display init failed");
-    }
-    create_ui();
-
-    SERIAL_PRINTF("LVGL initialized.\n");
-
-    g_rgb.begin(); // 初始化 FastLED，初始 Off
-    SERIAL_PRINTF("[RGB] init: NUM_LEDS=%d, pin=%d\n", NUM_LEDS, LED_PIN);
-
-    startKeyScanTask();
-}
-
-/*
- * ------------------------------------------------------------
- * Arduino loop
- * ------------------------------------------------------------
- */
-
-/* Last time the encoder label received an update. Used to clear stale
-   text back to "--" after 1500 ms of inactivity. */
-static constexpr uint32_t ENC_LABEL_TIMEOUT_MS = 1500;
-
-/* RGB 灯效 tick 节流：动态灯效（Rainbow/Wave/Pulse）每 ~30ms 推进一帧 */
 static constexpr uint32_t RGB_TICK_MS = 30;
 
 void loop()
 {
     static uint32_t last_ms = millis();
-    static uint32_t last_enc_ms = 0;
     static uint32_t last_rgb_tick_ms = 0;
+    static uint8_t prev_pressed = 0;
+
+    /* 旋钮单击/旋转 BLE 按键的"延后 release"标记。
+     * 在 BLE HID 协议里，press 与 release 之间必须留出至少一个 report 周期
+     * (~ms 级)，Host 才能识别为一次有效按放。否则可能被当成"按住不放"
+     * 或干脆丢失。所以本帧 press、下一帧开头 release。
+     * 注意：只 release 旋钮那次按下的单键，绝不调 releaseAll()，
+     * 否则会清掉正在按的矩阵键（HID 报告里的其他键槽）—— 这是之前
+     * "蓝牙和硬件按键冲突"的根因，已修。 */
+    static bool s_pendingEncRelease = false;
 
     const uint32_t now = millis();
     if (now != last_ms)
@@ -495,11 +366,11 @@ void loop()
         last_ms = now;
     }
 
-    /* ---- keyId=2 切换 RGB 总开关 ---- */
-    if (g_toggleRgbFlag)
+    /* ---- 帧开头：先把上一帧旋钮 BLE 按下的键 release ---- */
+    if (s_pendingEncRelease)
     {
-        g_toggleRgbFlag = false;
-        g_rgb.setEnabled(!g_rgb.isEnabled());
+        g_bleKbd.encoderRelease();
+        s_pendingEncRelease = false;
     }
 
     /* ---- 推进 RGB 动态灯效 ---- */
@@ -509,74 +380,132 @@ void loop()
         g_rgb.tick();
     }
 
-    /* Drain pressed-key queue: only the last value matters (边沿去重) */
-    if (g_key_label != NULL)
+    /* ---- 处理按键按下/释放 ----
+     *
+     * 多键并发：用本帧集合缓冲，避免 drainQueue 只保留最后一个 keyId。
+     * - 按下：UI + BLE 都按
+     * - 释放：BLE release
+     * - 全部释放完 → 清 prev_pressed_，下一帧可重新触发
+     */
+    uint8_t pressed_keys[8];
+    uint8_t pressed_n = 0;
+    drainQueue<uint8_t>(g_keyPressQueue, [&](uint8_t k)
+                        { if (pressed_n < 8) pressed_keys[pressed_n++] = k; });
+    for (uint8_t i = 0; i < pressed_n; ++i)
     {
-        uint8_t latestKeyId = UINT8_MAX; // sentinel = "no update this tick"
-        drainQueue<uint8_t>(g_pressedKeyQueue,
-                            [&latestKeyId](uint8_t v)
-                            { latestKeyId = v; });
-        if (latestKeyId != UINT8_MAX)
-        {
-            if (latestKeyId == 0)
-            {
-                lv_label_set_text(g_key_label, "KEY: --");
-            }
-            else
-            {
-                lv_label_set_text_fmt(g_key_label, "KEY: KEY%u", latestKeyId);
-            }
-        }
+        uint8_t k = pressed_keys[i];
+        if (k == prev_pressed)
+            continue; // 防重复
+        prev_pressed = k;
+        g_pm.handleKeyPress(k);
+        g_bleKbd.pressKey(k);
     }
 
-    /* Drain encoder queue: keep the latest event's timestamp for timeout.
-       同时处理 rotate(切灯效) 和 click(未使用) 等。 */
-    if (g_encoder_label != NULL)
+    uint8_t released_keys[8];
+    uint8_t released_n = 0;
+    drainQueue<uint8_t>(g_keyReleaseQueue, [&](uint8_t k)
+                        { if (released_n < 8) released_keys[released_n++] = k; });
+    for (uint8_t i = 0; i < released_n; ++i)
     {
-        drainQueue<EncoderUiMsg>(g_encoderQueue, [&](const EncoderUiMsg &msg)
-                                 {
-            last_enc_ms = now;
-            switch (msg.kind)
-            {
-                case 1: // rotate: 切灯效
-                    if (msg.delta > 0) g_rgb.cycleEffect(+1);
-                    else               g_rgb.cycleEffect(-1);
-                    /* 切完立刻刷一次静态灯效标签 */
-                    if (g_rgb_label != NULL) {
-                        lv_label_set_text_fmt(g_rgb_label, "RGB: %s%s",
-                                              RGBLightControl::effectName(g_rgb.currentEffect()),
-                                              g_rgb.isEnabled() ? "" : " (off)");
-                    }
-                    lv_label_set_text_fmt(g_encoder_label, "ENC: %+d", msg.delta);
-                    break;
-                case 2: lv_label_set_text(g_encoder_label, "ENC: click");               break;
-                case 3: lv_label_set_text(g_encoder_label, "ENC: double");              break;
-                case 4: lv_label_set_text(g_encoder_label, "ENC: long");                break;
-            } });
-        /* 超时未收到事件 → 清除标签 */
-        if (last_enc_ms != 0 && (now - last_enc_ms) >= ENC_LABEL_TIMEOUT_MS)
-        {
-            lv_label_set_text(g_encoder_label, "ENC: --");
-            last_enc_ms = 0;
-        }
+        uint8_t k = released_keys[i];
+        g_bleKbd.releaseKey(k);
+        if (k == prev_pressed)
+            prev_pressed = 0;
     }
 
-    /* 灯效使能状态/灯效名变化时刷新标签（仅在每帧最多刷一次） */
-    if (g_rgb_label != NULL)
-    {
-        static bool prevEnabled = false;
-        static LightEffect prevEffect = LightEffect::Off;
-        if (g_rgb.isEnabled() != prevEnabled ||
-            g_rgb.currentEffect() != prevEffect)
+    /* ---- 处理旋钮事件 ----
+     *
+     * 旋转（rotate）：
+     *   1) 调 page->onEncoder(d)，让 UI 决定如何响应（菜单切项 / 调参数）
+     *   2) 若页面 consumesEncoder()=false（Menu/Status/BLE），
+     *      额外发 BLE 方向键（顺时针→Right / 逆时针→Left）作为"前进/后退"。
+     * 单击/双击/长按：
+     *   BLE 上报 Enter/Esc/Tab（仅 BLE，不绑 UI 动作）。
+     * 所有旋钮 BLE 按键都走"下一帧 release"，避免与矩阵键冲突 + 保证 HID 时序。 */
+    drainQueue<int8_t>(g_encoderRotateQueue, [&](int8_t d)
+                       {
+        /* 1) UI 路由（切菜单 / 调参数 / 纯展示页面 no-op） */
+        g_pm.handleEncoderRotate(d);
+        /* 2) 若当前页面"不消费"旋转（MenuPage/StatusPage/BlePage），
+         *    同步发 BLE 方向键（前进/后退）。 */
+        Page *p = g_pm.current();
+        if (p != nullptr && !p->consumesEncoder())
         {
-            prevEnabled = g_rgb.isEnabled();
-            prevEffect = g_rgb.currentEffect();
-            lv_label_set_text_fmt(g_rgb_label, "RGB: %s%s",
-                                  RGBLightControl::effectName(prevEffect),
-                                  prevEnabled ? "" : " (off)");
+            g_bleKbd.encoderRotate(d);
+            s_pendingEncRelease = true; // 下一帧释放
+        } });
+    drainQueue<EncoderUiMsg>(g_encoderUiQueue, [&](const EncoderUiMsg &m)
+                             {
+        /* 单击/双击/长按 → BLE 上报对应键（Enter/Esc/Tab） */
+        if (m.kind >= 2 && m.kind <= 4) {
+            g_bleKbd.encoderClick((int8_t)(m.kind - 1)); // 2→1, 3→2, 4→3
+            s_pendingEncRelease = true; // 下一帧释放（不 releaseAll！）
+        }
+        /* UI 动作仍然不绑定（与之前设计一致） */ });
+
+    /* ---- 当前页面每帧 service tick ---- */
+    if (Page *p = g_pm.current())
+    {
+        if (p->id() == PAGE_TOMATO)
+        {
+            g_tomato_page.serviceTick();
+        }
+        else if (p->id() == PAGE_STATUS)
+        {
+            g_status_page.serviceTick();
+        }
+        else if (p->id() == PAGE_BLE)
+        {
+            g_ble_page.serviceTick();
         }
     }
 
     lv_timer_handler();
+    g_bleKbd.tick();
     delay(5);
+}
+
+/*
+ * ------------------------------------------------------------
+ * Arduino setup
+ * ------------------------------------------------------------
+ */
+void setup()
+{
+    g_serialMutex = xSemaphoreCreateMutex();
+    Serial.begin(115200);
+    delay(500);
+
+    SERIAL_PRINTF("\n=== EKeys ===\n");
+
+    pinMode(TFT_BL, OUTPUT);
+    digitalWrite(TFT_BL, LOW);
+
+    if (!gfx->begin(SPI_FAST_HZ))
+    {
+        halt("gfx->begin() failed");
+    }
+
+    lv_init();
+    if (!lvgl_display_init())
+    {
+        halt("LVGL display init failed");
+    }
+
+    g_rgb.begin();
+    SERIAL_PRINTF("[RGB] init: NUM_LEDS=%d, pin=%d\n", NUM_LEDS, LED_PIN);
+
+    g_bleKbd.begin();
+#if EKEYS_ENABLE_BLE
+    SERIAL_PRINTF("[BLE] enabled, advertising as '%s'\n", EKEYS_DEVICE_NAME);
+#else
+    SERIAL_PRINTF("[BLE] disabled (EKEYS_ENABLE_BLE=0)\n");
+#endif
+
+    g_pm.begin();
+    registerAllPages();
+    g_pm.push(PAGE_MENU);
+    SERIAL_PRINTF("[UI] pages registered, started at MENU\n");
+
+    startKeyScanTask();
 }
