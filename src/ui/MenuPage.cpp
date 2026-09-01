@@ -119,7 +119,10 @@ namespace ekeys
          * 用 1px 边框 + 微透明度代替"光感"。 */
         highlight_ = lv_obj_create(root_obj);
         lv_obj_remove_style_all(highlight_);
-        lv_obj_set_size(highlight_, ROW_W, ROW_HEIGHT);
+        /* 高亮条宽度先给一个占位值，待 label 创建完毕、按"最长标题"测量后
+         * 再用 lv_obj_set_width() 改成真实宽度（见下方）。这样矩形只包住文字，
+         * 不再横跨全屏。 */
+        lv_obj_set_size(highlight_, 64, ROW_HEIGHT);
         lv_obj_set_style_bg_color(highlight_, highlightColor(), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(highlight_, LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_radius(highlight_, 6, LV_PART_MAIN);
@@ -136,6 +139,7 @@ namespace ekeys
         /* lv_obj_set_layout(highlight_, 0);  // 默认即 NONE，无需调用 */
 
         /* 菜单项 label：纯文本 + pad 让出 indicator */
+        int16_t maxLabelW = 0;
         for (uint8_t i = 0; i < ENTRY_COUNT; ++i)
         {
             lv_obj_t *row = lv_label_create(root_obj);
@@ -146,6 +150,22 @@ namespace ekeys
             lv_obj_set_style_text_font(row, &lv_font_montserrat_20, LV_PART_MAIN);
             lv_obj_set_pos(row, ROW_LEFT + 18, ROW_Y[i]);
             items_[i] = row;
+            /* LVGL 8.3：在 label 上调用 lv_obj_update_layout() 后，
+             * 可用 lv_obj_get_self_size() / lv_obj_get_width() 取得真实渲染宽度。*/
+            lv_obj_update_layout(row);
+            const int16_t w = lv_obj_get_self_width(row);
+            if (w > maxLabelW)
+                maxLabelW = w;
+        }
+
+        /* 根据"最长标题"重新调整高亮条尺寸：
+         *   宽 = 文字区域起始 (ROW_LEFT+18) - 高亮条起始 (ROW_LEFT)
+         *       + 最长标题像素宽度 + 右侧余量 (ROW_BAR_PAD_R)
+         * 这样高亮条刚好包住文字，不再跨满全屏。 */
+        if (highlight_ != nullptr && maxLabelW > 0)
+        {
+            const int16_t barW = (int16_t)(18 + (int32_t)maxLabelW + ROW_BAR_PAD_R);
+            lv_obj_set_width(highlight_, barW);
         }
 
         /* 选中指示符：> 圆点三角形 —— 静态绘制，不参与动画

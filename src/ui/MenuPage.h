@@ -54,7 +54,9 @@ namespace ekeys
         static const int16_t ROW_Y[ENTRY_COUNT]; /* 定义见 MenuPage.cpp */
         static constexpr int16_t ROW_HEIGHT = 20;
         static constexpr int16_t ROW_LEFT = 10;
-        static constexpr int16_t ROW_W = SCREEN_W_PX - 20;
+        /* 高亮条宽度 = 当前所有菜单项中最长标题的渲染宽度 + 左右内边距。
+         * 不再固定为全屏宽度，避免出现长条拖出整个屏幕的视觉负担。 */
+        static constexpr int16_t ROW_BAR_PAD_R = 10; /* 文字右侧余量 */
 
         /* 当前选中项索引 */
         uint8_t selected_{0};
