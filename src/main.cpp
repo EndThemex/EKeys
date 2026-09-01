@@ -514,7 +514,12 @@ void loop()
             g_bleKbd.encoderClick((int8_t)(m.kind - 1)); // 2→1, 3→2, 4→3
             s_pendingEncRelease = true; // 下一帧释放（不 releaseAll！）
         }
-        /* UI 动作仍然不绑定（与之前设计一致） */ });
+        /* 单击额外路由到 UI：作为"进入/确认"（与 KEY2 同义）。
+         * 这里放在 BLE 之后，避免 BLE 路径把变量吞掉导致 UI 路由不到；
+         * m.kind==2 表示单击 → 直接转发到 PageManager。 */
+        if (m.kind == 2) {
+            g_pm.handleEncoderClick();
+        } });
 
     /* ---- 当前页面每帧 service tick ---- */
     if (Page *p = g_pm.current())
