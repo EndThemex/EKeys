@@ -62,14 +62,8 @@ namespace ekeys
 
     void BlePage::onConfirm()
     {
-        /* KEY2 = 进入 KeyMap 配置子页（profile 切换 / 单键编辑） */
+        /* KEY2 / 旋钮按下 = 进入 KeyMap 配置子页 */
         requestPush(PAGE_KEYMAP);
-    }
-
-    void BlePage::onEncoderClick()
-    {
-        /* 旋钮单击 = 进入 KeyMap 子页（与 KEY2 等价） */
-        onConfirm();
     }
 
     void BlePage::onSelectKey(uint8_t keyId)

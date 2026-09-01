@@ -33,9 +33,9 @@ namespace ekeys
    *
    * 旋钮语义：
    *   - 旋转 -> onEncoder(delta)
-   *   - 单击 -> onEncoderClick()
+   *   - 按下 -> onConfirm()（与 KEY2 同义，统一为"进入/确认"）
    *
-   * 页面自身决定 KEY2 / 旋钮单击 在自己的页面里到底是什么动作。
+   * 页面自身决定 KEY2 / 旋钮按下 在自己的页面里到底是什么动作。
    */
   class PageManager
   {

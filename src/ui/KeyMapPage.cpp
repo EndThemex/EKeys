@@ -248,19 +248,13 @@ namespace ekeys
         refresh();
     }
 
-    void KeyMapPage::onEncoderClick()
+    void KeyMapPage::onConfirm()
     {
-        /* 旋钮单击 = 切到下一个 profile。 */
+        /* KEY2 / 旋钮按下 = 切到下一个 profile。 */
         uint8_t cur = ble_.activeProfile();
         uint8_t next = (cur + 1) % BLE_PROFILE_COUNT;
         ble_.setActiveProfile(next);
         refresh();
-    }
-
-    void KeyMapPage::onConfirm()
-    {
-        /* KEY2 = 等价旋钮单击（切 profile）。 */
-        onEncoderClick();
     }
 
     void KeyMapPage::onSelectKey(uint8_t keyId)

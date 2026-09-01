@@ -26,11 +26,11 @@ EC11(U8) 连接到：
 
 按键：用 **OneButton** 库识别单击 / 双击 / 长按。
 
-| 按键动作 | encoderDelta | UI 显示 |
-|---|---|---|
-| 单击 | 1 | `ENC: click` |
-| 双击 | 2 | `ENC: double` |
-| 长按起始 | 3 | `ENC: long` |
+| 按键动作 | encoderDelta | UI 显示 | 用途 |
+|---|---|---|---|
+| 单击 | 1 | `ENC: click` | **进入/确认**（路由到当前页 `onConfirm()`，与 KEY2 同义） |
+| 双击 | 2 | `ENC: double` | 暂未路由到 UI（仅 BLE 上报 Esc） |
+| 长按起始 | 3 | `ENC: long` | 暂未路由到 UI（仅 BLE 上报 Tab） |
 
 ---
 

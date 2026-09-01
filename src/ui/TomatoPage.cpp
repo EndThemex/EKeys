@@ -125,9 +125,9 @@ namespace ekeys
         refresh();
     }
 
-    void TomatoPage::onEncoderClick()
+    void TomatoPage::onConfirm()
     {
-        /* 单击：IDLE/RUN/PAUSE/DONE 各自的"切换"动作 */
+        /* KEY2 / 旋钮按下 = 启动/暂停/恢复/重置（依状态机当前态） */
         switch (state_)
         {
         case State::Idle:
@@ -143,12 +143,6 @@ namespace ekeys
             resetTimer();
             break;
         }
-    }
-
-    void TomatoPage::onConfirm()
-    {
-        /* KEY2 = 与单击同义 */
-        onEncoderClick();
     }
 
     void TomatoPage::startTimer()

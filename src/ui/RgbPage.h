@@ -32,7 +32,6 @@ namespace ekeys
         /* Page API */
         void onEnter() override;
         void onEncoder(int8_t delta) override;
-        void onEncoderClick() override;
         void onConfirm() override;
 
         /* RgbPage 用旋钮调灯效/亮度/开关 → 消费旋转，不发 BLE 方向键 */

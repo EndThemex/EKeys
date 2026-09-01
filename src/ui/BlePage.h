@@ -26,9 +26,8 @@ namespace ekeys
 
         void onEnter() override;
 
-        /* 交互：KEY2 / 旋钮单击 / KEY3 = toggle BLE 开关 */
+        /* 交互：KEY2 / 旋钮按下 = 进入 KeyMap 子页 */
         void onConfirm() override;
-        void onEncoderClick() override;
         void onSelectKey(uint8_t keyId) override;
 
         /* 每帧调用一次，更新状态文本（避免陈旧）。 */

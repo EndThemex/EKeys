@@ -100,16 +100,11 @@ namespace ekeys
         refresh();
     }
 
-    void RgbPage::onEncoderClick()
-    {
-        /* 任意模式下单击 = toggle on/off */
-        rgb_.setEnabled(!rgb_.isEnabled());
-        refresh();
-    }
-
     void RgbPage::onConfirm()
     {
-        /* KEY2 = 切到下一个模式 */
+        /* KEY2 / 旋钮按下 = 切到下一个模式。
+         * 注：原"任意模式下单击 = toggle on/off"已统一到"进入/确认"语义，
+         * 可通过进入 Power 模式后旋转来切换 on/off。 */
         mode_ = (Mode)(((uint8_t)mode_ + 1) % (uint8_t)Mode::Count);
         refresh();
     }

@@ -34,8 +34,7 @@ namespace ekeys
         void onExit() override;
 
         void onEncoder(int8_t delta) override;        // 旋钮旋转：选按键
-        void onEncoderClick() override;              // 旋钮单击：切 profile
-        void onConfirm() override;                   // KEY2：切 profile
+        void onConfirm() override;                   // KEY2 / 旋钮按下：切 profile
         void onSelectKey(uint8_t keyId) override;    // KEY3..9 跳到该键
 
     private:

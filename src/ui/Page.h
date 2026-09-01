@@ -34,13 +34,13 @@ namespace ekeys
         /* 事件钩子：默认空实现，页面按需重写
          *
          * onEncoder(delta): 旋钮旋转，delta = ±1（每步）
-         * onEncoderClick(): 旋钮单击
-         * onConfirm():      KEY2（"进入/确认"）按下
-         *                    注意：每个页面需要决定 KEY2 是"进入动作"还是"确认选项"
+         * onConfirm():      "进入/确认"动作 —— 触发源有两个：
+         *                    - KEY2 矩阵键按下
+         *                    - 旋钮按下（旋钮按键）
+         *                    统一抽象成"用户希望确认/进入"，避免页面写两份等价代码。
          * onSelectKey(keyId): 其他矩阵键（KEY3..KEY9）按下，用于快速跳页等
          */
         virtual void onEncoder(int8_t /*delta*/) {}
-        virtual void onEncoderClick() {}
         virtual void onConfirm() {}
         virtual void onSelectKey(uint8_t /*keyId*/) {}
 

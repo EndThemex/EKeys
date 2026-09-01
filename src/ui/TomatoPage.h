@@ -27,7 +27,6 @@ namespace ekeys
         void onEnter() override;
         void onExit() override;
         void onEncoder(int8_t delta) override;
-        void onEncoderClick() override;
         void onConfirm() override;
 
         /* TomatoPage 用旋钮调时长 → 消费旋转，不发 BLE 方向键 */

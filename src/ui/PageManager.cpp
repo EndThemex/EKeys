@@ -176,8 +176,16 @@ namespace ekeys
 
     void PageManager::handleEncoderClick()
     {
+        /* 旋钮按下 = 进入/确认（与 KEY2 同语义）。
+         * 之所以统一路由到 onConfirm() 而不是 onEncoderClick()：
+         *   - 此前各页 onConfirm() / onEncoderClick() 大量互相调用（Tomato/Ble/KeyMap），
+         *     表明设计上两者本就是同一个动作；
+         *   - 旋钮单击也作为"进入/确认"，让用户在脱离矩阵键盘的场景下
+         *     仍能完整操作 UI（菜单进入子页、番茄钟启停、BLE 子页进入 KeyMap 等）。
+         * 个别页原本用 onEncoderClick() 做差异化动作（如 RgbPage 的 toggle on/off），
+         * 后续若仍需保留可通过旋转 Power 模式实现。 */
         if (Page *p = current())
-            p->onEncoderClick();
+            p->onConfirm();
     }
 
     void PageManager::printStack() const
