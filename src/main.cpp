@@ -369,6 +369,10 @@ void loop()
     /* ---- 帧开头：先把上一帧旋钮 BLE 按下的键 release ---- */
     if (s_pendingEncRelease)
     {
+        /* 单击/双击/长按 → encoderRelease() 释放单击键。
+         * 旋转 → encoderRotateRelease() 释放方向键。
+         * 两条路径互不影响。 */
+        g_bleKbd.encoderRotateRelease();
         g_bleKbd.encoderRelease();
         s_pendingEncRelease = false;
     }
@@ -424,10 +428,19 @@ void loop()
      * 所有旋钮 BLE 按键都走"下一帧 release"，避免与矩阵键冲突 + 保证 HID 时序。 */
     drainQueue<int8_t>(g_encoderRotateQueue, [&](int8_t d)
                        {
-        /* 1) UI 路由（切菜单 / 调参数 / 纯展示页面 no-op） */
+        /* 1) UI 路由（切菜单 / 调参数 / 纯展示页面 no-op）
+         *
+         * UI 路由仍然 1:1 透传 delta，让菜单/参数 UI 的步进响应速度
+         * 不受 BLE 合并影响（用户在调灯效亮度时希望每一格都能感觉到）。
+         * BLE 方向键的去抖合并由 BleKeyboardSink 内部状态机负责。 */
         g_pm.handleEncoderRotate(d);
         /* 2) 若当前页面"不消费"旋转（MenuPage/StatusPage/BlePage），
-         *    同步发 BLE 方向键（前进/后退）。 */
+         *    同步发 BLE 方向键（前进/后退）。
+         *    BleKeyboardSink::encoderRotate() 已做：
+         *      - 净步数合并（同向多步只发 1 次 press）
+         *      - 反向抖动吞掉（±1 抵消）
+         *      - 方向切换自动 release 上一次键（防粘键）
+         *    所以这里多次 drainQueue 的同向 delta 不会再让 Host 切多次。 */
         Page *p = g_pm.current();
         if (p != nullptr && !p->consumesEncoder())
         {

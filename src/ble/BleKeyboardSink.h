@@ -34,6 +34,9 @@ namespace ekeys
 
         // 旋钮旋转：delta = +1 顺时针, -1 逆时针
         // press 一帧后再调 encoderRotateRelease() 释放（保持矩阵键按下状态）
+        // 内部会自动合并连续同向 delta（短时间内只发 1 次 HID），
+        // 自动处理反向 → 同向切换（先 release 上一个键再 press 新的），
+        // 也兜底过滤慢速抖动的反向尖峰。
         void encoderRotate(int8_t delta);
         void encoderRotateRelease();
 
