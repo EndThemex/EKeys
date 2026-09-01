@@ -96,9 +96,8 @@ namespace ekeys
     {
         lv_obj_t *root_obj = root();
 
-        /* 屏幕底色显式重设 —— 主题可能把它改成白色 */
-        lv_obj_set_style_bg_color(root_obj, bgColor(), LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(root_obj, LV_OPA_COVER, LV_PART_MAIN);
+        /* root 保持透明，透出屏幕级 PNG 背景图（PageManager::begin() 设置） */
+        lv_obj_set_style_bg_opa(root_obj, LV_OPA_TRANSP, LV_PART_MAIN);
 
         /* 顶部标题栏 */
         lv_obj_t *title = lv_label_create(root_obj);

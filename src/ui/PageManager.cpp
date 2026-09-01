@@ -1,6 +1,9 @@
 #include "ui/PageManager.h"
 #include <lvgl.h>
 
+/* PNG 转换背景图（428x142 RGB565），定义在 ui/assets/bgv1.c */
+LV_IMG_DECLARE(bgv1);
+
 namespace ekeys
 {
 
@@ -9,10 +12,13 @@ namespace ekeys
     void PageManager::begin()
     {
         /* LVGL 屏幕已由 main.cpp 的 lvgl_display_init() 创建好。
-         * 这里只清空 background 与构建默认主题 */
+         * 这里清空 background、铺设 PNG 背景图，并构建默认主题 */
         lv_obj_t *scr = lv_scr_act();
         lv_obj_set_style_bg_color(scr, lv_color_hex(0x101820), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, LV_PART_MAIN);
+        /* 背景图与屏幕同尺寸（428x142），top-left 对齐即铺满整屏。
+         * 页面 root 保持透明（Page::enter()），即可透出此图 */
+        lv_obj_set_style_bg_img_src(scr, &bgv1, LV_PART_MAIN);
     }
 
     void PageManager::registerPage(Page *p)
