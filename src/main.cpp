@@ -8,6 +8,7 @@
 #include "keyscan/RotaryEncoder.h"
 #include "rgb/RGBLightControl.h"
 #include "ble/BleKeyboardSink.h"
+#include "ble/BleKeyMap.h"
 #include "ui/Pages.h"
 #include "ui/PageManager.h"
 #include "ui/MenuPage.h"
@@ -16,6 +17,8 @@
 #include "ui/StatusPage.h"
 #include "ui/BlePage.h"
 #include "ui/MicPage.h"
+#include "ui/KeyMapPage.h"
+#include <Preferences.h>
 
 using namespace ekeys;
 
@@ -178,12 +181,65 @@ static bool lvgl_display_init()
  */
 static RGBLightControl g_rgb;
 static BleKeyboardSink g_bleKbd;
+
+/*
+ * ------------------------------------------------------------
+ * NVS: BLE profile 持久化
+ * ------------------------------------------------------------
+ *
+ * 用户在 KeyMap 子页切换 profile 后必须重启仍然保留 → 写入 Preferences。
+ * 写入放在 setActiveProfile 路径上比较复杂（要改 BleKeyMap 接口 + 回调），
+ * 这里采用最简方案：BLE 路径只切内存中的索引，main loop 末尾比对当前
+ * profile 与上次写入的索引，发现变化就 putUChar 一次。开销可忽略。
+ *
+ * 必须放在 g_bleKbd 声明之后 —— 这些 helper 直接引用它。
+ */
+namespace
+{
+    constexpr const char *NVS_NS = "ekeys";
+    constexpr const char *NVS_KEY_PROFILE = "ble_profile";
+    Preferences g_nvs;
+    uint8_t g_lastSavedProfile = 0xFF; // 哨兵：首次循环强制写一次（无副作用）
+    bool g_nvsReady = false;
+
+    void loadBleProfileFromNvs()
+    {
+        if (!g_nvsReady)
+        {
+            g_nvs.begin(NVS_NS, false);
+            g_nvsReady = true;
+        }
+        uint8_t idx = g_nvs.getUChar(NVS_KEY_PROFILE, 0);
+        if (idx >= BLE_PROFILE_COUNT)
+            idx = 0;
+        g_bleKbd.setActiveProfile(idx);
+        g_lastSavedProfile = idx;
+        SERIAL_PRINTF("[BLE] profile %u loaded from NVS\n", idx);
+    }
+
+    void saveBleProfileToNvs()
+    {
+        uint8_t idx = g_bleKbd.activeProfile();
+        if (idx == g_lastSavedProfile)
+            return;
+        if (!g_nvsReady)
+        {
+            g_nvs.begin(NVS_NS, false);
+            g_nvsReady = true;
+        }
+        g_nvs.putUChar(NVS_KEY_PROFILE, idx);
+        g_lastSavedProfile = idx;
+        SERIAL_PRINTF("[BLE] profile %u saved to NVS\n", idx);
+    }
+} // anonymous namespace
+
 static MenuPage g_menu;
 static RgbPage g_rgb_page{g_rgb};
 static TomatoPage g_tomato_page{g_rgb};
 static StatusPage g_status_page{g_rgb};
 static BlePage g_ble_page{g_bleKbd};
 static MicPage g_mic_page;
+static KeyMapPage g_keymap_page{g_bleKbd};
 
 static PageManager g_pm;
 
@@ -195,6 +251,7 @@ static void registerAllPages()
     g_pm.registerPage(&g_status_page);
     g_pm.registerPage(&g_ble_page);
     g_pm.registerPage(&g_mic_page);
+    g_pm.registerPage(&g_keymap_page);
 }
 
 /*
@@ -482,6 +539,12 @@ void loop()
 
     lv_timer_handler();
     g_bleKbd.tick();
+
+    /* BLE profile 持久化（每秒最多一次，开销可忽略）。
+     * 第一次进入循环时 g_lastSavedProfile == 0xFF，saveBleProfileToNvs()
+     * 会写一次当前值落盘，之后只有在 UI 真正切 profile 时再写。 */
+    saveBleProfileToNvs();
+
     delay(5);
 }
 
@@ -521,6 +584,10 @@ void setup()
 #else
     SERIAL_PRINTF("[BLE] disabled (EKEYS_ENABLE_BLE=0)\n");
 #endif
+
+    /* 在 BLE begin 之后立刻把持久化的 profile 同步到 BLE_KEY_MAP 等数组。
+     * 必须在 g_pm.begin() 之前：UI 注册时 BlePage 会读 activeProfile()。 */
+    loadBleProfileFromNvs();
 
     g_pm.begin();
     registerAllPages();

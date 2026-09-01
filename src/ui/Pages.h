@@ -22,6 +22,7 @@ namespace ekeys
         PAGE_STATUS = 4, // 系统状态（保留）
         PAGE_BLE = 5,    // 蓝牙连接状态
         PAGE_MIC = 6,    // 麦克风频谱
+        PAGE_KEYMAP = 7, // BLE → KeyMap 配置子页（profile 切换 / 单键编辑）
     };
 
 } // namespace ekeys

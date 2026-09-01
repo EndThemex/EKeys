@@ -1,7 +1,7 @@
 #pragma once
 #include <Arduino.h>
 
-/* BLE 键位映射表
+/* BLE 键位映射表（多 profile，可切换）
  *
  * 物理键 keyId (1..9) 和旋钮动作（单击/双击/长按）映射到 ESP32 BLE Keyboard
  * 库内部使用的 key 编码。
@@ -42,36 +42,72 @@ namespace ekeys
         return (hidUsageId >= 0xE0) ? hidUsageId : (uint8_t)(hidUsageId + 0x88U);
     }
 
-    // 默认：1..9 → 顶部数字键 1..9
-    inline constexpr uint8_t BLE_KEY_MAP[10] = {
-        0,                 // index 0 占位（keyId 从 1 开始）
-        hidToLibKey(0x1E), // 1 → '1'
-        hidToLibKey(0x1F), // 2 → '2'
-        hidToLibKey(0x20), // 3 → '3'
-        hidToLibKey(0x21), // 4 → '4'
-        hidToLibKey(0x22), // 5 → '5'
-        hidToLibKey(0x23), // 6 → '6'
-        hidToLibKey(0x24), // 7 → '7'
-        hidToLibKey(0x25), // 8 → '8'
-        hidToLibKey(0x26), // 9 → '9'
+    /* ---- Profile 数据模型 ----
+     *
+     * 每个 profile 是一组按键配置：
+     *   - keyMap[10]：keyId 1..9 → BLE 库 key 码（index 0 占位）
+     *   - encoderMap[4]：单击/双击/长按 → BLE 库 key 码（index 0 占位）
+     *   - rotateMap[3]：旋钮 CW/CCW → BLE 库 key 码（index 0 占位）
+     *   - name：显示名（最多 12 字符，给 UI 留余地）
+     *
+     * 预设 4 套常用配置（详见 .cpp），用户可在 BLE → KeyMap 子页切换；
+     * 当前选中的 profile 索引持久化到 NVS（重启仍生效）。
+     */
+    struct KeyMapProfile
+    {
+        char name[16];
+        uint8_t keyMap[10];
+        uint8_t encoderMap[4];
+        uint8_t rotateMap[3];
     };
 
-    // 旋钮动作 → 库 key 码
-    // kind 1=单击, 2=双击, 3=长按
-    inline constexpr uint8_t BLE_ENCODER_MAP[4] = {
-        0,                 // index 0 占位
-        hidToLibKey(0x28), // 1 单击 → Enter
-        hidToLibKey(0x29), // 2 双击 → Esc
-        hidToLibKey(0x2B), // 3 长按 → Tab
+    /* 预置配置数量 */
+    static constexpr uint8_t BLE_PROFILE_COUNT = 4;
+
+    /* 当前生效的 profile 索引（运行时可变，main.cpp 负责 NVS 持久化） */
+    uint8_t bleActiveProfile();
+
+    /* 设置当前 profile 索引（带边界裁剪），并把 BLE_KEY_MAP / ENCODER_MAP /
+     * ROTATE_MAP 同步刷新成新 profile 的内容。给 main.cpp 启动期一次性调用。 */
+    void bleSetActiveProfile(uint8_t idx);
+
+    /* profile 表本身（const，存放在 .cpp） */
+    const KeyMapProfile &bleProfile(uint8_t idx);
+
+    /* ---- 旧 API 兼容：常量数组视图 ----
+     *
+     * 老的 BLE 发送逻辑（BLE_KEY_MAP[1..9] 等）保持原有调用语义：
+     *   - 索引 0 占位
+     *   - 直接从"当前 profile"复制出来
+     * 用 static constexpr 不行（必须可重写），所以这里用 inline 变量
+     * （C++17），BleKeyboardSink 启动时通过 refreshMaps() 同步一次。
+     */
+    inline uint8_t BLE_KEY_MAP[10] = {
+        0,
+        hidToLibKey(0x1E),
+        hidToLibKey(0x1F),
+        hidToLibKey(0x20),
+        hidToLibKey(0x21),
+        hidToLibKey(0x22),
+        hidToLibKey(0x23),
+        hidToLibKey(0x24),
+        hidToLibKey(0x25),
+        hidToLibKey(0x26),
+    };
+    inline uint8_t BLE_ENCODER_MAP[4] = {
+        0,
+        hidToLibKey(0x28),
+        hidToLibKey(0x29),
+        hidToLibKey(0x2B),
+    };
+    inline uint8_t BLE_ROTATE_MAP[3] = {
+        0,
+        hidToLibKey(0x4F),
+        hidToLibKey(0x50),
     };
 
-    // 旋钮旋转 → 库 key 码
-    // index 1 = delta = +1（顺时针），2 = delta = -1（逆时针）
-    // HID 0x4F = Right Arrow（"前进"），0x50 = Left Arrow（"后退"）
-    inline constexpr uint8_t BLE_ROTATE_MAP[3] = {
-        0,                 // index 0 占位
-        hidToLibKey(0x4F), // 1 顺时针 → Right Arrow
-        hidToLibKey(0x50), // 2 逆时针 → Left Arrow
-    };
+    /* 内部：用 bleActiveProfile() 把当前 profile 同步到上面的 3 个数组。
+     * BleKeyboardSink::setActiveProfile() 内部调用；UI 不直接调用。 */
+    void refreshMapsFromActiveProfile();
 
 } // namespace ekeys

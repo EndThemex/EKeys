@@ -49,7 +49,7 @@ namespace ekeys
         vendor_label_ = vendor;
 
         lv_obj_t *hint = lv_label_create(root_obj);
-        lv_label_set_text(hint, "KEY2 toggle  KEY1 back");
+        lv_label_set_text(hint, "KEY2 KeyMap  KEY3 toggle  KEY1 back");
         lv_obj_set_style_text_color(hint, lv_color_hex(0x808080), LV_PART_MAIN);
         lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, LV_PART_MAIN);
         lv_obj_align(hint, LV_ALIGN_BOTTOM_RIGHT, -8, -4);
@@ -62,22 +62,24 @@ namespace ekeys
 
     void BlePage::onConfirm()
     {
-        /* KEY2 = toggle BLE 开关 */
-        ble_.setEnabled(!ble_.isEnabled());
-        refresh();
+        /* KEY2 = 进入 KeyMap 配置子页（profile 切换 / 单键编辑） */
+        requestPush(PAGE_KEYMAP);
     }
 
     void BlePage::onEncoderClick()
     {
-        /* 旋钮单击 = toggle BLE 开关（与 KEY2 等价） */
+        /* 旋钮单击 = 进入 KeyMap 子页（与 KEY2 等价） */
         onConfirm();
     }
 
     void BlePage::onSelectKey(uint8_t keyId)
     {
-        /* KEY3 = toggle BLE 开关（备选快捷键）。其他按键忽略。 */
+        /* KEY3 = toggle BLE 开关（快速开关），其他 KEY 忽略。 */
         if (keyId == 3)
-            onConfirm();
+        {
+            ble_.setEnabled(!ble_.isEnabled());
+            refresh();
+        }
     }
 
     void BlePage::serviceTick()

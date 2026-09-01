@@ -46,6 +46,12 @@ namespace ekeys
          * 不修改库的 begin/end 内部状态，只切换 NimBLE 广播 + 自维护 enabled_ 标志。 */
         bool isEnabled() const;
         void setEnabled(bool en);
+
+        /* Profile 切换：UI 在 KeyMap 子页改 profile 时调用。
+         * 内部触发 refreshMapsFromActiveProfile()，下次按键立刻按新表发。
+         * index 越界会自动裁剪到 0。 */
+        void setActiveProfile(uint8_t idx);
+        uint8_t activeProfile() const;
     };
 
 } // namespace ekeys

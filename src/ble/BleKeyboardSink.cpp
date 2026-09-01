@@ -263,4 +263,29 @@ namespace ekeys
 #endif
     }
 
+    void BleKeyboardSink::setActiveProfile(uint8_t idx)
+    {
+        /* 委托给 BleKeyMap：它会做边界裁剪 + 同步 3 个数组。 */
+        bleSetActiveProfile(idx);
+        /* 切换 profile 时清掉旋转状态机：旧方向的 HID key 还卡在 g_lastRotateHid
+         * 上没 release，新 profile 的同一键码可能不同，必须强制清零避免粘键。 */
+#if EKEYS_ENABLE_BLE
+        if (g_lastRotateHid != 0 && g_enabled && g_ble.isConnected())
+        {
+            g_ble.release(g_lastRotateHid);
+        }
+        g_lastRotateHid = 0;
+        g_lastRotateSigned = 0;
+        g_rotAccum = 0;
+        g_rotPressPending = false;
+        g_lastEncKey = 0;
+        g_lastRotatePressMs = 0; // 切换后立即可发 press
+#endif
+    }
+
+    uint8_t BleKeyboardSink::activeProfile() const
+    {
+        return bleActiveProfile();
+    }
+
 } // namespace ekeys
