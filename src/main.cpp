@@ -15,6 +15,7 @@
 #include "ui/TomatoPage.h"
 #include "ui/StatusPage.h"
 #include "ui/BlePage.h"
+#include "ui/MicPage.h"
 
 using namespace ekeys;
 
@@ -182,6 +183,7 @@ static RgbPage g_rgb_page{g_rgb};
 static TomatoPage g_tomato_page{g_rgb};
 static StatusPage g_status_page{g_rgb};
 static BlePage g_ble_page{g_bleKbd};
+static MicPage g_mic_page;
 
 static PageManager g_pm;
 
@@ -192,6 +194,7 @@ static void registerAllPages()
     g_pm.registerPage(&g_tomato_page);
     g_pm.registerPage(&g_status_page);
     g_pm.registerPage(&g_ble_page);
+    g_pm.registerPage(&g_mic_page);
 }
 
 /*
@@ -470,6 +473,10 @@ void loop()
         else if (p->id() == PAGE_BLE)
         {
             g_ble_page.serviceTick();
+        }
+        else if (p->id() == PAGE_MIC)
+        {
+            g_mic_page.serviceTick();
         }
     }
 

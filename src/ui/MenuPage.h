@@ -44,7 +44,7 @@ namespace ekeys
             uint8_t pageId;
         };
 
-        static constexpr uint8_t ENTRY_COUNT = 4;
+        static constexpr uint8_t ENTRY_COUNT = 5;
         static const MenuEntry ENTRIES_[ENTRY_COUNT];
 
         /* 每行的 y 坐标（与 buildUi() 中同步；只读不变量）。

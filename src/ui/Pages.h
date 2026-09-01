@@ -21,6 +21,7 @@ namespace ekeys
         PAGE_TOMATO = 3, // 番茄钟
         PAGE_STATUS = 4, // 系统状态（保留）
         PAGE_BLE = 5,    // 蓝牙连接状态
+        PAGE_MIC = 6,    // 麦克风频谱
     };
 
 } // namespace ekeys

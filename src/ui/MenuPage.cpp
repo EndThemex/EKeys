@@ -9,6 +9,7 @@ namespace ekeys
     const MenuPage::MenuEntry MenuPage::ENTRIES_[MenuPage::ENTRY_COUNT] = {
         {"RGB Control", PAGE_RGB},
         {"Pomodoro", PAGE_TOMATO},
+        {"Mic", PAGE_MIC},
         {"Status", PAGE_STATUS},
         {"BLE", PAGE_BLE},
     };
@@ -17,7 +18,7 @@ namespace ekeys
      * 这里提供 ODR-used 的定义；constexpr 修饰暗示它在编译期可获取，
      * 但为了让链接器找到符号，必须有这一个 .cpp 中的定义。
      * 屏幕高度 142：4 行起始 32/52/72/92，每行高 20，最后一行底部 112，留出 30px 给底部 hint。 */
-    const int16_t MenuPage::ROW_Y[MenuPage::ENTRY_COUNT] = {32, 52, 72, 92};
+    const int16_t MenuPage::ROW_Y[MenuPage::ENTRY_COUNT] = {24, 44, 64, 84, 104};
 
     static constexpr uint32_t ANIM_DURATION_MS = 200;
 
