@@ -87,6 +87,10 @@ namespace ekeys
 
         /* --- 按钮：OneButton 内部上拉 --- */
         g_button = new OneButton(cfg.encoderSWPin, /*activeLow=*/true);
+        /* 单击/双击超时窗口：默认 400ms 把"单击"压到 ~150ms，
+         * 让单次按下感觉更跟手；双击仍可在 150ms 内连击两次识别。
+         * 长按阈值仍保留默认 800ms。 */
+        g_button->setClickTicks(2);   // 2 × tickMs(默认 50ms) ≈ 100~150ms
         g_button->attachClick([]()
                               { g_clickFlag = true; });
         g_button->attachDoubleClick([]()
