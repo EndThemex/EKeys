@@ -12,13 +12,14 @@ namespace ekeys
         {"Mic", PAGE_MIC},
         {"Status", PAGE_STATUS},
         {"BLE", PAGE_BLE},
+        {"Neumo", PAGE_NEUMO},
     };
 
     /* 每行的 y 坐标（与 buildUi() 中同步；只读不变量）。
      * 这里提供 ODR-used 的定义；constexpr 修饰暗示它在编译期可获取，
      * 但为了让链接器找到符号，必须有这一个 .cpp 中的定义。
-     * 屏幕高度 142：4 行起始 32/52/72/92，每行高 20，最后一行底部 112，留出 30px 给底部 hint。 */
-    const int16_t MenuPage::ROW_Y[MenuPage::ENTRY_COUNT] = {24, 44, 64, 84, 104};
+     * 屏幕高度 142：6 行起始 24/42/60/78/96/114，每行高 18，最后一行底部 132，留出 ~10px 给底部 hint。 */
+    const int16_t MenuPage::ROW_Y[MenuPage::ENTRY_COUNT] = {24, 42, 60, 78, 96, 114};
 
     static constexpr uint32_t ANIM_DURATION_MS = 200;
 
