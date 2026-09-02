@@ -19,6 +19,7 @@
 #include "ui/MicPage.h"
 #include "ui/KeyMapPage.h"
 #include "ui/NeumoPage.h"
+#include "ui/ThemePage.h"
 #include <Preferences.h>
 
 using namespace ekeys;
@@ -242,6 +243,7 @@ static BlePage g_ble_page{g_bleKbd};
 static MicPage g_mic_page;
 static KeyMapPage g_keymap_page{g_bleKbd};
 static NeumoPage g_neumo_page;
+static ThemePage g_theme_page;
 
 static PageManager g_pm;
 
@@ -255,6 +257,7 @@ static void registerAllPages()
     g_pm.registerPage(&g_mic_page);
     g_pm.registerPage(&g_keymap_page);
     g_pm.registerPage(&g_neumo_page);
+    g_pm.registerPage(&g_theme_page);
 }
 
 /*

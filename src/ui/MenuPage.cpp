@@ -13,32 +13,37 @@ namespace ekeys
         {"Status", PAGE_STATUS},
         {"BLE", PAGE_BLE},
         {"Neumo", PAGE_NEUMO},
+        {"Theme", PAGE_THEME},
     };
 
     /* 每行的 y 坐标（与 buildUi() 中同步；只读不变量）。
      * 这里提供 ODR-used 的定义；constexpr 修饰暗示它在编译期可获取，
      * 但为了让链接器找到符号，必须有这一个 .cpp 中的定义。
-     * 屏幕高度 142：6 行起始 24/42/60/78/96/114，每行高 18，最后一行底部 132，留出 ~10px 给底部 hint。 */
-    const int16_t MenuPage::ROW_Y[MenuPage::ENTRY_COUNT] = {24, 42, 60, 78, 96, 114};
+     * 屏幕高度 142：标题(20pt@4)~24；7 行 16px 高 + 2px 间距，
+     * 起始 26/44/60/76/92/108/124，最后一行底部 140，留出 ~2px 给底部 hint。 */
+    const int16_t MenuPage::ROW_Y[MenuPage::ENTRY_COUNT] = {26, 44, 60, 76, 92, 108, 124};
 
     static constexpr uint32_t ANIM_DURATION_MS = 200;
 
-    /* ===== 颜色辅助：集中维护，避免散落在代码各处 ===== */
+    /* ===== 颜色辅助：集中维护，避免散落在代码各处 =====
+     * 调色板：Background #050507 / Panel #0F0A18 / Panel Light #1E162C /
+     *         Purple #492B80 / Primary Purple #9468F1 / Bright Purple #C7AAF6 /
+     *         Text #F7F5F9 / Secondary Text #A69FAF */
     /* 屏幕底色（与 main.cpp / PageManager.cpp 保持一致） */
-    static inline lv_color_t bgColor() { return lv_color_hex(0x101820); }
-    /* 高亮条：品牌亮蓝偏青，靠对比+饱和度来"抢眼"，不是单纯提亮灰 */
-    static inline lv_color_t highlightColor() { return lv_color_hex(0x2A87FF); }
+    static inline lv_color_t bgColor() { return lv_color_hex(0x050507); }
+    /* 高亮条：品牌主紫，靠饱和度+亮度"抢眼" */
+    static inline lv_color_t highlightColor() { return lv_color_hex(0x9468F1); }
     /* 高亮条更亮的外缘描边（透明叠加） */
-    static inline lv_color_t highlightBorderColor() { return lv_color_hex(0x5FB1FF); }
-    /* 选中行：纯白 + 略偏暖，整体亮度高 */
-    static inline lv_color_t rowActiveColor() { return lv_color_hex(0xFFFFFF); }
-    /* 未选中行：比之前的 #808080 更暗，且带蓝调，与高亮条统一冷色调 */
-    static inline lv_color_t rowNormalColor() { return lv_color_hex(0x5C6470); }
+    static inline lv_color_t highlightBorderColor() { return lv_color_hex(0xC7AAF6); }
+    /* 选中行：主文字色，高亮偏冷白 */
+    static inline lv_color_t rowActiveColor() { return lv_color_hex(0xF7F5F9); }
+    /* 未选中行：Secondary Text，与主紫色调统一冷紫调 */
+    static inline lv_color_t rowNormalColor() { return lv_color_hex(0xA69FAF); }
     /* 选中行右侧的"激活态"小指示色（> 圆点） */
-    static inline lv_color_t indicatorColor() { return lv_color_hex(0x5FB1FF); }
+    static inline lv_color_t indicatorColor() { return lv_color_hex(0xC7AAF6); }
 
     MenuPage::MenuPage()
-        : Page(/*id=*/PAGE_MENU, "Menu", lv_color_hex(0xFFFFFF)) {}
+        : Page(/*id=*/PAGE_MENU, "Menu", lv_color_hex(0x9468F1)) {}
 
     /* ---- 静态动画回调 ---- */
 
@@ -104,14 +109,14 @@ namespace ekeys
         /* 顶部标题栏 */
         lv_obj_t *title = lv_label_create(root_obj);
         lv_label_set_text(title, "EKeys Menu");
-        lv_obj_set_style_text_color(title, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+        lv_obj_set_style_text_color(title, lv_color_hex(0xF7F5F9), LV_PART_MAIN);
         lv_obj_set_style_text_font(title, &lv_font_montserrat_20, LV_PART_MAIN);
         lv_obj_align(title, LV_ALIGN_TOP_LEFT, 8, 4);
 
-        /* 顶部分割线：颜色比之前更冷亮一点，配合蓝色高亮条 */
+        /* 顶部分割线：Panel Light #1E162C，深紫面板色作为分隔条 */
         lv_obj_t *line = lv_obj_create(root_obj);
         lv_obj_set_size(line, SCREEN_W_PX - 16, 1);
-        lv_obj_set_style_bg_color(line, lv_color_hex(0x1F2A38), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(line, lv_color_hex(0x1E162C), LV_PART_MAIN);
         lv_obj_set_style_border_width(line, 0, LV_PART_MAIN);
         lv_obj_align(line, LV_ALIGN_TOP_MID, 0, 28);
 
@@ -149,7 +154,7 @@ namespace ekeys
             lv_obj_set_style_text_color(row,
                                         (i == selected_) ? rowActiveColor() : rowNormalColor(),
                                         LV_PART_MAIN);
-            lv_obj_set_style_text_font(row, &lv_font_montserrat_20, LV_PART_MAIN);
+            lv_obj_set_style_text_font(row, &lv_font_montserrat_14, LV_PART_MAIN);
             lv_obj_set_pos(row, ROW_LEFT + 18, ROW_Y[i]);
             items_[i] = row;
             /* LVGL 8.3：在 label 上调用 lv_obj_update_layout() 后，
@@ -176,7 +181,7 @@ namespace ekeys
         indicator_ = lv_label_create(root_obj);
         lv_label_set_text(indicator_, ">");
         lv_obj_set_style_text_color(indicator_, indicatorColor(), LV_PART_MAIN);
-        lv_obj_set_style_text_font(indicator_, &lv_font_montserrat_20, LV_PART_MAIN);
+        lv_obj_set_style_text_font(indicator_, &lv_font_montserrat_14, LV_PART_MAIN);
         lv_obj_set_pos(indicator_, ROW_LEFT + 4, ROW_Y[selected_]);
 
         /* 底部提示 —— 按 docs/10-input-mapping-rule.md §5 L 类型模板。
@@ -186,7 +191,7 @@ namespace ekeys
         char hint_buf[80];
         buildHintLabel(kind(), hint_buf, sizeof(hint_buf));
         lv_label_set_text(hint, hint_buf);
-        lv_obj_set_style_text_color(hint, lv_color_hex(0x6B7280), LV_PART_MAIN);
+        lv_obj_set_style_text_color(hint, lv_color_hex(0xA69FAF), LV_PART_MAIN);
         lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, LV_PART_MAIN);
         lv_obj_align(hint, LV_ALIGN_BOTTOM_RIGHT, -8, -4);
     }

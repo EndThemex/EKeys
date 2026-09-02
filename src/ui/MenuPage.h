@@ -50,7 +50,7 @@ namespace ekeys
             uint8_t pageId;
         };
 
-        static constexpr uint8_t ENTRY_COUNT = 6;
+        static constexpr uint8_t ENTRY_COUNT = 7;
         static const MenuEntry ENTRIES_[ENTRY_COUNT];
 
         /* 每行的 y 坐标（与 buildUi() 中同步；只读不变量）。
@@ -58,7 +58,7 @@ namespace ekeys
          * 改用类内 inline constexpr（C++17 起 ODR-usable），下面这些
          * 整数常量改为 inline constexpr value，数组仍放 .cpp。 */
         static const int16_t ROW_Y[ENTRY_COUNT]; /* 定义见 MenuPage.cpp */
-        static constexpr int16_t ROW_HEIGHT = 18;
+        static constexpr int16_t ROW_HEIGHT = 16;
         static constexpr int16_t ROW_LEFT = 10;
         /* 高亮条宽度 = 当前所有菜单项中最长标题的渲染宽度 + 左右内边距。
          * 不再固定为全屏宽度，避免出现长条拖出整个屏幕的视觉负担。 */

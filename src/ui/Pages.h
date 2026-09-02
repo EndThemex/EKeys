@@ -24,6 +24,7 @@ namespace ekeys
         PAGE_MIC = 6,    // 麦克风频谱
         PAGE_KEYMAP = 7, // BLE → KeyMap 配置子页（profile 切换 / 单键编辑）
         PAGE_NEUMO = 8,  // 拟态组件展示页（input / button / switch / checkbox）
+        PAGE_THEME = 9,  // 主题色查看页（5×2 色卡 + HEX）
     };
 
 } // namespace ekeys
