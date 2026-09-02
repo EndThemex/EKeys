@@ -1,83 +1,131 @@
 #include "rgb/RGBLightControl.h"
 
-namespace ekeys {
+namespace ekeys
+{
 
-RGBLightControl::RGBLightControl() {}
+    RGBLightControl::RGBLightControl() {}
 
-void RGBLightControl::begin() {
-    // VCC 控制：参考 FunModularKeyboard 写 LOW（高电平开/低电平开由板子决定）
-    pinMode(LED_VCC_CTRL, OUTPUT);
-    digitalWrite(LED_VCC_CTRL, LOW);
+    void RGBLightControl::begin()
+    {
+        // VCC 控制：参考 FunModularKeyboard 写 LOW（高电平开/低电平开由板子决定）
+        pinMode(LED_VCC_CTRL, OUTPUT);
+        digitalWrite(LED_VCC_CTRL, LOW);
 
-    FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds_, NUM_LEDS);
-    FastLED.setBrightness(brightness_);  // 0~255，80 较温和
-    FastLED.clear(true);        // 上电全灭
-    enabled_ = false;
-    currentEffect_ = LightEffect::Off;
-}
-
-void RGBLightControl::setBrightnessLevel(uint8_t b) {
-    brightness_ = b;
-    FastLED.setBrightness(brightness_);
-}
-
-void RGBLightControl::show() {
-    FastLED.show();
-}
-
-void RGBLightControl::turnOffAll() {
-    FastLED.clear(true);
-}
-
-void RGBLightControl::setEnabled(bool enabled) {
-    enabled_ = enabled;
-    if (!enabled_) {
-        turnOffAll();
-    } else {
-        applyEffectStatic();
+        FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds_, NUM_LEDS);
+        FastLED.setBrightness(brightness_); // 0~255，80 较温和
+        FastLED.clear(true);                // 上电全灭
+        enabled_ = false;
+        currentEffect_ = LightEffect::Off;
     }
-}
 
-void RGBLightControl::setEffect(LightEffect e) {
-    if (e >= LightEffect::Count) e = LightEffect::Off;
-    currentEffect_ = e;
-    if (enabled_) applyEffectStatic();
-}
-
-void RGBLightControl::cycleEffect(int8_t dir) {
-    int8_t cur = (int8_t)currentEffect_;
-    int8_t n   = (int8_t)LightEffect::Count;
-    cur = (cur + dir + n) % n;
-    setEffect((LightEffect)cur);
-}
-
-const char* RGBLightControl::effectName(LightEffect e) {
-    switch (e) {
-        case LightEffect::Off:          return "Off";
-        case LightEffect::StaticWhite:  return "Static White";
-        case LightEffect::StaticRed:    return "Static Red";
-        case LightEffect::StaticGreen:  return "Static Green";
-        case LightEffect::StaticBlue:   return "Static Blue";
-        case LightEffect::Rainbow:      return "Rainbow";
-        case LightEffect::RainbowWave:  return "Rainbow Wave";
-        case LightEffect::Pulse:        return "Pulse";
-        default:                        return "?";
+    void RGBLightControl::setBrightnessLevel(uint8_t b)
+    {
+        if (brightness_ == b)
+            return;
+        brightness_ = b;
+        FastLED.setBrightness(brightness_);
+        // FastLED.setBrightness 仅影响下一次 show()，因此静态灯效需要立即重画一帧。
+        // Off 状态本身不显示，无需重画；动态灯效会由 tick() 自然刷新。
+        if (enabled_ && currentEffect_ != LightEffect::Off)
+        {
+            switch (currentEffect_)
+            {
+            case LightEffect::Rainbow:
+            case LightEffect::RainbowWave:
+            case LightEffect::Pulse:
+                // 动态灯效：等待下一次 tick() 即可
+                break;
+            default:
+                applyEffectStatic();
+                break;
+            }
+        }
     }
-}
 
-void RGBLightControl::applyEffectStatic() {
-    switch (currentEffect_) {
+    void RGBLightControl::show()
+    {
+        FastLED.show();
+    }
+
+    void RGBLightControl::turnOffAll()
+    {
+        FastLED.clear(true);
+    }
+
+    void RGBLightControl::setEnabled(bool enabled)
+    {
+        enabled_ = enabled;
+        if (!enabled_)
+        {
+            turnOffAll();
+        }
+        else
+        {
+            applyEffectStatic();
+        }
+    }
+
+    void RGBLightControl::setEffect(LightEffect e)
+    {
+        if (e >= LightEffect::Count)
+            e = LightEffect::Off;
+        currentEffect_ = e;
+        if (enabled_)
+            applyEffectStatic();
+    }
+
+    void RGBLightControl::cycleEffect(int8_t dir)
+    {
+        int8_t cur = (int8_t)currentEffect_;
+        int8_t n = (int8_t)LightEffect::Count;
+        cur = (cur + dir + n) % n;
+        setEffect((LightEffect)cur);
+    }
+
+    const char *RGBLightControl::effectName(LightEffect e)
+    {
+        switch (e)
+        {
+        case LightEffect::Off:
+            return "Off";
+        case LightEffect::StaticWhite:
+            return "Static White";
+        case LightEffect::StaticRed:
+            return "Static Red";
+        case LightEffect::StaticGreen:
+            return "Static Green";
+        case LightEffect::StaticBlue:
+            return "Static Blue";
+        case LightEffect::Rainbow:
+            return "Rainbow";
+        case LightEffect::RainbowWave:
+            return "Rainbow Wave";
+        case LightEffect::Pulse:
+            return "Pulse";
+        default:
+            return "?";
+        }
+    }
+
+    void RGBLightControl::applyEffectStatic()
+    {
+        switch (currentEffect_)
+        {
         case LightEffect::Off:
             FastLED.clear(true);
             return;
         case LightEffect::StaticWhite:
-            fill_solid(leds_, NUM_LEDS, CRGB::White); break;
+            fill_solid(leds_, NUM_LEDS, CRGB::White);
+            break;
         case LightEffect::StaticRed:
-            fill_solid(leds_, NUM_LEDS, CRGB::Red); break;
+            fill_solid(leds_, NUM_LEDS, CRGB::Red);
+            break;
         case LightEffect::StaticGreen:
-            fill_solid(leds_, NUM_LEDS, CRGB::Green); break;
+            fill_solid(leds_, NUM_LEDS, CRGB::Green);
+            break;
         case LightEffect::StaticBlue:
-            fill_solid(leds_, NUM_LEDS, CRGB::Blue); break;
+            fill_solid(leds_, NUM_LEDS, CRGB::Blue);
+            break;
         case LightEffect::Rainbow:
         case LightEffect::RainbowWave:
         case LightEffect::Pulse:
@@ -86,43 +134,50 @@ void RGBLightControl::applyEffectStatic() {
             break;
         default:
             return;
+        }
+        FastLED.show();
     }
-    FastLED.show();
-}
 
-void RGBLightControl::tick() {
-    if (!enabled_) return;
+    void RGBLightControl::tick()
+    {
+        if (!enabled_)
+            return;
 
-    static uint8_t hue = 0;
-    switch (currentEffect_) {
+        static uint8_t hue = 0;
+        switch (currentEffect_)
+        {
         case LightEffect::Rainbow:
             fill_rainbow(leds_, NUM_LEDS, hue, 256 / max((int)NUM_LEDS, 1));
             hue++;
             FastLED.show();
             break;
         case LightEffect::RainbowWave:
-            for (int i = 0; i < NUM_LEDS; ++i) {
+            for (int i = 0; i < NUM_LEDS; ++i)
+            {
                 leds_[i] = CHSV((uint8_t)(hue + i * 20), 255, 255);
             }
             hue++;
             FastLED.show();
             break;
-        case LightEffect::Pulse: {
+        case LightEffect::Pulse:
+        {
             // 整体呼吸：brightness 用 0..255 三角波
             static uint8_t br = 0;
             static int8_t step = 4;
-            for (int i = 0; i < NUM_LEDS; ++i) {
+            for (int i = 0; i < NUM_LEDS; ++i)
+            {
                 leds_[i] = CRGB(255, 255, 255).nscale8(br);
             }
             br += step;
-            if (br <= 0 || br >= 255) step = -step;
+            if (br <= 0 || br >= 255)
+                step = -step;
             FastLED.show();
             break;
         }
         default:
             // 静态灯效：applyEffectStatic 已写好，不需要 tick
             break;
+        }
     }
-}
 
-}  // namespace ekeys
+} // namespace ekeys
