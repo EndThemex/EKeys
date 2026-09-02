@@ -600,7 +600,7 @@ void setup()
      * 必须在 g_pm.begin() 之前：UI 注册时 BlePage 会读 activeProfile()。 */
     loadBleProfileFromNvs();
 
-    g_pm.begin();
+    g_pm.begin(&g_rgb);
     registerAllPages();
     g_pm.push(PAGE_MENU);
     SERIAL_PRINTF("[UI] pages registered, started at MENU\n");

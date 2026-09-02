@@ -4,6 +4,7 @@
 #include <lvgl.h>
 #include <vector>
 #include "ui/Page.h"
+#include "rgb/RGBLightControl.h"
 
 namespace ekeys
 {
@@ -42,7 +43,10 @@ namespace ekeys
   public:
     PageManager();
 
-    void begin();
+    /* begin(rgb) 初始化 LVGL 屏幕、铺设背景图，并把 LED 默认灯效
+     * 设为与背景色协调的 StaticMoss（深苔绿 #2E5613）。
+     * RgbPage 等页面可在自身 onEnter() 中覆盖。 */
+    void begin(RGBLightControl *rgb = nullptr);
     void loopTick(); // 每帧调用：推进番茄钟等需要 frame tick 的逻辑
 
     /* 注册/入栈/弹栈 */
@@ -69,6 +73,7 @@ namespace ekeys
 
     std::vector<Page *> registry_;
     std::vector<Page *> stack_;
+    RGBLightControl *rgb_{nullptr};
   };
 
 } // namespace ekeys

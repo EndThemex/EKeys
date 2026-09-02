@@ -96,12 +96,18 @@ namespace ekeys
             return "Static Green";
         case LightEffect::StaticBlue:
             return "Static Blue";
+        case LightEffect::StaticOlive:
+            return "Static Olive"; // 橄榄（bgv1 主色）
+        case LightEffect::StaticMoss:
+            return "Static Moss"; // 苔绿（bgv2 主色）
         case LightEffect::Rainbow:
             return "Rainbow";
         case LightEffect::RainbowWave:
             return "Rainbow Wave";
         case LightEffect::Pulse:
             return "Pulse";
+        case LightEffect::AuroraMoss:
+            return "Aurora Moss"; // 极光苔绿
         default:
             return "?";
         }
@@ -126,9 +132,18 @@ namespace ekeys
         case LightEffect::StaticBlue:
             fill_solid(leds_, NUM_LEDS, CRGB::Blue);
             break;
+        case LightEffect::StaticOlive:
+            // #416100 ≈ R=65 G=97 B=0（bgv1 主色）
+            fill_solid(leds_, NUM_LEDS, CRGB(65, 97, 0));
+            break;
+        case LightEffect::StaticMoss:
+            // #2E5613 ≈ R=46 G=86 B=19（bgv2 主色，更暗更深绿）
+            fill_solid(leds_, NUM_LEDS, CRGB(46, 86, 19));
+            break;
         case LightEffect::Rainbow:
         case LightEffect::RainbowWave:
         case LightEffect::Pulse:
+        case LightEffect::AuroraMoss:
             // 动态灯效：先填一帧底色，后续 tick() 推进
             fill_solid(leds_, NUM_LEDS, CRGB::Black);
             break;
@@ -171,6 +186,38 @@ namespace ekeys
             br += step;
             if (br <= 0 || br >= 255)
                 step = -step;
+            FastLED.show();
+            break;
+        }
+        case LightEffect::AuroraMoss:
+        {
+            // 极光苔绿：每颗 LED 在 #416100(橄榄) → #2E5613(苔绿) → #83A100(亮黄绿)
+            // 三色之间做相位偏移的呼吸；整排 9 颗形成缓慢的极光波。
+            // 周期 ≈ 4s（30ms/tick * 133 ≈ 4s）。
+            static uint8_t phase = 0; // 0..255
+            // 关键色（与 bgv2 配色调色板保持一致）
+            const CRGB cOlive(65, 97, 0);    // #416100
+            const CRGB cMoss(46, 86, 19);    // #2E5613
+            const CRGB cBright(131, 161, 0); // #83A100（bgv1/bgv2 中的高光色）
+            for (int i = 0; i < NUM_LEDS; ++i)
+            {
+                // 每颗 LED 相位错开 28 (≈ 256/9)，形成行波
+                uint8_t p = phase + i * 28;
+                // 用 0..84 / 85..169 / 170..255 三个区间做三色插值
+                if (p < 85)
+                {
+                    leds_[i] = blend(cMoss, cOlive, (uint8_t)(p * 3));
+                }
+                else if (p < 170)
+                {
+                    leds_[i] = blend(cOlive, cBright, (uint8_t)((p - 85) * 3));
+                }
+                else
+                {
+                    leds_[i] = blend(cBright, cMoss, (uint8_t)((p - 170) * 3));
+                }
+            }
+            phase += 2; // 30ms * 2/256 ≈ 4s 一个完整循环
             FastLED.show();
             break;
         }

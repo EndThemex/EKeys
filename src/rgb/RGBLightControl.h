@@ -21,9 +21,12 @@ namespace ekeys
         StaticRed,   // 静态红
         StaticGreen, // 静态绿
         StaticBlue,  // 静态蓝
+        StaticOlive, // 静态橄榄（#416100，bgv1 主色）
+        StaticMoss,  // 静态深苔绿（#2E5613，bgv2 主色）
         Rainbow,     // 彩虹
         RainbowWave, // 彩虹波浪
         Pulse,       // 整体呼吸
+        AuroraMoss,  // 极光苔绿：#416100↔#2E5613↔#83A100 平滑呼吸
         Count,       // 哨兵：灯效总数
     };
 
