@@ -25,6 +25,12 @@ namespace ekeys
         void onEnter() override;
         void onExit() override;
 
+        /* PageKind：L 列表选择 —— KEY3..KEY9 直接跳到第 idx 项（idx = keyId - 3）。
+         * 当前菜单共 5 项，所以 idx ∈ [0,4] 有效；KEY3=idx0, KEY4=idx1, ...
+         * KEY8=idx5 已越界 → 返回 false，无操作；KEY9=idx6 同上。 */
+        PageKind kind() const override { return PageKind::List; }
+        bool selectItem(uint8_t idx) override;
+
         /* 菜单页的旋钮旋转 = 切菜单项 + 发 BLE 方向键（不消费） */
         bool consumesEncoder() const override { return false; }
 

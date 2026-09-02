@@ -45,7 +45,9 @@ namespace ekeys
         rgb_label_ = rgb;
 
         lv_obj_t *hint = lv_label_create(root_obj);
-        lv_label_set_text(hint, "KEY1 back");
+        char hint_buf[80];
+        buildHintLabel(kind(), hint_buf, sizeof(hint_buf));
+        lv_label_set_text(hint, hint_buf);
         lv_obj_set_style_text_color(hint, lv_color_hex(0x808080), LV_PART_MAIN);
         lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, LV_PART_MAIN);
         lv_obj_align(hint, LV_ALIGN_BOTTOM_RIGHT, -8, -4);

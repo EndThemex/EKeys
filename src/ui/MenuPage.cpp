@@ -178,9 +178,13 @@ namespace ekeys
         lv_obj_set_style_text_font(indicator_, &lv_font_montserrat_20, LV_PART_MAIN);
         lv_obj_set_pos(indicator_, ROW_LEFT + 4, ROW_Y[selected_]);
 
-        /* 底部提示 */
+        /* 底部提示 —— 按 docs/10-input-mapping-rule.md §5 L 类型模板。
+         * 428 屏宽单行可放下模板整串（"K1 back  KNOB pick  K2 enter  K3..K9 jump"），
+         * 不再拆成左右两段。 */
         lv_obj_t *hint = lv_label_create(root_obj);
-        lv_label_set_text(hint, "KNOB pick  KEY2 enter");
+        char hint_buf[80];
+        buildHintLabel(kind(), hint_buf, sizeof(hint_buf));
+        lv_label_set_text(hint, hint_buf);
         lv_obj_set_style_text_color(hint, lv_color_hex(0x6B7280), LV_PART_MAIN);
         lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, LV_PART_MAIN);
         lv_obj_align(hint, LV_ALIGN_BOTTOM_RIGHT, -8, -4);
@@ -328,6 +332,18 @@ namespace ekeys
     {
         /* KEY2 = 进入当前选中页 */
         requestPush(ENTRIES_[selected_].pageId);
+    }
+
+    /* L 类型 selectItem：KEY3..KEY9 直接跳到第 idx 项（idx = keyId - 3）。
+     * 当前共 5 项，idx ∈ [0,4]；越界返回 false，基类直接丢弃。 */
+    bool MenuPage::selectItem(uint8_t idx)
+    {
+        if (idx >= ENTRY_COUNT)
+            return false;
+        const uint8_t from = selected_;
+        selected_ = idx;
+        animateToSelected(from, selected_);
+        return true;
     }
 
 } // namespace ekeys

@@ -49,7 +49,9 @@ namespace ekeys
         vendor_label_ = vendor;
 
         lv_obj_t *hint = lv_label_create(root_obj);
-        lv_label_set_text(hint, "KEY2 KeyMap  KEY3 toggle  KEY1 back");
+        char hint_buf[80];
+        buildHintLabel(kind(), hint_buf, sizeof(hint_buf));
+        lv_label_set_text(hint, hint_buf);
         lv_obj_set_style_text_color(hint, lv_color_hex(0x808080), LV_PART_MAIN);
         lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, LV_PART_MAIN);
         lv_obj_align(hint, LV_ALIGN_BOTTOM_RIGHT, -8, -4);
@@ -66,13 +68,35 @@ namespace ekeys
         requestPush(PAGE_KEYMAP);
     }
 
-    void BlePage::onSelectKey(uint8_t keyId)
+    void BlePage::onSelectKey(uint8_t /*keyId*/)
     {
-        /* KEY3 = toggle BLE 开关（快速开关），其他 KEY 忽略。 */
-        if (keyId == 3)
+        /* 基类已按 kind() 路由到 selectAction(idx)；本函数保留为空避免误导。 */
+    }
+
+    /* A 类型 selectAction：
+     *   idx=0 → toggle BLE 开关
+     *   idx=1 → reconnect（预留）
+     *   idx=2 → clear bond（预留）
+     *   idx>=3 → 越界返回 false。
+     *
+     * 注：reconnect / clear bond 当前 BleKeyboardSink 接口未必暴露，
+     * 这里先占位，确保规则可声明；后续接入时直接实现 idx=1/2 即可。 */
+    bool BlePage::selectAction(uint8_t idx)
+    {
+        switch (idx)
         {
+        case 0:
             ble_.setEnabled(!ble_.isEnabled());
             refresh();
+            return true;
+        case 1:
+            /* TODO: reconnect —— 待 BleKeyboardSink 提供接口后实现 */
+            return false;
+        case 2:
+            /* TODO: clear bond —— 待 BleKeyboardSink 提供接口后实现 */
+            return false;
+        default:
+            return false;
         }
     }
 

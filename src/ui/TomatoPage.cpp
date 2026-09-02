@@ -40,9 +40,13 @@ namespace ekeys
         lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 60);
         time_label_ = t;
 
-        /* 提示行 */
+        /* 提示行 —— 按 docs/10-input-mapping-rule.md §5 S 类型模板固定文案。
+         * 不再随状态拼接 "click=start/pause/..." 等动态文本（§4 优化 4）：
+         * 状态变化应在主信息区（status_label_ / time_label_ 的颜色与文字）反馈。 */
         lv_obj_t *h = lv_label_create(root_obj);
-        lv_label_set_text(h, "KEY1 back");
+        char hint_buf[80];
+        buildHintLabel(kind(), hint_buf, sizeof(hint_buf));
+        lv_label_set_text(h, hint_buf);
         lv_obj_set_style_text_color(h, lv_color_hex(0x808080), LV_PART_MAIN);
         lv_obj_set_style_text_font(h, &lv_font_montserrat_14, LV_PART_MAIN);
         lv_obj_align(h, LV_ALIGN_BOTTOM_RIGHT, -8, -4);
@@ -188,6 +192,37 @@ namespace ekeys
         rgb_.show();
     }
 
+    /* S 类型 selectState：idx 映射到番茄钟动作（reset/start/pause/resume）。
+     *   idx=0 → resetTimer()
+     *   idx=1 → startTimer()
+     *   idx=2 → pauseTimer()
+     *   idx=3 → resumeTimer()
+     *   idx>=4 → 越界返回 false。
+     *
+     * 复用基类的状态机逻辑：reset 必须从任何态都允许，start 仅在 Idle/Pause/Done 生效，
+     * pause/resume 仅在 Run/Pause 生效。复用 resetTimer/startTimer/pauseTimer/resumeTimer
+     * 内部各自的允许条件（不重复实现）。 */
+    bool TomatoPage::selectState(uint8_t idx)
+    {
+        switch (idx)
+        {
+        case 0:
+            resetTimer();
+            return true;
+        case 1:
+            startTimer();
+            return true;
+        case 2:
+            pauseTimer();
+            return true;
+        case 3:
+            resumeTimer();
+            return true;
+        default:
+            return false;
+        }
+    }
+
     void TomatoPage::refresh()
     {
         /* 状态行 */
@@ -217,16 +252,8 @@ namespace ekeys
         }
         if (hint_label_ != nullptr)
         {
-            const char *h = "KEY1 back";
-            if (state_ == State::Idle)
-                h = "click=start";
-            if (state_ == State::Run)
-                h = "click=pause";
-            if (state_ == State::Pause)
-                h = "click=resume";
-            if (state_ == State::Done)
-                h = "click=reset";
-            lv_label_set_text(hint_label_, h);
+            /* hint 文案固定为 §5 S 类型模板，不随 state 变化（§4 优化 4）。
+             * buildUi() 构造时已经写好，这里无需更新。 */
         }
     }
 

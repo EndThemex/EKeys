@@ -55,9 +55,11 @@ namespace ekeys
         lv_obj_align(val_row, LV_ALIGN_TOP_LEFT, 8, 70);
         value_label_ = val_row;
 
-        /* 提示行 */
+        /* 提示行 —— 按 docs/10-input-mapping-rule.md §5 M 类型模板。 */
         lv_obj_t *hint = lv_label_create(root_obj);
-        lv_label_set_text(hint, "KEY1 back");
+        char hint_buf[80];
+        buildHintLabel(kind(), hint_buf, sizeof(hint_buf));
+        lv_label_set_text(hint, hint_buf);
         lv_obj_set_style_text_color(hint, lv_color_hex(0x808080), LV_PART_MAIN);
         lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, LV_PART_MAIN);
         lv_obj_align(hint, LV_ALIGN_BOTTOM_RIGHT, -8, -4);
@@ -107,6 +109,16 @@ namespace ekeys
          * 可通过进入 Power 模式后旋转来切换 on/off。 */
         mode_ = (Mode)(((uint8_t)mode_ + 1) % (uint8_t)Mode::Count);
         refresh();
+    }
+
+    /* M 类型 selectMode：idx ∈ [0, 模式总数-1] 直接进入对应模式；越界返回 false。 */
+    bool RgbPage::selectMode(uint8_t idx)
+    {
+        if (idx >= (uint8_t)Mode::Count)
+            return false;
+        mode_ = (Mode)idx;
+        refresh();
+        return true;
     }
 
     void RgbPage::refresh()

@@ -79,32 +79,23 @@ namespace ekeys
      * 老的 BLE 发送逻辑（BLE_KEY_MAP[1..9] 等）保持原有调用语义：
      *   - 索引 0 占位
      *   - 直接从"当前 profile"复制出来
-     * 用 static constexpr 不行（必须可重写），所以这里用 inline 变量
-     * （C++17），BleKeyboardSink 启动时通过 refreshMaps() 同步一次。
+     *
+     * 这些数组**必须可写**（refreshMapsFromActiveProfile() 会覆盖），
+     * 所以不能用 static constexpr（编译期常量不可写）。
+     * C++17 的 inline 变量可以做到"头文件声明 + 单一定义"，但本项目
+     * arduino 框架默认 C++11，升标准风险较大。
+     *
+     * 因此采用经典的 extern 声明 + BleKeyMap.cpp 单一定义的方案：
+     *   - 任何 .h/.cpp 直接 #include "BleKeyMap.h" 即可使用这三个符号；
+     *   - 真正的存储定义只在 BleKeyMap.cpp 出现一次。
+     *
+     * ⚠️ 不要改成 `inline uint8_t arr[N] = {...}` —— 那是 C++17 特性，
+     * 当前工程会在编译期出 warning 并退化为每个 TU 一份拷贝（ODR 风险）。
+     * 详见 docs/10-input-mapping-rule.md §10.1。
      */
-    inline uint8_t BLE_KEY_MAP[10] = {
-        0,
-        hidToLibKey(0x1E),
-        hidToLibKey(0x1F),
-        hidToLibKey(0x20),
-        hidToLibKey(0x21),
-        hidToLibKey(0x22),
-        hidToLibKey(0x23),
-        hidToLibKey(0x24),
-        hidToLibKey(0x25),
-        hidToLibKey(0x26),
-    };
-    inline uint8_t BLE_ENCODER_MAP[4] = {
-        0,
-        hidToLibKey(0x28),
-        hidToLibKey(0x29),
-        hidToLibKey(0x2B),
-    };
-    inline uint8_t BLE_ROTATE_MAP[3] = {
-        0,
-        hidToLibKey(0x4F),
-        hidToLibKey(0x50),
-    };
+    extern uint8_t BLE_KEY_MAP[10];
+    extern uint8_t BLE_ENCODER_MAP[4];
+    extern uint8_t BLE_ROTATE_MAP[3];
 
     /* 内部：用 bleActiveProfile() 把当前 profile 同步到上面的 3 个数组。
      * BleKeyboardSink::setActiveProfile() 内部调用；UI 不直接调用。 */

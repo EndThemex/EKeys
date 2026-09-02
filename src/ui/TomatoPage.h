@@ -29,6 +29,18 @@ namespace ekeys
         void onEncoder(int8_t delta) override;
         void onConfirm() override;
 
+        /* PageKind：S 流程状态机 —— KEY3..KEY9 直接进入第 idx 个状态/动作。
+         * 状态机本身只有 4 个态（Idle/Run/Pause/Done），但"动作"视角下：
+         *   idx=0 → reset    (KEY3)
+         *   idx=1 → start    (KEY4)
+         *   idx=2 → pause    (KEY5)
+         *   idx=3 → resume   (KEY6)
+         *   idx>=4           → 越界返回 false，基类丢弃。
+         * 选择"动作"而非"状态"作为直选语义，是因为状态 DONE 没有"进入"价值，
+         * 而 reset/start/pause/resume 是用户真正想"一键触发"的四个动作。 */
+        PageKind kind() const override { return PageKind::State; }
+        bool selectState(uint8_t idx) override;
+
         /* TomatoPage 用旋钮调时长 → 消费旋转，不发 BLE 方向键 */
         bool consumesEncoder() const override { return true; }
 

@@ -112,9 +112,11 @@ namespace ekeys
         lv_obj_set_style_text_font(diag_label_, &lv_font_montserrat_14, LV_PART_MAIN);
         lv_obj_align(diag_label_, LV_ALIGN_TOP_LEFT, 8, 42);
 
-        /* 底部提示 */
+        /* 底部提示 —— 按 docs/10-input-mapping-rule.md §5 R 类型模板。 */
         hint_ = lv_label_create(root_obj);
-        lv_label_set_text(hint_, "KEY1 back");
+        char hint_buf[80];
+        buildHintLabel(kind(), hint_buf, sizeof(hint_buf));
+        lv_label_set_text(hint_, hint_buf);
         lv_obj_set_style_text_color(hint_, lv_color_hex(0x808080), LV_PART_MAIN);
         lv_obj_set_style_text_font(hint_, &lv_font_montserrat_14, LV_PART_MAIN);
         lv_obj_align(hint_, LV_ALIGN_BOTTOM_RIGHT, -8, -4);

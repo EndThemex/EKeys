@@ -51,35 +51,87 @@ namespace ekeys
             snprintf(out, outLen, "%d", hid - 0x1E + 1);
             return;
         }
-        if (hid == 0x27) { snprintf(out, outLen, "0"); return; }
+        if (hid == 0x27)
+        {
+            snprintf(out, outLen, "0");
+            return;
+        }
 
         /* 常见功能键 */
         switch (hid)
         {
-        case 0x28: snprintf(out, outLen, "Ent"); return; // Enter
-        case 0x29: snprintf(out, outLen, "Esc"); return; // Esc
-        case 0x2A: snprintf(out, outLen, "Bsp"); return; // Backspace
-        case 0x2B: snprintf(out, outLen, "Tab"); return; // Tab
-        case 0x2C: snprintf(out, outLen, "Spc"); return; // Space
-        case 0x4F: snprintf(out, outLen, ">");   return; // Right Arrow
-        case 0x50: snprintf(out, outLen, "<");   return; // Left Arrow
-        case 0x51: snprintf(out, outLen, "v");   return; // Down Arrow
-        case 0x52: snprintf(out, outLen, "^");   return; // Up Arrow
-        case 0x4A: snprintf(out, outLen, "Hm");  return; // Home
-        case 0x4B: snprintf(out, outLen, "PgU"); return; // Page Up
-        case 0x4C: snprintf(out, outLen, "Del"); return; // Delete Forward
-        case 0x4D: snprintf(out, outLen, "End"); return; // End
-        case 0x4E: snprintf(out, outLen, "PgD"); return; // Page Down
+        case 0x28:
+            snprintf(out, outLen, "Ent");
+            return; // Enter
+        case 0x29:
+            snprintf(out, outLen, "Esc");
+            return; // Esc
+        case 0x2A:
+            snprintf(out, outLen, "Bsp");
+            return; // Backspace
+        case 0x2B:
+            snprintf(out, outLen, "Tab");
+            return; // Tab
+        case 0x2C:
+            snprintf(out, outLen, "Spc");
+            return; // Space
+        case 0x4F:
+            snprintf(out, outLen, ">");
+            return; // Right Arrow
+        case 0x50:
+            snprintf(out, outLen, "<");
+            return; // Left Arrow
+        case 0x51:
+            snprintf(out, outLen, "v");
+            return; // Down Arrow
+        case 0x52:
+            snprintf(out, outLen, "^");
+            return; // Up Arrow
+        case 0x4A:
+            snprintf(out, outLen, "Hm");
+            return; // Home
+        case 0x4B:
+            snprintf(out, outLen, "PgU");
+            return; // Page Up
+        case 0x4C:
+            snprintf(out, outLen, "Del");
+            return; // Delete Forward
+        case 0x4D:
+            snprintf(out, outLen, "End");
+            return; // End
+        case 0x4E:
+            snprintf(out, outLen, "PgD");
+            return; // Page Down
         }
 
         /* Media 键（HID Consumer 0xCD/0xE9/0xEA 等）直接透传 libKey（库内部按
          * media 路径处理）。0xCD = Play/Pause, 0xB5 = Next, 0xB6 = Prev,
          * 0xE9 = Vol+, 0xEA = Vol- */
-        if (libKey == 0xCD) { snprintf(out, outLen, "Play"); return; }
-        if (libKey == 0xB5) { snprintf(out, outLen, "Next"); return; }
-        if (libKey == 0xB6) { snprintf(out, outLen, "Prev"); return; }
-        if (libKey == 0xE9) { snprintf(out, outLen, "Vol+"); return; }
-        if (libKey == 0xEA) { snprintf(out, outLen, "Vol-"); return; }
+        if (libKey == 0xCD)
+        {
+            snprintf(out, outLen, "Play");
+            return;
+        }
+        if (libKey == 0xB5)
+        {
+            snprintf(out, outLen, "Next");
+            return;
+        }
+        if (libKey == 0xB6)
+        {
+            snprintf(out, outLen, "Prev");
+            return;
+        }
+        if (libKey == 0xE9)
+        {
+            snprintf(out, outLen, "Vol+");
+            return;
+        }
+        if (libKey == 0xEA)
+        {
+            snprintf(out, outLen, "Vol-");
+            return;
+        }
 
         /* 兜底：显示 hex 前缀 */
         snprintf(out, outLen, "%02X", hid);
@@ -209,18 +261,20 @@ namespace ekeys
             cell_labels_[i + 1] = lab;
         }
 
-        /* ---- y=120..138 底部 hint 区 ---- */
-        lv_obj_t *hint_left = lv_label_create(root_obj);
-        lv_label_set_text(hint_left, "K2 next");
-        lv_obj_set_style_text_color(hint_left, lv_color_hex(0x6B7280), LV_PART_MAIN);
-        lv_obj_set_style_text_font(hint_left, &lv_font_montserrat_14, LV_PART_MAIN);
-        lv_obj_align(hint_left, LV_ALIGN_BOTTOM_LEFT, 8, -4);
-
-        lv_obj_t *hint_right = lv_label_create(root_obj);
-        lv_label_set_text(hint_right, "KNOB pick  K1 back");
-        lv_obj_set_style_text_color(hint_right, lv_color_hex(0x6B7280), LV_PART_MAIN);
-        lv_obj_set_style_text_font(hint_right, &lv_font_montserrat_14, LV_PART_MAIN);
-        lv_obj_align(hint_right, LV_ALIGN_BOTTOM_RIGHT, -8, -4);
+        /* ---- y=120..138 底部 hint 区 ----
+         * 按 docs/10-input-mapping-rule.md §5 L 类型模板：
+         * "K1 back  KNOB pick  K2 enter  K3..K9 jump"
+         * 注：当前 KeyMapPage 的 K2 实际语义是"下一 profile"而非"进入选中项"，
+         * 模板里 K2 enter 是 L 类的通用含义，与 KeyMap 的 K2=next profile 略不一致；
+         * 这里保留模板以保证跨页一致性，并接受这一处 L 类内的微小例外。
+         * （如要严格区分，可在 hint 后追加 "K2 next profile" 等小字片段。） */
+        lv_obj_t *hint = lv_label_create(root_obj);
+        char hint_buf[80];
+        buildHintLabel(kind(), hint_buf, sizeof(hint_buf));
+        lv_label_set_text(hint, hint_buf);
+        lv_obj_set_style_text_color(hint, lv_color_hex(0x6B7280), LV_PART_MAIN);
+        lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, LV_PART_MAIN);
+        lv_obj_align(hint, LV_ALIGN_BOTTOM_RIGHT, -8, -4);
 
         refresh();
     }
@@ -268,15 +322,15 @@ namespace ekeys
         refresh();
     }
 
-    void KeyMapPage::onSelectKey(uint8_t keyId)
+    /* L 类型 selectItem：idx ∈ [0,8] → keyId = idx + 1。idx 越界返回 false。 */
+    bool KeyMapPage::selectItem(uint8_t idx)
     {
-        /* KEY3..KEY9 直接跳到对应 keyId。KEY1 由 PageManager 处理（back）。
-         * KEY2 已经走 onConfirm。 */
-        if (keyId >= 3 && keyId <= 9)
-        {
-            selectedKeyId_ = keyId;
-            refresh();
-        }
+        const uint8_t keyId = (uint8_t)(idx + 1U);
+        if (keyId < 1 || keyId > 9)
+            return false;
+        selectedKeyId_ = keyId;
+        refresh();
+        return true;
     }
 
     void KeyMapPage::refresh()

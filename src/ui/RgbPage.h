@@ -34,6 +34,12 @@ namespace ekeys
         void onEncoder(int8_t delta) override;
         void onConfirm() override;
 
+        /* PageKind：M 多模式控制 —— KEY3..KEY9 直接进入第 idx 个模式。
+         * 当前 3 个模式（Effect / Bright / Power），idx ∈ [0,2] 有效。
+         * idx=0 → Effect, idx=1 → Bright, idx=2 → Power；越界返回 false。 */
+        PageKind kind() const override { return PageKind::Mode; }
+        bool selectMode(uint8_t idx) override;
+
         /* RgbPage 用旋钮调灯效/亮度/开关 → 消费旋转，不发 BLE 方向键 */
         bool consumesEncoder() const override { return true; }
 

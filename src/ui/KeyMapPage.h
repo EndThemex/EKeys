@@ -33,7 +33,12 @@ namespace ekeys
 
         void onEncoder(int8_t delta) override;        // 旋钮旋转：选按键
         void onConfirm() override;                   // KEY2 / 旋钮按下：切 profile
-        void onSelectKey(uint8_t keyId) override;    // KEY3..9 跳到该键
+
+        /* PageKind：L 列表选择 —— KEY3..KEY9 直接跳到第 idx 项（idx = keyId - 3）。
+         * 这里的"项"= 物理按键 keyId（1..9）。idx=0 → keyId=1, idx=1 → keyId=2, ...
+         * idx=8 → keyId=9，正好 9 个槽位。 */
+        PageKind kind() const override { return PageKind::List; }
+        bool selectItem(uint8_t idx) override;
 
     private:
         void buildUi() override;

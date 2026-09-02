@@ -29,10 +29,16 @@ namespace ekeys
     static const KeyMapProfile kProfileNumpad = {
         "Numpad",
         {
-            0,                 // index 0 占位
-            H_(0x1E), H_(0x1F), H_(0x20), // 1 2 3
-            H_(0x21), H_(0x22), H_(0x23), // 4 5 6
-            H_(0x24), H_(0x25), H_(0x26), // 7 8 9
+            0, // index 0 占位
+            H_(0x1E),
+            H_(0x1F),
+            H_(0x20), // 1 2 3
+            H_(0x21),
+            H_(0x22),
+            H_(0x23), // 4 5 6
+            H_(0x24),
+            H_(0x25),
+            H_(0x26), // 7 8 9
         },
         {
             0,
@@ -57,9 +63,15 @@ namespace ekeys
         "Media",
         {
             0,
-            H_(0xCD), H_(0xE9), H_(0xEA),       // 1 Play,  2 Vol+, 3 Vol-
-            H_(0xB5), H_(0xB6), H_(0x29),       // 4 Next,  5 Prev,  6 Esc
-            H_(0x4A), H_(0x4B), H_(0x4E),       // 7 Home,  8 PgUp, 9 PgDn
+            H_(0xCD),
+            H_(0xE9),
+            H_(0xEA), // 1 Play,  2 Vol+, 3 Vol-
+            H_(0xB5),
+            H_(0xB6),
+            H_(0x29), // 4 Next,  5 Prev,  6 Esc
+            H_(0x4A),
+            H_(0x4B),
+            H_(0x4E), // 7 Home,  8 PgUp, 9 PgDn
         },
         {
             0,
@@ -90,9 +102,15 @@ namespace ekeys
         "Editor",
         {
             0,
-            (uint8_t)'c', (uint8_t)'v', (uint8_t)'x', // 1 Copy, 2 Paste, 3 Cut
-            (uint8_t)'z', (uint8_t)'a', (uint8_t)'s', // 4 Undo, 5 SelAll, 6 Save
-            (uint8_t)'f', (uint8_t)'r', H_(0x2C),    // 7 Find, 8 Run (compile), 9 Space
+            (uint8_t)'c',
+            (uint8_t)'v',
+            (uint8_t)'x', // 1 Copy, 2 Paste, 3 Cut
+            (uint8_t)'z',
+            (uint8_t)'a',
+            (uint8_t)'s', // 4 Undo, 5 SelAll, 6 Save
+            (uint8_t)'f',
+            (uint8_t)'r',
+            H_(0x2C), // 7 Find, 8 Run (compile), 9 Space
         },
         {
             0,
@@ -117,9 +135,15 @@ namespace ekeys
         "Present",
         {
             0,
-            H_(0x06), H_(0x07), H_(0x08),       // 1 'c', 2 'd', 3 'e'
-            H_(0x09), H_(0x0A), H_(0x0B),       // 4 'f', 5 'g', 6 'h'
-            H_(0x0C), H_(0x0D), H_(0x0E),       // 7 'i', 8 'j', 9 'k'
+            H_(0x06),
+            H_(0x07),
+            H_(0x08), // 1 'c', 2 'd', 3 'e'
+            H_(0x09),
+            H_(0x0A),
+            H_(0x0B), // 4 'f', 5 'g', 6 'h'
+            H_(0x0C),
+            H_(0x0D),
+            H_(0x0E), // 7 'i', 8 'j', 9 'k'
         },
         {
             0,
@@ -132,6 +156,35 @@ namespace ekeys
             H_(0x4F), // CW → Right（下一页）
             H_(0x50), // CCW → Left（上一页）
         },
+    };
+
+    /* ---- 旧 API 兼容数组的存储定义 ----
+     *
+     * 头文件里是 extern 声明，这里给出唯一定义。初始值与 Numpad profile
+     * 完全一致（这是默认 profile，main.cpp 启动时若 NVS 没值也会是 0）。
+     * 后续 refreshMapsFromActiveProfile() 会按当前 profile 覆盖。 */
+    uint8_t BLE_KEY_MAP[10] = {
+        0,
+        H_(0x1E),
+        H_(0x1F),
+        H_(0x20), // 1 2 3
+        H_(0x21),
+        H_(0x22),
+        H_(0x23), // 4 5 6
+        H_(0x24),
+        H_(0x25),
+        H_(0x26), // 7 8 9
+    };
+    uint8_t BLE_ENCODER_MAP[4] = {
+        0,
+        H_(0x28), // 单击 → Enter
+        H_(0x29), // 双击 → Esc
+        H_(0x2B), // 长按 → Tab
+    };
+    uint8_t BLE_ROTATE_MAP[3] = {
+        0,
+        H_(0x4F), // CW → Right
+        H_(0x50), // CCW → Left
     };
 
     /* profile 表 */

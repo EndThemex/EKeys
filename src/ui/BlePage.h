@@ -28,7 +28,15 @@ namespace ekeys
 
         /* 交互：KEY2 / 旋钮按下 = 进入 KeyMap 子页 */
         void onConfirm() override;
-        void onSelectKey(uint8_t keyId) override;
+        void onSelectKey(uint8_t /*keyId*/) override;
+
+        /* PageKind：A 即时动作 —— KEY3..KEY9 直接触发第 idx 个动作。
+         *   idx=0 → toggle BLE 开关  (KEY3)
+         *   idx=1 → reconnect         (KEY4) —— 预留
+         *   idx=2 → clear bond        (KEY5) —— 预留
+         *   idx>=3 → 越界返回 false，基类丢弃。 */
+        PageKind kind() const override { return PageKind::Action; }
+        bool selectAction(uint8_t idx) override;
 
         /* 每帧调用一次，更新状态文本（避免陈旧）。 */
         void serviceTick();

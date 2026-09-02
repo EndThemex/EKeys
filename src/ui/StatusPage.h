@@ -15,6 +15,9 @@ namespace ekeys
 
         void onEnter() override;
 
+        /* PageKind：R 只读展示 —— 不响应 KEY3..KEY9 与旋钮。 */
+        PageKind kind() const override { return PageKind::ReadOnly; }
+
         /* 每帧调用一次，刷新 heap/uptime/rgb 文本。
          * 不放 LVGL 定时器是因为 frame tick 已经由 loop() 推动。 */
         void serviceTick();

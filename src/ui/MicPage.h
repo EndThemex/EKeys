@@ -31,6 +31,9 @@ namespace ekeys
         void onEnter() override;
         void onExit() override;
 
+        /* PageKind：R 只读展示 —— 不响应 KEY3..KEY9 与旋钮。 */
+        PageKind kind() const override { return PageKind::ReadOnly; }
+
         /* 每帧调用一次：读 mic → FFT → 刷新柱状条 + 诊断文本 */
         void serviceTick();
 
