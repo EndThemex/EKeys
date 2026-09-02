@@ -10,8 +10,16 @@ namespace ekeys
      *
      * 视觉：每个菜单项是一张"卡片"，从屏幕左缘开始横向铺开；
      * 选中卡片停在屏幕中央附近（露出右侧下一张卡片作为"即将到来"的提示），
-     * 卡片带紫色描边 + 半透明填充。底部有一排分页指示点。
-     * 切换时通过 translate_x 平滑滑动整组卡片。
+     * 卡片带紫色描边 + 半透明填充。顶部有一排分页指示点
+     * （7 个空心底点 + 1 个实心高亮点，高亮点在底点之间滑动，
+     * 与卡片滑动同步）。切换时通过 translate_x 平移整组卡片，
+     * 同时高亮点滑动到新位置、选中卡片做轻微"上抬"反馈。
+     *
+     * 丝滑设计要点：
+     *   1) translate_x 不在 ready_cb 里清零——终值就是 selected_ 的目标位置。
+     *   2) 连续旋转时新旧动画"接力"——保留旧动画 var，从当前值平滑过渡到新值，
+     *      避免每次都从 0 起步造成视觉抽动。
+     *   3) 选中样式瞬时切换（颜色/描边），位置用动画过渡，二者解耦。
      *
      * 注意：根据当前设计，旋钮在其他子页会交给子页自身处理（用于调整数值等），
      * 所以本类的 onEncoder() 只负责切菜单项。 */
@@ -40,6 +48,7 @@ namespace ekeys
         /* 动画 / 高亮 */
         void animateToSelected(uint8_t fromIdx, uint8_t toIdx);
         static void animSetX(void *var, int32_t v);
+        static void animSetY(void *var, int32_t v); /* 选中卡片 translate_y 上抬反馈 */
         static void animReadyCb(lv_anim_t *a);
 
         /* 指示点更新：把 dots_[selected_] 设为实心，其它设为空心 */
@@ -82,10 +91,10 @@ namespace ekeys
 
         /* 指示点视觉常量 */
         static constexpr uint8_t DOT_COUNT = ENTRY_COUNT;
-        static constexpr int16_t DOT_RADIUS = 3;
-        static constexpr int16_t DOT_RADIUS_ACTIVE = 4;
+        static constexpr int16_t DOT_SIZE = 8;   /* 7 个底点 + 1 个高亮点统一 8x8，避免 size 变化触发 layout */
+        static constexpr int16_t DOT_RADIUS = 3; /* 未选中底点半径（空心圆描边） */
         static constexpr int16_t DOT_SPACING = 14;
-        /* 圆点放在屏幕最顶部 (y=10)，圆点直径 8，居中后下边缘在 y=14，
+        /* 圆点放在屏幕最顶部 (y=10)，圆点高度 8，居中后下边缘在 y=14，
          * 与卡片顶 (y=24) 留 10px 间距。 */
         static constexpr int16_t DOT_Y = 10;
 
@@ -96,8 +105,10 @@ namespace ekeys
         lv_obj_t *cards_[ENTRY_COUNT]{nullptr};
         /* 菜单项 label（每个 label 挂在对应 card 上） */
         lv_obj_t *items_[ENTRY_COUNT]{nullptr};
-        /* 指示点 */
+        /* 指示点底点（7 个空心圆，永远不动） */
         lv_obj_t *dots_[DOT_COUNT]{nullptr};
+        /* 指示点高亮（1 个实心紫色方块，在底点之间滑动） */
+        lv_obj_t *dots_highlight_{nullptr};
     };
 
 } // namespace ekeys

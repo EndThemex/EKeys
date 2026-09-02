@@ -129,9 +129,18 @@ Arduino_GFX *gfx = alloc(new Arduino_NV3007(
  * ------------------------------------------------------------
  */
 static lv_disp_draw_buf_t draw_buf;
-#define LVGL_BUFFER_LINES 20
-static lv_color_t lv_buf1[SCREEN_W_PX * LVGL_BUFFER_LINES];
-static lv_color_t lv_buf2[SCREEN_W_PX * LVGL_BUFFER_LINES];
+/* 半屏缓冲（单缓冲，71 行 ≈ 屏幕一半）：
+ *   - 单缓冲：渲染完一块 → flush → 渲染下一块，flush 期间不会被新动画值覆盖
+ *     （因为 exec_cb 在 lv_refr() 之前应用，flush 期间不会重跑 exec_cb），
+ *     单次 flush 内的矩形是原子的，不会有"逐行撕裂"。
+ *   - 半屏而非全屏：RAM 占用 ≈ 60KB，避免 ESP32-MINI-N8（无 PSRAM，
+ *     内部 DRAM 仅 ~200KB）被 243KB 双缓冲打爆
+ *     （链接器报 dram0_0_seg overflowed by 60152 bytes）。
+ *   - 屏幕 142 行 / 半屏 71 行 ≈ 一帧分 2 块 flush，远少于之前 20 行缓冲的 8 块，
+ *     撕裂感肉眼上基本不可见。
+ * 如果以后换到有 PSRAM 的芯片（如 ESP32-S3），可以加 lv_buf2 形成双缓冲轮转，
+ * 但单缓冲对当前 ESP32-MINI-N8 + 菜单页完全够用。 */
+static lv_color_t lv_buf1[SCREEN_W_PX * (SCREEN_H_PX / 2)];
 
 static void my_disp_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
 {
@@ -147,7 +156,9 @@ static void my_disp_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_col
 
 static bool lvgl_display_init()
 {
-    lv_disp_draw_buf_init(&draw_buf, lv_buf1, lv_buf2, SCREEN_W_PX * LVGL_BUFFER_LINES);
+    /* 单缓冲：第二个参数 nullptr 表示不使用 ping-pong 双缓冲。
+     * LVGL 仍会按脏区域自动分块 flush（每块 ≤ 半屏高度）。 */
+    lv_disp_draw_buf_init(&draw_buf, lv_buf1, nullptr, SCREEN_W_PX * (SCREEN_H_PX / 2));
 
     static lv_disp_drv_t disp_drv;
     lv_disp_drv_init(&disp_drv);
