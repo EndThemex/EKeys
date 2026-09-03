@@ -16,7 +16,8 @@ namespace ekeys
     /* 全局页面 id。注册时由各 Page 子类的构造函数传入。 */
     enum PageId : uint8_t
     {
-        PAGE_MENU = 1,   // 主菜单（首页）
+        PAGE_AVATAR = 0, // 主页：EAvatar 动画（屏幕 142×428 portrait）
+        PAGE_MENU = 1,   // 主菜单（首页之后的菜单列表）
         PAGE_RGB = 2,    // RGB 控制
         PAGE_TOMATO = 3, // 番茄钟
         PAGE_STATUS = 4, // 系统状态（保留）

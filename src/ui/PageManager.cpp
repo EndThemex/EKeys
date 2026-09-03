@@ -1,4 +1,5 @@
 #include "ui/PageManager.h"
+#include "ui/Pages.h"
 #include <lvgl.h>
 
 /* PNG 转换背景图（428x142 RGB565），定义在 ui/assets/bgv2.c */
@@ -94,14 +95,27 @@ namespace ekeys
         stack_.pop_back();
         if (stack_.empty())
         {
-            /* 栈空：重启主页，避免空白 */
+            /* 栈空：重启主页，避免空白。
+             * 新主页是 PAGE_AVATAR (id=0)；旧的 PAGE_MENU (id=1) 作为"次级入口"。
+             * 优先按 PAGE_AVATAR 查找，找不到再退回 id=1 兜底。 */
             Page *home = nullptr;
             for (auto *q : registry_)
             {
-                if (q->id() == 1)
+                if (q->id() == PAGE_AVATAR)
                 {
                     home = q;
                     break;
+                }
+            }
+            if (home == nullptr)
+            {
+                for (auto *q : registry_)
+                {
+                    if (q->id() == 1)
+                    {
+                        home = q;
+                        break;
+                    }
                 }
             }
             if (home != nullptr)

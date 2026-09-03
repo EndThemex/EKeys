@@ -11,6 +11,7 @@
 #include "ble/BleKeyMap.h"
 #include "ui/Pages.h"
 #include "ui/PageManager.h"
+#include "ui/AvatarPage.h"
 #include "ui/MenuPage.h"
 #include "ui/RgbPage.h"
 #include "ui/TomatoPage.h"
@@ -248,6 +249,7 @@ namespace
     }
 } // anonymous namespace
 
+static AvatarPage g_avatar_page;
 static MenuPage g_menu;
 static RgbPage g_rgb_page{g_rgb};
 static TomatoPage g_tomato_page{g_rgb};
@@ -263,6 +265,9 @@ static PageManager g_pm;
 
 static void registerAllPages()
 {
+    /* 注册顺序不重要，PageManager 按 id 索引查找。
+     * AvatarPage 必须注册，否则 push(PAGE_AVATAR) 会失败。 */
+    g_pm.registerPage(&g_avatar_page);
     g_pm.registerPage(&g_menu);
     g_pm.registerPage(&g_rgb_page);
     g_pm.registerPage(&g_tomato_page);
@@ -622,8 +627,10 @@ void setup()
 
     g_pm.begin(&g_rgb);
     registerAllPages();
-    g_pm.push(PAGE_MENU);
-    SERIAL_PRINTF("[UI] pages registered, started at MENU\n");
+    /* 启动后默认显示 AvatarPage（EAvatar 主页动画）。
+     * KEY2 或旋钮单击 → 进入 MenuPage。 */
+    g_pm.push(PAGE_AVATAR);
+    SERIAL_PRINTF("[UI] pages registered, started at AVATAR\n");
 
     startKeyScanTask();
 }
