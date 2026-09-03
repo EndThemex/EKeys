@@ -35,7 +35,7 @@ namespace ekeys
         void onExit() override;
 
         /* PageKind：L 列表选择 —— KEY3..KEY9 直接跳到第 idx 项（idx = keyId - 3）。
-         * 当前菜单共 7 项，idx ∈ [0,6] 有效；超出范围 → 返回 false，无操作。 */
+         * 当前菜单共 8 项，idx ∈ [0,7] 有效；超出范围 → 返回 false，无操作。 */
         PageKind kind() const override { return PageKind::List; }
         bool selectItem(uint8_t idx) override;
 
@@ -60,7 +60,7 @@ namespace ekeys
             uint8_t pageId;
         };
 
-        static constexpr uint8_t ENTRY_COUNT = 7;
+        static constexpr uint8_t ENTRY_COUNT = 8;
         static const MenuEntry ENTRIES_[ENTRY_COUNT];
 
         /* 每张卡片在「轨道」上的 x 坐标（与 buildUi() 中同步；只读不变量）。

@@ -20,6 +20,8 @@
 #include "ui/KeyMapPage.h"
 #include "ui/NeumoPage.h"
 #include "ui/ThemePage.h"
+#include "ui/Backlight.h"
+#include "ui/BacklightPage.h"
 #include <Preferences.h>
 
 using namespace ekeys;
@@ -255,6 +257,7 @@ static MicPage g_mic_page;
 static KeyMapPage g_keymap_page{g_bleKbd};
 static NeumoPage g_neumo_page;
 static ThemePage g_theme_page;
+static BacklightPage g_backlight_page;
 
 static PageManager g_pm;
 
@@ -269,6 +272,7 @@ static void registerAllPages()
     g_pm.registerPage(&g_keymap_page);
     g_pm.registerPage(&g_neumo_page);
     g_pm.registerPage(&g_theme_page);
+    g_pm.registerPage(&g_backlight_page);
 }
 
 /*
@@ -584,7 +588,12 @@ void setup()
     SERIAL_PRINTF("\n=== EKeys ===\n");
 
     pinMode(TFT_BL, OUTPUT);
-    digitalWrite(TFT_BL, LOW);
+    /* 旧版 digitalWrite(TFT_BL, LOW) 等价于 "最亮"。
+     * 改为 LEDC PWM 控制（详见 ui/Backlight.cpp），可由 BacklightPage
+     * 通过 setBrightnessPct() 在 [25%, 100%] 区间内调节。
+     * 必须在 gfx->begin() 之后调用：ledc 通道与 BL 引脚绑定，
+     * 不依赖屏幕初始化，但放在这里与原调用位置一致。 */
+    Backlight::instance().begin();
 
     if (!gfx->begin(SPI_FAST_HZ))
     {

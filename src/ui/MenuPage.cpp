@@ -14,14 +14,15 @@ namespace ekeys
         {"BLE", PAGE_BLE},
         {"Neumo", PAGE_NEUMO},
         {"Theme", PAGE_THEME},
+        {"Backlight", PAGE_BACKLIGHT},
     };
 
     /* 每张卡片在「轨道」上的 x 坐标（与 buildUi() 中同步；只读不变量）。
      * 屏幕宽度 428：卡片宽 200、间距 28；
      * 第一张卡片 x = (428 - 200) / 2 = 114，使选中卡片位于屏幕中央；
      * 后续卡片沿 +X 铺开，每张卡片相对上一张 +228 (200+28)。
-     * （仅前两张可见；最后一张完全在屏幕外，由顶部圆点指示全部 7 项。） */
-    const int16_t MenuPage::CARD_X[MenuPage::ENTRY_COUNT] = {114, 342, 570, 798, 1026, 1254, 1482};
+     * （仅前两张可见；最后一张完全在屏幕外，由顶部圆点指示全部 8 项。） */
+    const int16_t MenuPage::CARD_X[MenuPage::ENTRY_COUNT] = {114, 342, 570, 798, 1026, 1254, 1482, 1710};
 
     /* 切换动画时长：280ms，配合 ease_in_out 形成"先慢后快再慢"的平滑到位。
      * 之前用过 overshoot（末端过冲再回弹），但 overshoot 在连续旋转时
