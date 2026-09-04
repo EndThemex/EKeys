@@ -2,10 +2,7 @@
 #define _ARDUINO_GFX_LIBRARIES_H_
 
 #include "Arduino_DataBus.h"
-#include "databus/Arduino_AVRPAR8.h"
 #include "databus/Arduino_UNOPAR8.h"
-#include "databus/Arduino_AVRPAR16.h"
-#include "databus/Arduino_DUEPAR16.h"
 #include "databus/Arduino_ESP32DSIPanel.h"
 #include "databus/Arduino_ESP32LCD8.h"
 #include "databus/Arduino_ESP32LCD16.h"
@@ -18,10 +15,6 @@
 #include "databus/Arduino_ESP32PAR16QQ.h"
 #include "databus/Arduino_ESP32QSPI.h"
 #include "databus/Arduino_ESP32RGBPanel.h"
-#include "databus/Arduino_ESP32S2PAR8.h"
-#include "databus/Arduino_ESP32S2PAR8Q.h"
-#include "databus/Arduino_ESP32S2PAR16.h"
-#include "databus/Arduino_ESP32S2PAR16Q.h"
 #include "databus/Arduino_ESP32SPI.h"
 #include "databus/Arduino_ESP32SPIDMA.h"
 #include "databus/Arduino_ESP8266SPI.h"
@@ -49,27 +42,10 @@
 #endif // !defined(LITTLE_FOOT_PRINT)
 
 #include "display/Arduino_AXS15231B.h"
-#include "display/Arduino_CO5300.h"
 #include "display/Arduino_DSI_Display.h"
-#include "display/Arduino_GC9A01.h"
-#include "display/Arduino_GC9C01.h"
-#include "display/Arduino_GC9106.h"
-#include "display/Arduino_GC9107.h"
-#include "display/Arduino_JBT6K71.h"
-#include "display/Arduino_JD9613.h"
 #include "display/Arduino_NV3007.h"
 #include "display/Arduino_NV3023.h"
 #include "display/Arduino_NV3041A.h"
-#include "display/Arduino_OTM8009A.h"
-#include "display/Arduino_R61529.h"
-#include "display/Arduino_RM67162.h"
-#include "display/Arduino_RM690B0.h"
-#include "display/Arduino_RGB_Display.h"
-#include "display/Arduino_SEPS525.h"
-#include "display/Arduino_SH1106.h"
-#include "display/Arduino_SPD2010.h"
-#include "display/Arduino_SSD1283A.h"
-#include "display/Arduino_SSD1306.h"
 
 #if defined(ARDUINO_ARCH_SAMD) && defined(SEEED_GROVE_UI_WIRELESS)
 #define DISPLAY_DEV_KIT
