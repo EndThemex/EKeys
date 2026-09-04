@@ -376,7 +376,7 @@ namespace eavatar
             FPt pts[PROFILE_SAMPLES / 2];
             int n = 0;
             ellipsePointsF(pts, n, cx + ex, cy + ey, rx, ry, localRot, open);
-            fillPoly(ctx, pts, n, lv_color_white(), opa);
+            fillPoly(ctx, pts, n, lv_color_black(), opa);
         }
 
         /* 3) accent（高亮小圆点，Thinking / Notify / Burst / Comet / Orbit 触发） */
@@ -386,7 +386,7 @@ namespace eavatar
             int n = 0;
             ellipsePointsF(pts, n, cx + f.accent_x * R * bs, cy + f.accent_y * R * bs,
                            3.5f, 3.5f, 0.0f, 1.0f);
-            fillPoly(ctx, pts, n, lv_color_white(),
+            fillPoly(ctx, pts, n, lv_color_black(),
                      (lv_opa_t)(255.0f * f.accent_alpha + 0.5f));
         }
     }
@@ -400,7 +400,7 @@ namespace eavatar
                     (float)CY_ + f.body_y,
                     (float)BODY_R_PX_, pts);
         fillPoly(ctx, pts, PROFILE_SAMPLES,
-                 lv_color_hex(0x050505), /* 近黑，与原版一致 */
+                 lv_color_white(), /* 主体改为白色 */
                  (lv_opa_t)(255.0f * clamp01(f.alpha) + 0.5f));
     }
 

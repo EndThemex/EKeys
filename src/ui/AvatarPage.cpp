@@ -13,7 +13,7 @@ namespace ekeys
 
     /* hint 文字模板：保持简短，避免与菜单页模板混淆。
      * 单行居中，可显示在 428px 屏宽内。 */
-    static const char *HINT_TEXT = "KEY2 / KNOB  ->  menu";
+    static const char *HINT_TEXT = "KEY2 menu  K3-K9 anim  KNOB gaze";
 
     AvatarPage::AvatarPage()
         : Page(/*id=*/PAGE_AVATAR, "Avatar", lv_color_hex(0x050505))
@@ -88,8 +88,10 @@ namespace ekeys
          * 此处仅调 setGaze；BLE 方向键由 main loop 根据 consumesEncoder() 分发。 */
         static float gazeX = 0.0f;
         gazeX += (float)delta * 0.35f;
-        if (gazeX > 1.0f) gazeX = 1.0f;
-        if (gazeX < -1.0f) gazeX = -1.0f;
+        if (gazeX > 1.0f)
+            gazeX = 1.0f;
+        if (gazeX < -1.0f)
+            gazeX = -1.0f;
         avatar_.setGaze(gazeX, 0.0f);
     }
 
@@ -97,6 +99,44 @@ namespace ekeys
     {
         /* 主页 KEY2 / 旋钮单击 → 进入菜单 */
         requestPush(PAGE_MENU);
+    }
+
+    /* KEY3..KEY9 → 切换 avatar 动画状态。
+     * 索引到状态的映射写在头文件里。 */
+    void AvatarPage::onSelectKey(uint8_t keyId)
+    {
+        constexpr uint8_t KEY3_OFFSET = 3;
+        if (keyId < KEY3_OFFSET)
+            return;
+        const uint8_t idx = (uint8_t)(keyId - KEY3_OFFSET);
+        /* 7 个键 → 7 个基础状态。超出 idx 范围时基类 Page::onSelectKey 默认
+         * 因为 ReadOnly 已经吞掉，这里保险起见再 clamp 一次。 */
+        static const eavatar::AvatarState kStates[7] = {
+            eavatar::AvatarState::Idle,
+            eavatar::AvatarState::Thinking,
+            eavatar::AvatarState::Wink,
+            eavatar::AvatarState::Wide,
+            eavatar::AvatarState::Alert,
+            eavatar::AvatarState::Notify,
+            eavatar::AvatarState::Sleep,
+        };
+        if (idx >= (sizeof(kStates) / sizeof(kStates[0])))
+            return;
+        avatar_.setState(kStates[idx]);
+        /* 顶部状态文字同步显示当前动画名，便于用户在切换时立刻看到反馈 */
+        if (status_label_ != nullptr)
+        {
+            const char *names[7] = {
+                "Idle",
+                "Thinking",
+                "Wink",
+                "Wide",
+                "Alert",
+                "Notify",
+                "Sleep",
+            };
+            lv_label_set_text(status_label_, names[idx]);
+        }
     }
 
     /* 让旋钮旋转穿透到 BLE 方向键（与菜单页一致） */

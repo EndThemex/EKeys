@@ -43,6 +43,18 @@ namespace ekeys
         /* 主页旋钮单击 → 进入菜单（与 KEY2 同义） */
         void onConfirm() override;
 
+        /* KEY3..KEY9 → 切换 7 个动画状态
+         *   KEY3 → Idle
+         *   KEY4 → Thinking
+         *   KEY5 → Wink
+         *   KEY6 → Wide
+         *   KEY7 → Alert
+         *   KEY8 → Notify
+         *   KEY9 → Sleep
+         * 虽然 kind()=ReadOnly 会让基类默认忽略，这里显式 override 把按键
+         * 接到 avatar_.setState()，让主页从"纯展示"升级为"可触发"。 */
+        void onSelectKey(uint8_t keyId) override;
+
         /* KEY2 按下 → 进入菜单 */
         /* 默认 Page::onSelectKey 已经会落到 kind() 路由；主页不需要响应任何 KEY3..KEY9。 */
 
