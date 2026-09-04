@@ -20,6 +20,9 @@ private:
  bool auto_showing_ = false;
  bool blinking_ = false;
  float target_gaze_x_=0,target_gaze_y_=0,speaking_level_=0;
+ /* speak_s_：speaking_level_ 的 attack/release 平滑值（攻击 ~66ms / 释放 ~190ms，
+  * skill §7），只有它能直接驱动几何，原始值会抖。 */
+ float speak_s_=0;
  void applyExpression(AvatarExpression, AvatarFrame &);
  void sampleState(AvatarState, float, AvatarFrame &);
  void updateBlink(float, AvatarFrame &);

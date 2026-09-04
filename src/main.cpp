@@ -103,7 +103,7 @@ static T *alloc(T *p)
  * SPI bus & NV3007 display
  * ------------------------------------------------------------
  */
-#define SPI_FAST_HZ 10000000
+#define SPI_FAST_HZ 20000000
 
 Arduino_DataBus *bus = alloc(new Arduino_ESP32SPI(
     TFT_DC,
