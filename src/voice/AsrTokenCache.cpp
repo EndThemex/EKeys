@@ -92,10 +92,13 @@ bool AsrTokenCache::refresh()
 
     snprintf(token_, sizeof(token_), "%s", access);
     expires_at_ms_ = millis() + static_cast<uint32_t>(expires_in) * 1000U;
-    DeviceSettings cur;
-    Configuration::instance().snapshot(cur);
-    snprintf(api_key_, sizeof(api_key_), "%s", cur.voice_baidu_api_key);
-    snprintf(secret_key_, sizeof(secret_key_), "%s", cur.voice_baidu_secret_key);
+    /*
+     * A4 修复：用本次 refresh() 入口处的 snap 回填凭证（TOCTOU）。
+     * 之前 refresh() 拿到响应后又 snapshot 一次，期间凭证可能被
+     * CMD_CONFIG_SET 改掉，导致 token 与 api_key_/secret_key_ 错配。
+     */
+    snprintf(api_key_, sizeof(api_key_), "%s", snap.voice_baidu_api_key);
+    snprintf(secret_key_, sizeof(secret_key_), "%s", snap.voice_baidu_secret_key);
     LOG_INFO("ASR", "token refreshed (expires_in=%lds)", expires_in);
     return true;
 }

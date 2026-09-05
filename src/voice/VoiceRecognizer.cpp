@@ -177,6 +177,10 @@ namespace ekeys
         if (token == nullptr)
         {
             LOG_ERROR("ASR", "no valid token, check baidu keys");
+            free(pcm_buf_);
+            pcm_buf_ = nullptr;
+            pcm_cap_samples_ = 0;
+            pcm_len_samples_ = 0;
             return;
         }
 
@@ -206,6 +210,10 @@ namespace ekeys
         {
             LOG_ERROR("ASR", "http %d", code);
             http.end();
+            free(pcm_buf_);
+            pcm_buf_ = nullptr;
+            pcm_cap_samples_ = 0;
+            pcm_len_samples_ = 0;
             return;
         }
 
@@ -215,12 +223,20 @@ namespace ekeys
         if (err)
         {
             LOG_ERROR("ASR", "json: %s", err.c_str());
+            free(pcm_buf_);
+            pcm_buf_ = nullptr;
+            pcm_cap_samples_ = 0;
+            pcm_len_samples_ = 0;
             return;
         }
         if ((doc["err_no"] | -1) != 0)
         {
             LOG_ERROR("ASR", "baidu err %d: %s",
                       doc["err_no"] | -1, doc["err_msg"] | "unknown");
+            free(pcm_buf_);
+            pcm_buf_ = nullptr;
+            pcm_cap_samples_ = 0;
+            pcm_len_samples_ = 0;
             return;
         }
 
@@ -228,6 +244,10 @@ namespace ekeys
         if (text[0] == '\0')
         {
             LOG_INFO("ASR", "empty result");
+            free(pcm_buf_);
+            pcm_buf_ = nullptr;
+            pcm_cap_samples_ = 0;
+            pcm_len_samples_ = 0;
             return;
         }
         LOG_INFO("ASR", "text: %s", text);
@@ -277,6 +297,12 @@ namespace ekeys
                 }
             }
         }
+
+        /* A3 修复：识别完成释放 PSRAM 缓冲，下次按需重建 */
+        free(pcm_buf_);
+        pcm_buf_ = nullptr;
+        pcm_cap_samples_ = 0;
+        pcm_len_samples_ = 0;
     }
 
 } // namespace ekeys

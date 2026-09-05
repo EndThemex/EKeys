@@ -26,6 +26,7 @@
 #include "audio/Speaker.h"
 #include "config/Configuration.h"
 #include "hardware/BatteryMonitor.h"
+#include "keymap/KeyEventDispatcher.h"
 #include "logging/LogManager.h"
 #include "message_types.h"
 #include "network/DiscoveryService.h"

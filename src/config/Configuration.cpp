@@ -144,6 +144,8 @@ namespace ekeys
             static_cast<uint8_t>(ini.GetLongValue("system", "active_keymap_profile", 0));
         settings_.work_mode =
             static_cast<uint8_t>(ini.GetLongValue("system", "work_mode", 0));
+        settings_.config_version =
+            static_cast<uint32_t>(ini.GetLongValue("system", "config_version", 0));
 
         settings_.wifi_switch =
             static_cast<uint8_t>(ini.GetLongValue("wifi", "wifi_switch", 0));
@@ -151,8 +153,10 @@ namespace ekeys
             static_cast<uint8_t>(ini.GetLongValue("wifi", "connect_host", 0));
         strncpy(settings_.wifi_ssid, ini.GetValue("wifi", "wifi_ssid", ""),
                 sizeof(settings_.wifi_ssid) - 1);
+        settings_.wifi_ssid[sizeof(settings_.wifi_ssid) - 1] = '\0';
         strncpy(settings_.wifi_password, ini.GetValue("wifi", "wifi_password", ""),
                 sizeof(settings_.wifi_password) - 1);
+        settings_.wifi_password[sizeof(settings_.wifi_password) - 1] = '\0';
 
         settings_.rgb_mode =
             static_cast<uint8_t>(ini.GetLongValue("rgb", "rgb_mode", 0));
@@ -175,12 +179,35 @@ namespace ekeys
         settings_.power_mode =
             static_cast<uint8_t>(ini.GetLongValue("audio", "power_mode", 0));
 
-        settings_.config_version =
-            static_cast<uint32_t>(ini.GetLongValue("system", "config_version", 0));
+        /* A2 修复：补充 voice 段读取，否则重启后语音配置全部丢失 */
+        settings_.voice_enable =
+            static_cast<uint8_t>(ini.GetLongValue("voice", "voice_enable", 0));
+        settings_.voice_trigger_key =
+            static_cast<uint8_t>(ini.GetLongValue("voice", "voice_trigger_key", 0));
+        settings_.voice_max_record_ms =
+            static_cast<uint16_t>(ini.GetLongValue("voice", "voice_max_record_ms", 0));
+        settings_.voice_auto_enter =
+            static_cast<uint8_t>(ini.GetLongValue("voice", "voice_auto_enter", 0));
+        settings_.voice_dev_pid =
+            static_cast<uint16_t>(ini.GetLongValue("voice", "voice_dev_pid", 0));
+        strncpy(settings_.voice_cuid, ini.GetValue("voice", "voice_cuid", ""),
+                sizeof(settings_.voice_cuid) - 1);
+        settings_.voice_cuid[sizeof(settings_.voice_cuid) - 1] = '\0';
+        strncpy(settings_.voice_baidu_api_key,
+                ini.GetValue("voice", "voice_baidu_api_key", ""),
+                sizeof(settings_.voice_baidu_api_key) - 1);
+        settings_.voice_baidu_api_key[sizeof(settings_.voice_baidu_api_key) - 1] = '\0';
+        strncpy(settings_.voice_baidu_secret_key,
+                ini.GetValue("voice", "voice_baidu_secret_key", ""),
+                sizeof(settings_.voice_baidu_secret_key) - 1);
+        settings_.voice_baidu_secret_key[sizeof(settings_.voice_baidu_secret_key) - 1] = '\0';
+
         strncpy(settings_.device_name, ini.GetValue("system", "device_name", ""),
                 sizeof(settings_.device_name) - 1);
+        settings_.device_name[sizeof(settings_.device_name) - 1] = '\0';
         strncpy(settings_.serial_number, ini.GetValue("system", "serial_number", ""),
                 sizeof(settings_.serial_number) - 1);
+        settings_.serial_number[sizeof(settings_.serial_number) - 1] = '\0';
 
         LOG_INFO("CONFIG", "config.ini loaded (active profile=%u)",
                  static_cast<unsigned>(settings_.active_keymap_profile));
