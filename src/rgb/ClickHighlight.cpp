@@ -6,6 +6,7 @@
 
 #include "ClickHighlight.h"
 
+#include "rgb/RGBDriver.h"
 #include "rgb/RGBLightControl.h"
 
 namespace ekeys

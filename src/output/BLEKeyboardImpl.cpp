@@ -9,6 +9,7 @@
 
 #include "BLEKeyboardImpl.h"
 
+#include <esp_bt.h>
 #include <BleKeyboard.h>
 
 #include "logging/LogManager.h"

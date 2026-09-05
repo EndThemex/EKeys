@@ -46,7 +46,15 @@ void Speaker::loop()
 
 bool Speaker::isRunning() const
 {
-    return inited_ && static_cast<const Audio *>(impl_)->isRunning();
+    /*
+     * ESP32-audioI2S 的 Audio::isRunning() 未声明 const，但语义上只是查询。
+     * 这里 const_cast 仅用于放宽 this 的 const 限定，不修改对象。
+     */
+    if (!inited_)
+    {
+        return false;
+    }
+    return const_cast<Audio *>(static_cast<const Audio *>(impl_))->isRunning();
 }
 
 void Speaker::SetVolume(uint8_t volume_0_21)

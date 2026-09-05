@@ -71,14 +71,14 @@
    字体设置
  *====================*/
 
-/* 阶段 01 / 02 仅用到 20 / 28 两种 Montserrat；其它字号按需开 */
+/* 阶段 01 / 02 启用 14 / 20 / 24 / 28 / 48 Montserrat；其它字号按需开 */
 #define LV_FONT_MONTSERRAT_12 0
-#define LV_FONT_MONTSERRAT_14 0
+#define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_16 0
-#define LV_FONT_MONTSERRAT_18 0
+#define LV_FONT_MONTSERRAT_18 1
 #define LV_FONT_MONTSERRAT_20 1
 #define LV_FONT_MONTSERRAT_22 0
-#define LV_FONT_MONTSERRAT_24 0
+#define LV_FONT_MONTSERRAT_24 1
 #define LV_FONT_MONTSERRAT_26 0
 #define LV_FONT_MONTSERRAT_28 1
 #define LV_FONT_MONTSERRAT_30 0
@@ -90,7 +90,7 @@
 #define LV_FONT_MONTSERRAT_42 0
 #define LV_FONT_MONTSERRAT_44 0
 #define LV_FONT_MONTSERRAT_46 0
-#define LV_FONT_MONTSERRAT_48 0
+#define LV_FONT_MONTSERRAT_48 1
 
 /* 压缩版（bpp=3）体积更小；本阶段不启用 */
 #define LV_FONT_MONTSERRAT_20_COMPRESSED 0

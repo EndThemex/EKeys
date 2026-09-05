@@ -81,6 +81,7 @@ namespace ekeys
         uint32_t last_tick_ms_;
         uint32_t last_time_post_ms_;
         uint32_t last_ha_status_ms_{0};
+        uint32_t last_battery_status_ms_{0};
         bool keymap_ui_pending_{false};
     };
 

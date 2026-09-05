@@ -25,6 +25,7 @@
 #include "app/AppContext.h"
 #include "audio/Speaker.h"
 #include "config/Configuration.h"
+#include "hardware/BatteryMonitor.h"
 #include "logging/LogManager.h"
 #include "message_types.h"
 #include "network/DiscoveryService.h"
@@ -45,6 +46,7 @@ namespace ekeys
         constexpr uint32_t kMainTaskTickPeriodMs = 5;
         constexpr uint32_t kMainTaskTimePostPeriodMs = 1000;
         constexpr uint32_t kHaStatusPeriodMs = 2500;
+        constexpr uint32_t kBatteryStatusPeriodMs = 5000;
 
         /*
          * 把 millis() 换算成 "HH:MM:SS"。NTP 未同步时作为兜底显示。
@@ -158,6 +160,7 @@ namespace ekeys
             [](const char *ip)
             { TcpChannel::instance().connectTo(ip); });
         Speaker::instance().begin();
+        BatteryMonitor::instance().begin();
         if (WiFiManager::instance().isEnabled())
         {
             WiFiManager::instance().scheduleConnect();
@@ -166,6 +169,7 @@ namespace ekeys
         last_tick_ms_ = millis();
         last_time_post_ms_ = last_tick_ms_;
         last_ha_status_ms_ = last_tick_ms_;
+        last_battery_status_ms_ = last_tick_ms_;
         LOG_INFO("MAIN", "MainTask started");
     }
 
@@ -516,6 +520,17 @@ namespace ekeys
             DisplayMessage msg;
             msg.type = DisplayMessageType::HaStatus;
             msg.ha_status = ha;
+            postMessage(msg);
+        }
+
+        /* 电池电量 → 状态条（5s 节流，避免每次 loop 都做 ADC 采样） */
+        if ((now - last_battery_status_ms_) >= kBatteryStatusPeriodMs)
+        {
+            last_battery_status_ms_ = now;
+            const uint8_t pct = BatteryMonitor::instance().readPercent();
+            DisplayMessage msg;
+            msg.type = DisplayMessageType::BatteryStatus;
+            msg.battery_percent = pct;
             postMessage(msg);
         }
     }

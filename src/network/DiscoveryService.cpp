@@ -27,7 +27,7 @@ namespace ekeys
         constexpr const char *kFallbackIp = "192.168.31.1";
         constexpr uint8_t kWorkModeBluetooth = 1;
 
-        WiFiUdp *s_udp = nullptr;
+        WiFiUDP *s_udp = nullptr;
 
     } // namespace
 
@@ -53,7 +53,7 @@ namespace ekeys
 
         if (s_udp == nullptr)
         {
-            s_udp = new WiFiUdp();
+            s_udp = new WiFiUDP();
         }
         if (!s_udp->begin(kDiscoveryPort))
         {

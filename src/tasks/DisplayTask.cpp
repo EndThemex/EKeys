@@ -145,7 +145,7 @@ namespace ekeys
         status_bar_set_working_mode(WIRED_KEYBOARD_MODE);
         status_bar_set_recording_state(false);
         status_bar_set_volume(0);
-        status_bar_set_battery_level(100);
+        /* 电量由 MainTask 5s 节流后投递 BatteryStatus 更新，避免此处硬编码 100 */
         status_bar_set_wifi_strength(0);
         status_bar_set_module_status(UI_MODA, false);
         status_bar_set_module_status(UI_MODB, false);
@@ -255,6 +255,10 @@ namespace ekeys
 
         case DisplayMessageType::MusicPlayer:
             applyMusicPlayer(msg);
+            break;
+
+        case DisplayMessageType::BatteryStatus:
+            status_bar_set_battery_level(msg.battery_percent);
             break;
 
         default:

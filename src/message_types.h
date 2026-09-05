@@ -41,6 +41,7 @@ namespace ekeys
         MusicPlayer = 8,
         KeymapProfile = 9,
         Navigate = 10, /* 屏幕路由（docs/05 §5.2），载荷 navigate_target */
+        BatteryStatus = 11, /* 电池电量（5s 节流，载荷 battery_percent） */
     };
 
     /* PC 状态（CMD_PC_STATUS，阶段 06 起由协议层填充） */
@@ -118,6 +119,7 @@ namespace ekeys
         uint32_t key_value{0}; /* KeyInput：按键位掩码（RGB 高亮，阶段 06） */
         uint8_t navigate_target{0}; /* Navigate：ui_screen_tag_t */
         bool asr_recording{false};
+        uint8_t battery_percent{0}; /* BatteryStatus：0~100 */
 
         ui_settings_snapshot_t setting{};
         PcStatusInfo pc_status{};

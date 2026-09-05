@@ -17,7 +17,7 @@
 
 #include "../../logging/LogManager.h"
 #include "../../message_types.h"
-#include "../../SerialProtocol.h"
+#include "../SerialProtocol.h"
 #include "../../tasks/DisplayTask.h"
 #include "../CommandRegistry.h"
 #include "../../config/Configuration.h"

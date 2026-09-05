@@ -70,8 +70,16 @@ void TcpChannel::stop()
 
 bool TcpChannel::isConnected() const
 {
-    auto *client = static_cast<const WiFiClient *>(impl_);
-    return state_ == State::Connected && client != nullptr && client->connected();
+    if (state_ != State::Connected)
+    {
+        return false;
+    }
+    /*
+     * WiFiClient::connected() 未声明 const，但语义上只是查询；
+     * 这里 const_cast 仅放宽 this 的 const 限定，不修改对象。
+     */
+    auto *client = const_cast<WiFiClient *>(static_cast<const WiFiClient *>(impl_));
+    return client != nullptr && client->connected();
 }
 
 const char *TcpChannel::remoteEndpoint(char *buf, size_t cap) const

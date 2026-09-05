@@ -13,6 +13,7 @@
 #define EKEYS_VOICE_ASR_TOKEN_CACHE_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 namespace ekeys {
 

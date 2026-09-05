@@ -17,6 +17,7 @@
 #ifndef EKEYS_VOICE_VOICE_RECOGNIZER_H
 #define EKEYS_VOICE_VOICE_RECOGNIZER_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "ui/ui_settings_types.h"

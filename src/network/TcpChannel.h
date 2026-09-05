@@ -12,6 +12,7 @@
 #ifndef EKEYS_NETWORK_TCP_CHANNEL_H
 #define EKEYS_NETWORK_TCP_CHANNEL_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 namespace ekeys {
