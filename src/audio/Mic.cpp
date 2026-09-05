@@ -47,7 +47,7 @@ bool Mic::begin()
     }
 
     i2s_pin_config_t pins = {};
-    pins.bck_io_num = kPinI2sMicBclk;   // IO13（专用 MIC_SCK）
+    pins.bck_io_num = kPinI2sMicBclk;   // IO10（专用 MIC_SCK）
     pins.ws_io_num = kPinI2sMicWs;      // IO12
     pins.data_out_num = I2S_PIN_NO_CHANGE;
     pins.data_in_num = kPinI2sMicDin;   // IO11
