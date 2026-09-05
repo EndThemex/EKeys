@@ -102,6 +102,7 @@ src/input/
 ```
 
 - `InputRouter` 决定一个 `InputEvent` 是进入 `KeyEventDispatcher`（走键映射）还是转 `DisplayMessage::ACTION_INPUT`（屏幕导航）。
+  - 当前实现：`InputRouter` 暂未抽象为独立类，由 `MainTask` 在 5ms tick 内直接分流 —— 按键边沿 → `KeyEventDispatcher::onKeyEdge()`（命中 ASR 走 VoiceRecognizer，其余走 RGB ClickHighlight）；EC11 旋钮事件经 `RotaryEncoder::setCallback()` 注入 `MainTask::sendDisplayAction()` 直接走 `ACTION_INPUT`。详见 `MainTask.cpp::loop()`。
 - 对应文档：`2.1 矩阵扫描`、`2.2 旋钮`、`2.3 外挂模块`、`2.4 特殊输入`。
 
 ### 3.4 键映射与 HID 输出（FEATURE_DOC §3、§4）
