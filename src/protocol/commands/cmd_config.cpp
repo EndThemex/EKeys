@@ -120,22 +120,20 @@ namespace ekeys::protocol::commands
             /*
              * C6 修复：副作用统一到 AppContext::applyUiSideEffects，
              * 与 MainTask::applyUiSettingsSnapshot 走同一路径，避免两份代码漂移。
+             * 关键修复：在 parseConfigSetCommand（已落定 settings_）**之前** 抓 prev，
+             * 之后用 prev 构造 curr 并叠加 result.*_changed 的新值，diff 才非空。
              */
             DeviceSettings prev{};
-            DeviceSettings curr{};
             Configuration::instance().snapshot(prev);
-            curr = prev;
-            /* 应用本次变更到 curr（仅内存，不写盘：持久化已由 parseConfigSetCommand 完成） */
+            DeviceSettings curr = prev;
+            Configuration &cfg_inst = Configuration::instance();
+            cfg_inst.snapshot(curr);
             if (result.work_mode_changed)
             {
                 curr.work_mode = result.work_mode;
             }
-            if (result.profile_changed)
-            {
-                /* active_keymap_profile 由 parseConfigSetCommand 单独写入；
-                 * 此处读取最新值用于 diff。 */
-                Configuration::instance().snapshot(curr);
-            }
+            /* profile_changed 由 parseConfigSetCommand 走 switchActiveProfile，
+             * 已在设置里写好；snapshot(curr) 已读到最新值。 */
             AppContext::instance().applyUiSideEffects(prev, curr);
             if (result.wifi_changed)
             {

@@ -35,6 +35,19 @@ namespace ekeys
         return inst;
     }
 
+    /*
+     * F3 修复：capturing_ 跨任务读写，外部读取（DisplayTask 频谱 / HA 屏 /
+     * cmd_config 副作用判断）都走临界区；写入侧（startCapture/finishCapture）配对。
+     */
+    bool VoiceRecognizer::isCapturing() const
+    {
+        bool v;
+        taskENTER_CRITICAL(&asr_lock_);
+        v = capturing_;
+        taskEXIT_CRITICAL(&asr_lock_);
+        return v;
+    }
+
     bool VoiceRecognizer::canWork() const
     {
         DeviceSettings snap;
@@ -71,10 +84,16 @@ namespace ekeys
 
     bool VoiceRecognizer::startCapture()
     {
+        /* F3 修复：capturing_ 跨任务访问，加锁 */
+        bool expected = false;
+        taskENTER_CRITICAL(&asr_lock_);
         if (capturing_)
         {
+            taskEXIT_CRITICAL(&asr_lock_);
             return false;
         }
+        capturing_ = true;
+        taskEXIT_CRITICAL(&asr_lock_);
 
         DeviceSettings snap;
         Configuration::instance().snapshot(snap);
@@ -84,6 +103,10 @@ namespace ekeys
             {
                 LOG_INFO("ASR", "voice only available in USB mode");
             }
+            /* F3 修复：失败回滚 capturing_ */
+            taskENTER_CRITICAL(&asr_lock_);
+            capturing_ = false;
+            taskEXIT_CRITICAL(&asr_lock_);
             return false;
         }
 
@@ -92,6 +115,9 @@ namespace ekeys
 
         if (!Mic::instance().begin())
         {
+            taskENTER_CRITICAL(&asr_lock_);
+            capturing_ = false;
+            taskEXIT_CRITICAL(&asr_lock_);
             return false;
         }
 
@@ -114,6 +140,9 @@ namespace ekeys
             {
                 LOG_ERROR("ASR", "pcm buffer alloc failed");
                 Mic::instance().end();
+                taskENTER_CRITICAL(&asr_lock_);
+                capturing_ = false;
+                taskEXIT_CRITICAL(&asr_lock_);
                 return false;
             }
             pcm_cap_samples_ = cap_samples;
@@ -122,7 +151,7 @@ namespace ekeys
         pcm_len_samples_ = 0;
         capture_start_ms_ = millis();
         captured_work_mode_ = snap.work_mode;
-        capturing_ = true;
+        /* capturing_ 已在入口置位 */
         postRecordingState(true);
         LOG_INFO("ASR", "recording started (cap=%us)",
                  static_cast<unsigned>(pcm_cap_samples_ / voice::kPcmSampleRate));
@@ -131,7 +160,12 @@ namespace ekeys
 
     void VoiceRecognizer::feedCapture()
     {
-        if (!capturing_)
+        /* F3 修复：capturing_ 加锁读 */
+        bool active;
+        taskENTER_CRITICAL(&asr_lock_);
+        active = capturing_;
+        taskEXIT_CRITICAL(&asr_lock_);
+        if (!active)
         {
             return;
         }
@@ -164,11 +198,16 @@ namespace ekeys
      */
     void VoiceRecognizer::finishCapture()
     {
+        /* F3 修复：capturing_ 加锁，flip 一次确保与 isCapturing 一致 */
+        taskENTER_CRITICAL(&asr_lock_);
         if (!capturing_)
         {
+            taskEXIT_CRITICAL(&asr_lock_);
             return;
         }
         capturing_ = false;
+        taskEXIT_CRITICAL(&asr_lock_);
+
         postRecordingState(false);
 
         const uint32_t duration_ms = millis() - capture_start_ms_;
@@ -220,6 +259,8 @@ namespace ekeys
         }
 
         /* 队列容量=1；若上一段识别未完成，直接丢弃旧任务（提示重发） */
+        /* F3 修复：asr_queue_* 与 asr_job_pending_ 由 MainTask 写、ASR Task 读，加锁 */
+        taskENTER_CRITICAL(&asr_lock_);
         if (asr_job_pending_)
         {
             LOG_WARNING("ASR", "previous job still running, drop oldest");
@@ -230,6 +271,7 @@ namespace ekeys
         asr_queue_[asr_queue_tail_] = job;
         asr_queue_tail_ = (asr_queue_tail_ + 1) % kAsrQueueDepth;
         asr_job_pending_ = true;
+        taskEXIT_CRITICAL(&asr_lock_);
 
         /* 移交所有权：录音缓冲清零，下一次 startCapture 重新分配 */
         pcm_buf_ = nullptr;
@@ -284,11 +326,21 @@ namespace ekeys
 
             while (asr_job_pending_)
             {
-                const uint8_t idx = asr_queue_head_;
-                AsrJob job = asr_queue_[idx];
+                /* F3 修复：队列与 pending 出队加锁，避免 MainTask 写时丢 job */
+                AsrJob job;
+                uint8_t idx;
+                taskENTER_CRITICAL(&asr_lock_);
+                if (!asr_job_pending_)
+                {
+                    taskEXIT_CRITICAL(&asr_lock_);
+                    break;
+                }
+                idx = asr_queue_head_;
+                job = asr_queue_[idx];
                 asr_queue_[idx] = AsrJob{};
                 asr_queue_head_ = (asr_queue_head_ + 1) % kAsrQueueDepth;
                 asr_job_pending_ = false;
+                taskEXIT_CRITICAL(&asr_lock_);
 
                 /* token */
                 const char *token = AsrTokenCache::instance().getToken();

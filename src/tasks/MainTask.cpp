@@ -139,6 +139,9 @@ namespace ekeys
         scanner_.begin();
         resolver_.begin();
 
+        /* A1 修复：注入 resolver，使 isVoiceTriggerKey 能命中 function_key=KEY_FUNCTION_ASR */
+        KeyEventDispatcher::init(&resolver_);
+
         g_main_task = this;
         encoder_.begin();
         encoder_.setCallback([this](uint8_t key)
@@ -246,10 +249,12 @@ namespace ekeys
 
             for (uint8_t i = 0; i < pc; ++i)
             {
+                KeyEventDispatcher::onKeyEdge(pressed[i], true);
                 resolver_.press(pressed[i], *keyboard_);
             }
             for (uint8_t i = 0; i < rc; ++i)
             {
+                KeyEventDispatcher::onKeyEdge(released[i], false);
                 resolver_.release(released[i], *keyboard_);
             }
         }

@@ -53,6 +53,8 @@ namespace ekeys
          */
         bool saveSetting(const char *key, const char *value);
         bool saveSetting(const char *key, int value);
+        /* F6 修复：pc_status_mask 持久化为无符号，与 %lu 一致 */
+        bool saveSetting(const char *key, uint32_t value);
 
         /*
          * 加载当前激活 Profile 的键映射；无文件返回 false。

@@ -8,6 +8,7 @@
 
 #include <Arduino.h>
 #include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 #include <driver/i2s.h>
 
 #include "hardware/PinMap.h"
@@ -15,10 +16,50 @@
 
 namespace ekeys {
 
+    namespace
+    {
+        /* F4 修复：Mic / I2S0 全局互斥信号量，跨任务（MainTask + DisplayTask）
+         * 共享同一硬件，避免 begin/end 重叠造成 i2s_driver_install 冲突。 */
+        SemaphoreHandle_t s_mic_mutex = nullptr;
+
+        SemaphoreHandle_t micMutex()
+        {
+            if (s_mic_mutex == nullptr)
+            {
+                s_mic_mutex = xSemaphoreCreateBinary();
+                if (s_mic_mutex != nullptr)
+                {
+                    xSemaphoreGive(s_mic_mutex);
+                }
+            }
+            return s_mic_mutex;
+        }
+    } // namespace
+
 Mic &Mic::instance()
 {
     static Mic inst;
     return inst;
+}
+
+bool Mic::take()
+{
+    SemaphoreHandle_t m = micMutex();
+    if (m == nullptr)
+    {
+        return false;
+    }
+    /* 短超时；外部已经串行化（prepareI2sForMicCapture/频谱串行） */
+    return xSemaphoreTake(m, pdMS_TO_TICKS(2000)) == pdTRUE;
+}
+
+void Mic::give()
+{
+    SemaphoreHandle_t m = micMutex();
+    if (m != nullptr)
+    {
+        xSemaphoreGive(m);
+    }
 }
 
 bool Mic::begin()
@@ -26,6 +67,12 @@ bool Mic::begin()
     if (inited_)
     {
         return true;
+    }
+    /* F4 修复：取互斥量保护 i2s_driver_install；install 期间不允许其他任务 end */
+    if (!take())
+    {
+        LOG_ERROR("MIC", "mic mutex take failed");
+        return false;
     }
 
     i2s_config_t cfg = {};
@@ -44,6 +91,7 @@ bool Mic::begin()
     if (i2s_driver_install(I2S_NUM_0, &cfg, 0, nullptr) != ESP_OK)
     {
         LOG_ERROR("MIC", "i2s_driver_install failed");
+        give();
         return false;
     }
 
@@ -59,6 +107,7 @@ bool Mic::begin()
     {
         LOG_ERROR("MIC", "i2s_set_pin failed");
         i2s_driver_uninstall(I2S_NUM_0);
+        give();
         return false;
     }
 
@@ -67,6 +116,7 @@ bool Mic::begin()
     LOG_INFO("MIC", "ICS43434 ready (sck=%u ws=%u din=%u, %ukHz)",
              kPinI2sMicBclk, kPinI2sMicWs, kPinI2sMicDin,
              static_cast<unsigned>(kSampleRate / 1000));
+    /* F4：保持持锁直至 end()；调用方连续 read 不需要反复 take。 */
     return true;
 }
 
@@ -74,10 +124,13 @@ void Mic::end()
 {
     if (!inited_)
     {
+        /* 没拿到互斥也要 release，避免对端 leak */
+        give();
         return;
     }
     i2s_driver_uninstall(I2S_NUM_0);
     inited_ = false;
+    give();
     LOG_INFO("MIC", "stopped");
 }
 

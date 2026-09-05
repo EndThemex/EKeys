@@ -48,8 +48,9 @@ namespace ekeys::protocol::commands
                     Configuration::instance().mutateSettings(
                         [&mask](DeviceSettings &d)
                         { d.pc_status_mask = mask; });
+                    /* F6 修复：用 uint32 重载，高位不再被截断 */
                     Configuration::instance().saveSetting(
-                        "pc_status_mask", static_cast<int>(mask));
+                        "pc_status_mask", mask);
                 }
                 SerialProtocol::instance().sendSuccessResponse(cmd, seq,
                                                                JsonObject());

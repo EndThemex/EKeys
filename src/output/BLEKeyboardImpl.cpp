@@ -24,6 +24,9 @@ namespace ekeys
         bool s_connected = false;
 
         constexpr uint8_t kModifierBase = 0xE0; // LCtrl .. RWin = 0xE0~0xE7
+        /* F2 修复：每个修饰键位独立引用计数（0xE0..0xE7）。 */
+        constexpr uint8_t kModifierCount = 8;
+        uint8_t s_mod_count[kModifierCount] = {0, 0, 0, 0, 0, 0, 0, 0};
 
     } // namespace
 
@@ -67,11 +70,15 @@ namespace ekeys
 
         if (modifier != 0)
         {
-            for (uint8_t bit = 0; bit < 8; ++bit)
+            for (uint8_t bit = 0; bit < kModifierCount; ++bit)
             {
                 if (modifier & (1u << bit))
                 {
                     s_ble->press(kModifierBase + bit);
+                    if (s_mod_count[bit] < 255)
+                    {
+                        s_mod_count[bit]++;
+                    }
                 }
             }
             for (auto &t : tracked_)
@@ -98,11 +105,18 @@ namespace ekeys
         {
             if (t.keycode == keycode)
             {
-                for (uint8_t bit = 0; bit < 8; ++bit)
+                for (uint8_t bit = 0; bit < kModifierCount; ++bit)
                 {
                     if (t.modifier & (1u << bit))
                     {
-                        s_ble->release(kModifierBase + bit);
+                        if (s_mod_count[bit] > 0)
+                        {
+                            s_mod_count[bit]--;
+                        }
+                        if (s_mod_count[bit] == 0)
+                        {
+                            s_ble->release(kModifierBase + bit);
+                        }
                     }
                 }
                 t.keycode = 0;
@@ -132,6 +146,10 @@ namespace ekeys
         {
             t.keycode = 0;
             t.modifier = 0;
+        }
+        for (uint8_t i = 0; i < kModifierCount; ++i)
+        {
+            s_mod_count[i] = 0;
         }
         s_ble->releaseAll();
     }

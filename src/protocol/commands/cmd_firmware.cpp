@@ -32,12 +32,16 @@ namespace ekeys::protocol::commands
         int handleConfVersionGet(int cmd, int seq, JsonObject /*data*/)
         {
             (void)cmd;
+            /* F9 修复：读取运行时实际值，与 handleConfVersionSet 写入的
+             * settings_.config_version 保持一致（之前恒返回 kConfigVersion=1）。 */
+            DeviceSettings snap;
+            Configuration::instance().snapshot(snap);
             JsonDocument doc;
             doc["cmd"] = CMD_CONF_VERSION_GET | 0x80;
             doc["seq"] = seq;
             doc["status"] = 0;
             JsonObject out = doc["data"].to<JsonObject>();
-            out["version"] = kConfigVersion;
+            out["version"] = static_cast<int>(snap.config_version);
             SerialProtocol::instance().sendDocument(doc);
             return 0;
         }

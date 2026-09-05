@@ -146,6 +146,9 @@ namespace ekeys
             static_cast<uint8_t>(ini.GetLongValue("system", "work_mode", 0));
         settings_.config_version =
             static_cast<uint32_t>(ini.GetLongValue("system", "config_version", 0));
+        /* F6 修复：pc_status_mask 作为 uint32 加载，long 范围足够 */
+        settings_.pc_status_mask =
+            static_cast<uint32_t>(ini.GetLongValue("system", "pc_status_mask", 0));
 
         settings_.wifi_switch =
             static_cast<uint8_t>(ini.GetLongValue("wifi", "wifi_switch", 0));
@@ -235,6 +238,15 @@ namespace ekeys
     {
         char buf[16];
         snprintf(buf, sizeof(buf), "%d", value);
+        return saveSetting(key, buf);
+    }
+
+    /* F6 修复：uint32 持久化，避免高位被 int 强转破坏 */
+    bool Configuration::saveSetting(const char *key, uint32_t value)
+    {
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%lu",
+                 static_cast<unsigned long>(value));
         return saveSetting(key, buf);
     }
 

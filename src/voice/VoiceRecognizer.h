@@ -1,4 +1,4 @@
-﻿/*
+/*
  * VoiceRecognizer.h
  *
  * 语音识别状态机（FEATURE_DOC §11，阶段 06 任务 6.10/6.12/6.13）。
@@ -23,6 +23,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <freertos/FreeRTOS.h>
+#include <freertos/portmacro.h>
+
 #include "ui/ui_settings_types.h"
 
 namespace ekeys {
@@ -46,7 +49,11 @@ public:
      */
     void finishCapture();
 
-    bool isCapturing() const { return capturing_; }
+    /*
+     * F3 修复：capturing_ 跨任务读写，需要临界区保护；
+     * isCapturing 内部走 taskENTER_CRITICAL，避免外部误用裸字段。
+     */
+    bool isCapturing() const;
     bool isSuspended() const { return suspended_; }
 
     /* 音乐屏进入 suspend / 离开 resume（docs/06 备注） */
@@ -93,6 +100,9 @@ private:
     size_t pcm_cap_samples_ = 0;
     size_t pcm_len_samples_ = 0;
     uint8_t captured_work_mode_ = 0;
+
+    /* F3 修复：capturing_ / asr_job_pending_ / 队列读写跨任务，加自旋锁 */
+    mutable portMUX_TYPE asr_lock_ = portMUX_INITIALIZER_UNLOCKED;
 
     /* C3：后台 ASR 任务相关 */
     void *asr_task_handle_ = nullptr; // TaskHandle_t 转发避免公开 freertos 头

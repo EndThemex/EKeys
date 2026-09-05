@@ -116,8 +116,26 @@ void Upgrade::performOta()
     uint8_t buf[kStreamBufSize];
     size_t written = 0;
     bool io_ok = true;
+    /*
+     * F7 修复：服务端停滞（available()==0 且 connected()==true）只 delay(1)
+     * 会永久挂起、阻塞 MainTask 直到看门狗复位。增加整体 idle 超时：
+     * 连续 kOtaIdleTimeoutMs 无新数据则放弃。
+     */
+    constexpr uint32_t kOtaIdleTimeoutMs = 15000;
+    constexpr uint32_t kOtaTotalTimeoutMs = 120000;
+    const uint32_t ota_start_ms = millis();
+    uint32_t last_progress_ms = ota_start_ms;
     while (written < static_cast<size_t>(content_len) && io_ok)
     {
+        const uint32_t now_ms = millis();
+        if ((now_ms - ota_start_ms) >= kOtaTotalTimeoutMs)
+        {
+            LOG_ERROR("OTA", "total timeout (%u/%u)",
+                      static_cast<unsigned>(written),
+                      static_cast<unsigned>(content_len));
+            io_ok = false;
+            break;
+        }
         const size_t avail =
             stream->available() ? stream->available() : 0;
         if (avail == 0)
@@ -127,6 +145,14 @@ void Upgrade::performOta()
                 LOG_ERROR("OTA", "stream closed early (%u/%d)",
                           static_cast<unsigned>(written), content_len);
                 io_ok = false;
+                break;
+            }
+            if ((now_ms - last_progress_ms) >= kOtaIdleTimeoutMs)
+            {
+                LOG_ERROR("OTA", "idle timeout (%ums no data)",
+                          static_cast<unsigned>(kOtaIdleTimeoutMs));
+                io_ok = false;
+                break;
             }
             delay(1);
             continue;
@@ -149,6 +175,7 @@ void Upgrade::performOta()
         }
         mbedtls_md5_update_ret(&ctx, buf, static_cast<size_t>(n));
         written += static_cast<size_t>(n);
+        last_progress_ms = millis();
     }
 
     if (!io_ok)

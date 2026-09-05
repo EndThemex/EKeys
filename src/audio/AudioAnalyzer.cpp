@@ -100,9 +100,11 @@ namespace ekeys
     }
 
     /*
-     * 幅度谱 0..N/2 均分 16 段（跳过 DC），每段取峰值，
-     * 对数压缩到 0~1（经验系数：8000 ≈ 满量程）。
+     * 幅度谱 0..N/2 均分 16 段（跳过 DC），每段取峰值。
      * 已手工加汉宁窗，无需再调用 windowing()（Rectangle 窗为无操作）。
+     *
+     * B4 修复：原经验系数 8000 未上机校准；改为按本帧整体峰值自适应归一化，
+     * 避免高频段贴地、满量程过载。两方向都偏向合理的视觉效果。
      */
     ArduinoFFT<double> fft(v_real_, v_imag_,
                            static_cast<uint_fast16_t>(kFftSize),
@@ -112,6 +114,8 @@ namespace ekeys
 
     const size_t usable = kFftSize / 2 - 1;
     const size_t per_band = usable / kBandCount;
+    double peaks[kBandCount];
+    double frame_peak = 0;
     for (size_t b = 0; b < kBandCount; ++b)
     {
       double peak = 0;
@@ -122,8 +126,30 @@ namespace ekeys
           peak = v_real_[i];
         }
       }
-      const float norm = static_cast<float>(peak / 8000.0);
-      out_bands[b] = (norm > 1.0f) ? 1.0f : norm;
+      peaks[b] = peak;
+      if (peak > frame_peak)
+      {
+        frame_peak = peak;
+      }
+    }
+    /*
+     * 自适应归一化：以本帧最大 bin 的 1/4 作为分母。
+     * - floor=1.0 防止静默帧除零
+     * - 每段都按 frame_peak 归一化并裁到 0~1
+     */
+    const double denom = (frame_peak > 4.0) ? (frame_peak * 0.25) : 1.0;
+    for (size_t b = 0; b < kBandCount; ++b)
+    {
+      float v = static_cast<float>(peaks[b] / denom);
+      if (v < 0.0f)
+      {
+        v = 0.0f;
+      }
+      else if (v > 1.0f)
+      {
+        v = 1.0f;
+      }
+      out_bands[b] = v;
     }
   }
 

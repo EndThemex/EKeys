@@ -1,4 +1,4 @@
-﻿/*
+/*
  * AppContext.cpp
  *
  * 阶段 03 启动顺序（SPIFFS 由 main.cpp 提前挂载）：
@@ -36,9 +36,26 @@ namespace ekeys
         configuration_ = &Configuration::instance();
         configuration_->setRepository(keymap_repo_.get());
 
-        setKeyboard(KeyboardFactory::create(WorkMode::Wired));
+        main_task_.begin(); // 内部 Configuration::load()
 
-        main_task_.begin();
+        /* F1 修复：按加载后的 work_mode 选择键盘后端，
+         * 避免 BLE/2.4G 模式下重启仍为 USB。 */
+        {
+            DeviceSettings snap;
+            configuration_->snapshot(snap);
+            WorkMode wm = WorkMode::Wired;
+            if (snap.work_mode == static_cast<uint8_t>(WorkMode::Bluetooth))
+            {
+                wm = WorkMode::Bluetooth;
+            }
+            else if (snap.work_mode ==
+                     static_cast<uint8_t>(WorkMode::Wireless24G))
+            {
+                wm = WorkMode::Wireless24G;
+            }
+            setKeyboard(KeyboardFactory::create(wm));
+            main_task_.setKeyboard(keyboard());
+        }
 
         /*
          * 协议层（阶段 04）：注册命令 handler 并启动 CDC JSON 行收发。
@@ -53,7 +70,7 @@ namespace ekeys
          */
         DisplayTask::instance().begin();
 
-        main_task_.setKeyboard(keyboard());
+        /* F1 修复：键盘已按 work_mode 创建；DisplayTask 仅补注入队列句柄 */
         main_task_.setDisplayQueue(DisplayTask::instance().queueHandle());
 
         LOG_INFO("APP", "AppContext initialized");

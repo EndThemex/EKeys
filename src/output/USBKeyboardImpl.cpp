@@ -22,7 +22,15 @@ namespace ekeys
         USBHIDKeyboard g_usb_keyboard;
 
         /*
-         * 记录每个 keycode 对应的修饰键位，release(keycode) 时一并释放。
+         * F2 修复：每个修饰键位独立引用计数。
+         * 之前 release(keycode) 直接 applyModifier(modifier, false) 释放整个 mask，
+         * 导致先松 Ctrl+A、再松 Ctrl+B 时把 Ctrl 一并释放，B 的组合键失效。
+         * 现在每个 modifier 位仅在计数归零时才真正下发 release。
+         */
+        constexpr uint8_t kModifierCount = 8; // LCtrl..RWin = 0xE0..0xE7
+        uint8_t g_mod_count[kModifierCount] = {0, 0, 0, 0, 0, 0, 0, 0};
+        /*
+         * 记录每个 keycode 对应的修饰键位，release(keycode) 时按位 dec 计数。
          * IKeyboard::release 无 modifier 参数，不记录会导致组合键释放后修饰键滞留。
          */
         struct PressedEntry
@@ -34,18 +42,31 @@ namespace ekeys
         PressedEntry g_pressed[kMaxPressed];
 
         // modifier 位掩码(0x01=LCtrl..0x80=RWin) → 0xE0~0xE7 的 usage code 逐位处理
+        // F2 修复：press 时 inc 计数、release 时 dec 计数，归零才真正下发 release。
         void applyModifier(uint8_t modifier, bool press)
         {
-            for (uint8_t bit = 0; bit < 8; ++bit)
+            for (uint8_t bit = 0; bit < kModifierCount; ++bit)
             {
-                if (modifier & (1u << bit))
+                if ((modifier & (1u << bit)) == 0)
                 {
-                    const uint8_t usage = 0xE0 + bit;
-                    if (press)
+                    continue;
+                }
+                const uint8_t usage = 0xE0 + bit;
+                if (press)
+                {
+                    g_usb_keyboard.pressRaw(usage);
+                    if (g_mod_count[bit] < 255)
                     {
-                        g_usb_keyboard.pressRaw(usage);
+                        g_mod_count[bit]++;
                     }
-                    else
+                }
+                else
+                {
+                    if (g_mod_count[bit] > 0)
+                    {
+                        g_mod_count[bit]--;
+                    }
+                    if (g_mod_count[bit] == 0)
                     {
                         g_usb_keyboard.releaseRaw(usage);
                     }
@@ -131,6 +152,10 @@ namespace ekeys
         {
             entry.keycode = 0;
             entry.modifier = 0;
+        }
+        for (uint8_t i = 0; i < kModifierCount; ++i)
+        {
+            g_mod_count[i] = 0;
         }
         g_usb_keyboard.releaseAll();
     }

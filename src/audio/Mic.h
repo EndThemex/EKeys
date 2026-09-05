@@ -33,6 +33,14 @@ public:
     bool inited() const { return inited_; }
 
     /*
+     * F4 修复：录音与频谱共享 I2S0 / Mic 硬件，靠时序不可靠。
+     * 暴露 take/give 以便 VoiceRecognizer / DisplayTask 显式互斥。
+     * begin() 内部已 take；end() 内部已 give。
+     */
+    bool take();
+    void give();
+
+    /*
      * 阻塞读取 PCM 样本（int16 单声道）。
      * 返回实际读取样本数；驱动未初始化返回 0。
      */

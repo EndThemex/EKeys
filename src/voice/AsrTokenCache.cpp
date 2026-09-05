@@ -40,7 +40,8 @@ const char *AsrTokenCache::getToken()
         strcmp(secret_key_, snap.voice_baidu_secret_key) != 0;
 
     if (token_[0] != '\0' && !credChanged &&
-        millis() + voice::kTokenRefreshMarginMs < expires_at_ms_)
+        /* F5 修复：用减法比较避免 millis() 回绕（~49.7 天） */
+        (expires_at_ms_ - millis()) > voice::kTokenRefreshMarginMs)
     {
         return token_;
     }
