@@ -14,6 +14,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "audio/Mic.h"
+
 namespace ekeys
 {
 
@@ -43,7 +45,11 @@ namespace ekeys
 
         static constexpr size_t kFftSize = 512;
         static constexpr size_t kBandCount = 16;
-        static constexpr uint32_t kSampleRate = 16000;
+        /*
+         * D4 修复：采样率常量统一指向 Mic::kSampleRate，
+         * 未来 Mic 调整（如 22050）时 AudioAnalyzer 自动跟随。
+         */
+        static constexpr uint32_t kSampleRate = Mic::kSampleRate;
 
     private:
         AudioAnalyzer() = default;

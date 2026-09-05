@@ -18,6 +18,7 @@ namespace ekeys
 
     class Configuration;
     class KeymapRepository;
+    struct DeviceSettings;
 
     class AppContext
     {
@@ -42,6 +43,14 @@ namespace ekeys
          * KeyboardFactory::recreate() 语义：create + setKeyboard）。
          */
         void applyWorkMode(uint8_t mode);
+
+        /*
+         * C6 修复：把"配置变更的副作用"统一到一处。
+         * 根据 prev / curr 两份快照 diff 出 work_mode / active_keymap_profile
+         * 变化，分别触发键盘重建 / 键映射重载，并统一调度 WiFi。
+         * 调用方：cmd_config::handleConfigSet 与 MainTask::applyUiSettingsSnapshot。
+         */
+        void applyUiSideEffects(const DeviceSettings &prev, const DeviceSettings &curr);
 
     private:
         AppContext() = default;

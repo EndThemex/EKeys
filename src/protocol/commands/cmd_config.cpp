@@ -117,23 +117,28 @@ namespace ekeys::protocol::commands
                 SerialProtocol::instance().sendDocument(resp);
             }
 
-            /* 副作用（阶段 04 任务 4.8） */
-            AppContext &app = AppContext::instance();
+            /*
+             * C6 修复：副作用统一到 AppContext::applyUiSideEffects，
+             * 与 MainTask::applyUiSettingsSnapshot 走同一路径，避免两份代码漂移。
+             */
+            DeviceSettings prev{};
+            DeviceSettings curr{};
+            Configuration::instance().snapshot(prev);
+            curr = prev;
+            /* 应用本次变更到 curr（仅内存，不写盘：持久化已由 parseConfigSetCommand 完成） */
             if (result.work_mode_changed)
             {
-                app.applyWorkMode(result.work_mode);
+                curr.work_mode = result.work_mode;
             }
             if (result.profile_changed)
             {
-                app.mainTask().reloadKeymap();
+                /* active_keymap_profile 由 parseConfigSetCommand 单独写入；
+                 * 此处读取最新值用于 diff。 */
+                Configuration::instance().snapshot(curr);
             }
+            AppContext::instance().applyUiSideEffects(prev, curr);
             if (result.wifi_changed)
             {
-                /*
-                 * 阶段 06：WiFi 状态机已接入。禁用 / BLE 模式 →
-                 * isEnabled()=false 内部停机；其余按新配置调度连接。
-                 */
-                WiFiManager::instance().scheduleConnect();
                 LOG_INFO("CFG_CMD", "wifi setting changed, reconnect scheduled");
             }
 

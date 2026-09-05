@@ -60,11 +60,27 @@ namespace ekeys
         DeviceSettings snap;
         Configuration::instance().snapshot(snap);
 
-        /* 同一配置（ssid+password）重复调度去重：简单用 ssid 首地址+长度粗判 */
+        /* C1 修复：空 SSID 直接拒绝，避免进入 WaitingRetry 再被 startConnect 回退 */
+        if (snap.wifi_ssid[0] == '\0')
+        {
+            LOG_WARNING("WIFI", "empty ssid, schedule ignored");
+            if (state_ != State::Idle)
+            {
+                stopReconnect();
+            }
+            return;
+        }
+
+        /* 同一配置（ssid+password）重复调度去重：串行化 SSID+密码，密码变更不会被吞 */
         uint32_t serial = 0;
         for (size_t i = 0; snap.wifi_ssid[i] != '\0'; ++i)
         {
             serial = serial * 31 + static_cast<uint8_t>(snap.wifi_ssid[i]);
+        }
+        serial = serial * 31 + 0xFF; /* 分隔常量，避免 ssid/password 拼接碰撞 */
+        for (size_t i = 0; snap.wifi_password[i] != '\0'; ++i)
+        {
+            serial = serial * 31 + static_cast<uint8_t>(snap.wifi_password[i]);
         }
 
         if (state_ == State::Connecting && serial == last_request_serial_)

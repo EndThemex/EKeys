@@ -1,4 +1,4 @@
-/*
+﻿/*
  * BatteryMonitor.cpp
  *
  * ESP32-S3 ADC1 通道读取 + 滑动平均 + 1:1 分压还原 + 电压→百分比。
@@ -69,9 +69,23 @@ namespace ekeys
 
     uint16_t BatteryMonitor::readMilliVolts()
     {
+        /*
+         * D7 修复：5s 内部节流缓存。
+         * 上层（MainTask）虽已 5s 节流，但保留内部缓存作为防御——
+         * 万一上游改成"每 tick"调用，ADC 也不会被高频占用。
+         */
+        const uint32_t now = millis();
+        if (cached_mv_valid_ &&
+            (now - cached_mv_ms_) < kReadCacheTtlMs)
+        {
+            return cached_mv_;
+        }
         const uint16_t adc_mv = adcMilliVoltsAvg_();
         const float vbat_mv = static_cast<float>(adc_mv) * kDividerRatio;
-        return static_cast<uint16_t>(vbat_mv);
+        cached_mv_ = static_cast<uint16_t>(vbat_mv);
+        cached_mv_ms_ = now;
+        cached_mv_valid_ = true;
+        return cached_mv_;
     }
 
     uint8_t BatteryMonitor::readPercent()

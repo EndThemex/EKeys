@@ -145,4 +145,21 @@ void Speaker::Stop()
     }
 }
 
+void Speaker::end()
+{
+    /*
+     * C9 修复：释放 Audio 实例。Audio 析构内部会卸载 I2S 驱动。
+     * 不在 begin() 时自动重建——下次需要播放时调用 begin() 重新分配。
+     */
+    if (!inited_)
+    {
+        return;
+    }
+    Audio *audio = static_cast<Audio *>(impl_);
+    delete audio; /* Audio 析构处理 I2S uninstall */
+    impl_ = nullptr;
+    inited_ = false;
+    LOG_INFO("SPK", "MAX98357 released");
+}
+
 }  // namespace ekeys

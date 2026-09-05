@@ -80,6 +80,11 @@ constexpr uint8_t kPinI2sLrclkSpeaker = 9;
 constexpr uint8_t kPinI2sDataSpeaker = 14;
 constexpr uint8_t kPinI2sMicBclk = 10;     // 与 Speaker BCLK 共用，运行时互斥
 constexpr uint8_t kPinI2sMicWs = 12;
+/*
+ * D9 修复：kPinI2sMicSck = 13 当前未在固件中引用（Mic.cpp 仅配 BCLK/WS/DIN）。
+ * 注释（§2.7）描述硬件 ICS43434 走 IO13 专用线，但本固件仍走 IO10 共享线。
+ * 保留常量以便未来切换到独立 SCK 时直接复用；当前"软互斥"是 B5 的核心保险。
+ */
 constexpr uint8_t kPinI2sMicSck = 13;
 constexpr uint8_t kPinI2sMicDin = 11;
 

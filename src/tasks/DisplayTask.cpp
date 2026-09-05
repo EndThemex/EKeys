@@ -141,8 +141,12 @@ namespace ekeys
         /* SquareLine UI：一次性创建 11 屏 */
         ui_init();
 
-        /* 状态条初始状态（当前无 WiFi / 模块 / 电池数据源，先按离线占位） */
-        status_bar_set_working_mode(WIRED_KEYBOARD_MODE);
+        /*
+         * C7 修复：移除 status_bar_set_working_mode(WIRED_KEYBOARD_MODE) 硬编码。
+         * 紧随其后的"启动快照"块会从 Configuration 读出真实 work_mode
+         * 并通过 applySetting → status_bar_set_working_mode() 覆盖，
+         * 这里写死反而会在首帧渲染前多一次冗余赋值。
+         */
         status_bar_set_recording_state(false);
         status_bar_set_volume(0);
         /* 电量由 MainTask 5s 节流后投递 BatteryStatus 更新，避免此处硬编码 100 */
@@ -192,7 +196,11 @@ namespace ekeys
         {
             /* "HH:MM:SS" → 主屏 ui_LabelTime（HH:MM）+ ui_LabelSecond（SS） */
             const char *t = msg.time_text;
-            if (t[0] != '\0')
+            /*
+             * C8 修复：长度 ≥ 8 才解析，避免上游格式变化（如 "H:MM:SS"）
+             * 导致 t[7] 越界。冒号位（t[2] / t[5]）也校验为 ':'，双重保险。
+             */
+            if (strlen(t) >= 8 && t[2] == ':' && t[5] == ':')
             {
                 static char hm[7];
                 static char ss[3];

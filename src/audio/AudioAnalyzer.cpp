@@ -62,6 +62,16 @@ namespace ekeys
     {
       return;
     }
+    /* C5 修复：count=0 时跳过 FFT，避免空帧白算 ~5ms CPU。
+     * 调用方（DisplayTask 频谱）每 20ms 一次，少算一帧不影响视觉。 */
+    if (count == 0)
+    {
+      for (size_t b = 0; b < kBandCount; ++b)
+      {
+        out_bands[b] = 0.0f;
+      }
+      return;
+    }
     if (count > kFftSize)
     {
       count = kFftSize;

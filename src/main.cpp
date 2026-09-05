@@ -67,7 +67,11 @@ void loop()
      * DisplayTask (Core 0) 内部周期调用 LvglPort::tick() 与
      * 消费 DisplayMessage 队列。本函数只需驱动 MainTask 的
      * 5ms 扫描循环。
+     *
+     * D2 修复：MainTask::loop() 内部已用 millis() 节流（5ms tick），
+     * 外层 delay(5) 让实际周期变成 10ms，浪费调度时间。
+     * 改为 delay(1) 让 FreeRTOS 调度器更频繁地切换到 WiFi/DisplayTask。
      */
     ekeys::AppContext::instance().mainTask().loop();
-    delay(5);
+    delay(1);
 }

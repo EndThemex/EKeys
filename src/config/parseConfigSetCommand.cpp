@@ -253,7 +253,10 @@ bool parseConfigSetCommand(JsonObject cfg, ConfigSetResult &result)
         /* ---- 语音 ---- */
         if (!cfg["voice_enable"].isNull()) {
             int v = cfg["voice_enable"].as<int>();
-            if (s.voice_enable != v) {
+            /* C2 修复：限定在 0/1，防止恶意/误用写入越界值 */
+            if (v < 0) v = 0;
+            if (v > 1) v = 1;
+            if (s.voice_enable != static_cast<uint8_t>(v)) {
                 LOG_INFO("CFG_SET", "voice_enable: %u -> %d",
                          s.voice_enable, v);
                 s.voice_enable = static_cast<uint8_t>(v);
@@ -265,7 +268,10 @@ bool parseConfigSetCommand(JsonObject cfg, ConfigSetResult &result)
         }
         if (!cfg["voice_trigger_key"].isNull()) {
             int v = cfg["voice_trigger_key"].as<int>();
-            if (s.voice_trigger_key != v) {
+            /* C2 修复：键下标限定 0~11（矩阵 12 键范围内），其余截断 */
+            if (v < 0) v = 0;
+            if (v > 11) v = 11;
+            if (s.voice_trigger_key != static_cast<uint8_t>(v)) {
                 LOG_INFO("CFG_SET", "voice_trigger_key: %u -> %d",
                          s.voice_trigger_key, v);
                 s.voice_trigger_key = static_cast<uint8_t>(v);
@@ -277,7 +283,11 @@ bool parseConfigSetCommand(JsonObject cfg, ConfigSetResult &result)
         }
         if (!cfg["voice_max_record_ms"].isNull()) {
             int v = cfg["voice_max_record_ms"].as<int>();
-            if (s.voice_max_record_ms != v) {
+            /* C2 修复：录音时长上界 60000ms（60s），下界 1000ms（1s），
+             * 防止过大值截断为 0 或过小值触发 ps_malloc(0)。 */
+            if (v < 1000) v = 1000;
+            if (v > 60000) v = 60000;
+            if (s.voice_max_record_ms != static_cast<uint16_t>(v)) {
                 LOG_INFO("CFG_SET", "voice_max_record_ms: %u -> %d",
                          s.voice_max_record_ms, v);
                 s.voice_max_record_ms = static_cast<uint16_t>(v);
@@ -289,7 +299,10 @@ bool parseConfigSetCommand(JsonObject cfg, ConfigSetResult &result)
         }
         if (!cfg["voice_auto_enter"].isNull()) {
             int v = cfg["voice_auto_enter"].as<int>();
-            if (s.voice_auto_enter != v) {
+            /* C2 修复：限定在 0/1 */
+            if (v < 0) v = 0;
+            if (v > 1) v = 1;
+            if (s.voice_auto_enter != static_cast<uint8_t>(v)) {
                 LOG_INFO("CFG_SET", "voice_auto_enter: %u -> %d",
                          s.voice_auto_enter, v);
                 s.voice_auto_enter = static_cast<uint8_t>(v);
@@ -301,7 +314,10 @@ bool parseConfigSetCommand(JsonObject cfg, ConfigSetResult &result)
         }
         if (!cfg["voice_dev_pid"].isNull()) {
             int v = cfg["voice_dev_pid"].as<int>();
-            if (s.voice_dev_pid != v) {
+            /* C2 修复：dev_pid 上界 65535，避免越界截断 */
+            if (v < 0) v = 0;
+            if (v > 65535) v = 65535;
+            if (s.voice_dev_pid != static_cast<uint16_t>(v)) {
                 LOG_INFO("CFG_SET", "voice_dev_pid: %u -> %d",
                          s.voice_dev_pid, v);
                 s.voice_dev_pid = static_cast<uint16_t>(v);

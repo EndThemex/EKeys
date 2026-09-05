@@ -10,6 +10,7 @@
 
 #include "config/Configuration.h"
 #include "keymap/KeyResolver.h"
+#include "logging/LogManager.h"
 #include "rgb/ClickHighlight.h"
 #include "voice/VoiceRecognizer.h"
 
@@ -43,6 +44,15 @@ namespace ekeys
 
     void KeyEventDispatcher::init(const KeyResolver *resolver)
     {
+        /*
+         * C4 修复：拒绝空指针，避免后续 MainTask 重建时留下悬挂指针。
+         * 当前 MainTask 是单例，长期有效，但保留防御性检查可避免后续误用。
+         */
+        if (resolver == nullptr)
+        {
+            LOG_WARNING("KEY", "KeyEventDispatcher::init with null resolver, ignored");
+            return;
+        }
         g_resolver = resolver;
     }
 

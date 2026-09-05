@@ -351,20 +351,21 @@ namespace ekeys
         s.rgb_single_color[sizeof(s.rgb_single_color) - 1] = '\0';
         const int rgbSingleColor = clampInt(atoi(s.rgb_single_color), 0, 255);
 
-        bool changed = false;
-        bool workModeChanged = false;
-        uint8_t newWorkMode = 0;
-        bool profileChanged = false;
-
         Configuration &config = Configuration::instance();
+
+        /* C6 修复：mutateSettings 入口前抓 prev，结束后取 curr，统一交给 applyUiSideEffects */
+        DeviceSettings prev{};
+        DeviceSettings curr{};
+        config.snapshot(prev);
+        curr = prev;
+
+        bool changed = false;
         config.mutateSettings([&](DeviceSettings &d)
                               {
             if (d.work_mode != static_cast<uint8_t>(s.work_mode))
             {
                 d.work_mode = static_cast<uint8_t>(s.work_mode);
                 changed = true;
-                workModeChanged = true;
-                newWorkMode = d.work_mode;
             }
             if (d.rgb_mode != static_cast<uint8_t>(s.rgb_mode))
             {
@@ -425,13 +426,13 @@ namespace ekeys
             {
                 d.active_keymap_profile = s.active_keymap_profile;
                 changed = true;
-                profileChanged = true;
             } });
 
         if (!changed)
         {
             return;
         }
+        config.snapshot(curr);
 
         LOG_INFO("MAIN", "ui settings %s (work_mode=%d tft=%d rgb=%d vol=%d)",
                  persist ? "save" : "apply",
@@ -461,31 +462,15 @@ namespace ekeys
             config.saveSetting("active_keymap_profile", static_cast<int>(s.active_keymap_profile));
         }
 
-        /* 副作用：工作模式重建键盘 / Profile 重载键映射 */
-        if (workModeChanged)
-        {
-            AppContext::instance().applyWorkMode(newWorkMode);
-            /*
-             * 按新模式重调 WiFi：BLE → isEnabled()=false 内部停机；
-             * 其余模式按新配置调度连接。
-             */
-            WiFiManager::instance().scheduleConnect();
-        }
-        if (profileChanged)
-        {
-            reloadKeymap();
-        }
-
-        /* 刷新显示（背光 / 状态条 / 设置屏快照），以配置层权威值为准 */
-        DeviceSettings snap;
-        config.snapshot(snap);
+        /* C6 修复：副作用统一走 AppContext::applyUiSideEffects，与 cmd_config 共用 */
+        AppContext::instance().applyUiSideEffects(prev, curr);
 
         /* 音量即时生效（Speaker::loop 与本任务同上下文） */
-        Speaker::instance().applyDeviceVolume(snap.device_volume);
+        Speaker::instance().applyDeviceVolume(curr.device_volume);
 
         DisplayMessage msg;
         msg.type = DisplayMessageType::SettingUpdate;
-        fillSettingPayload(snap, msg.setting);
+        fillSettingPayload(curr, msg.setting);
         postMessage(msg);
     }
 

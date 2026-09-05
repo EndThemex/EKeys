@@ -1,4 +1,4 @@
-/*
+﻿/*
  * AppContext.cpp
  *
  * 阶段 03 启动顺序（SPIFFS 由 main.cpp 提前挂载）：
@@ -12,11 +12,13 @@
 
 #include "config/Configuration.h"
 #include "logging/LogManager.h"
+#include "network/WiFiManager.h"
 #include "output/KeyboardFactory.h"
 #include "protocol/SerialProtocol.h"
 #include "protocol/registration.h"
 #include "services/KeymapRepository.h"
 #include "tasks/DisplayTask.h"
+#include "ui/ui_settings_types.h"
 
 namespace ekeys
 {
@@ -81,6 +83,38 @@ namespace ekeys
         keyboard_.reset(); // 释放旧实例（回收 HID / BLE 资源）
         setKeyboard(KeyboardFactory::create(wm));
         main_task_.setKeyboard(keyboard_.get());
+    }
+
+    /*
+     * C6 修复：cmd_config 与 MainTask::applyUiSettingsSnapshot 副作用去重。
+     * 调用方在 Configuration 已落定后，传入 prev / curr 两份快照：
+     *   - work_mode 变化 → 重建键盘实例 + 调度 WiFi
+     *   - active_keymap_profile 变化 → 重载键映射
+     *   - 任意配置变更但无线 WiFi 关键字段变化 → 仍调度一次 WiFi 重连
+     */
+    void AppContext::applyUiSideEffects(const DeviceSettings &prev, const DeviceSettings &curr)
+    {
+        const bool workModeChanged = (prev.work_mode != curr.work_mode);
+        const bool profileChanged =
+            (prev.active_keymap_profile != curr.active_keymap_profile);
+        const bool wifiRelevantChanged =
+            workModeChanged ||
+            (prev.wifi_switch != curr.wifi_switch) ||
+            (strcmp(prev.wifi_ssid, curr.wifi_ssid) != 0) ||
+            (strcmp(prev.wifi_password, curr.wifi_password) != 0);
+
+        if (workModeChanged)
+        {
+            applyWorkMode(curr.work_mode);
+        }
+        if (profileChanged)
+        {
+            main_task_.reloadKeymap();
+        }
+        if (wifiRelevantChanged)
+        {
+            WiFiManager::instance().scheduleConnect();
+        }
     }
 
 } // namespace ekeys

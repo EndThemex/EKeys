@@ -57,6 +57,15 @@ private:
     char host_ip_[16]{0};
     uint16_t host_port_ = 30000;
     void *impl_ = nullptr;  // WiFiClient*（避免在头文件引 WiFi.h）
+
+    /*
+     * D6 修复：行缓冲提为成员变量，stop() 中重置。
+     * 旧实现用函数级 static，断线重连时残留半行可能拼接到新连接的首行触发解析异常。
+     */
+    static constexpr size_t kTcpLineBufSize = 2048;
+    char line_buf_[kTcpLineBufSize]{};
+    size_t line_len_ = 0;
+    bool line_overflow_ = false;
 };
 
 }  // namespace ekeys

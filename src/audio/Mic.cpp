@@ -48,7 +48,9 @@ bool Mic::begin()
     }
 
     i2s_pin_config_t pins = {};
-    pins.bck_io_num = kPinI2sMicBclk;   // IO10（专用 MIC_SCK）
+    /* D9 修复：IO10 与 Speaker BCLK 共用，运行时由 prepareI2sForMicCapture() 互斥。
+     * 旧注释"专用 MIC_SCK"语义错误，易让维护者误以为两条 BCLK 独立。 */
+    pins.bck_io_num = kPinI2sMicBclk;   // IO10（与 Speaker BCLK 共用，运行时互斥）
     pins.ws_io_num = kPinI2sMicWs;      // IO12
     pins.data_out_num = I2S_PIN_NO_CHANGE;
     pins.data_in_num = kPinI2sMicDin;   // IO11

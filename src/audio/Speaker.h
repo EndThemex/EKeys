@@ -45,6 +45,15 @@ public:
     void Resume();
     void Stop();
 
+    /*
+     * C9 修复：与 Mic::end() 对称的资源释放接口。
+     * 调用方在系统关闭 / 低功耗进入深度睡眠前调用，
+     * delete Audio 实例（其内部析构会卸载 I2S 驱动）。
+     * 注意：Speaker 是全局单例，进程生命周期内通常不需要调用；
+     *       仅在 OTA / 复位前清理时使用。
+     */
+    void end();
+
 private:
     Speaker() = default;
 

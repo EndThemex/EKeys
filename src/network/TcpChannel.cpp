@@ -66,6 +66,10 @@ void TcpChannel::stop()
         client->stop();
     }
     state_ = State::Idle;
+    /* D6 修复：清空行缓冲，断线重连后无残留半行 */
+    line_len_ = 0;
+    line_overflow_ = false;
+    line_buf_[0] = '\0';
 }
 
 bool TcpChannel::isConnected() const
@@ -147,34 +151,31 @@ void TcpChannel::process()
         /* 收行 → 协议层 */
         while (client->available() > 0)
         {
-            static char line[2048];
-            static size_t len = 0;
-            static bool overflow = false;
             char c = static_cast<char>(client->read());
             if (c == '\n')
             {
-                if (overflow)
+                if (line_overflow_)
                 {
-                    overflow = false;
-                    len = 0;
+                    line_overflow_ = false;
+                    line_len_ = 0;
                     continue;
                 }
-                line[len] = '\0';
-                SerialProtocol::instance().handleTcpLine(line);
-                len = 0;
+                line_buf_[line_len_] = '\0';
+                SerialProtocol::instance().handleTcpLine(line_buf_);
+                line_len_ = 0;
             }
             else if (c == '\r')
             {
                 continue;
             }
-            else if (len + 1 >= sizeof(line))
+            else if (line_len_ + 1 >= sizeof(line_buf_))
             {
-                overflow = true;
+                line_overflow_ = true;
                 LOG_WARNING("TCP", "line overflow discarded");
             }
             else
             {
-                line[len++] = c;
+                line_buf_[line_len_++] = c;
             }
         }
         break;

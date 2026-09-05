@@ -9,6 +9,8 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #include "app/AppContext.h"
 #include "audio/Mic.h"
@@ -153,6 +155,13 @@ namespace ekeys
         }
     }
 
+    /*
+     * C3 修复：原 finishCapture() 同步 HTTP 10s+ 阻塞 MainTask，
+     * 现拆分为两步：
+     *   1) finishCapture() —— 截断 PCM + Mic::end() + 投递 ASR 任务，立即返回；
+     *   2) asrTaskLoop() —— 后台消费队列，执行 HTTP POST + JSON 解析 + 上报。
+     * 这样录音结束 MainTask 立即恢复 5ms tick，长录音场景不再卡死键盘/TCP。
+     */
     void VoiceRecognizer::finishCapture()
     {
         if (!capturing_)
@@ -169,14 +178,6 @@ namespace ekeys
         {
             LOG_INFO("ASR", "record too short (%ums), discarded",
                      static_cast<unsigned>(duration_ms));
-            return;
-        }
-
-        /* token */
-        const char *token = AsrTokenCache::instance().getToken();
-        if (token == nullptr)
-        {
-            LOG_ERROR("ASR", "no valid token, check baidu keys");
             free(pcm_buf_);
             pcm_buf_ = nullptr;
             pcm_cap_samples_ = 0;
@@ -184,125 +185,222 @@ namespace ekeys
             return;
         }
 
-        /* URL：dev_pid / cuid 来自设置 */
+        /* 抓取设备快照（cuid / dev_pid / auto_enter），后台识别时 Configuration 可能变更 */
         DeviceSettings snap;
         Configuration::instance().snapshot(snap);
-        const char *cuid = (snap.voice_cuid[0] != '\0') ? snap.voice_cuid
-                                                        : voice::kDefaultCuid;
-        char url[256];
-        snprintf(url, sizeof(url), "%s?dev_pid=%u&cuid=%s&token=%s",
-                 voice::kAsrUrlBase,
-                 static_cast<unsigned>(snap.voice_dev_pid != 0
-                                           ? snap.voice_dev_pid
-                                           : voice::kDefaultDevPid),
-                 cuid, token);
 
-        /* POST raw PCM */
-        const size_t byte_len = pcm_len_samples_ * sizeof(int16_t);
-        HTTPClient http;
-        http.begin(url);
-        http.addHeader("Content-Type", voice::kAsrContentType);
-        http.setTimeout(10000);
-        LOG_INFO("ASR", "recognizing %ums pcm...", static_cast<unsigned>(duration_ms));
-        const int code = http.POST(reinterpret_cast<uint8_t *>(pcm_buf_),
-                                   static_cast<size_t>(byte_len));
-        if (code != 200)
+        /* 移交 PCM 至后台任务：当前录音缓冲所有权移交给队列，
+         * 后续 startCapture() 因 pcm_buf_==nullptr 会重新分配。 */
+        AsrJob job;
+        job.pcm = pcm_buf_;
+        job.samples = pcm_len_samples_;
+        job.duration_ms = duration_ms;
+        job.auto_enter = (snap.voice_auto_enter != 0);
+        job.dev_pid = (snap.voice_dev_pid != 0) ? snap.voice_dev_pid
+                                                : voice::kDefaultDevPid;
+        if (snap.voice_cuid[0] != '\0')
         {
-            LOG_ERROR("ASR", "http %d", code);
-            http.end();
-            free(pcm_buf_);
+            strncpy(job.cuid, snap.voice_cuid, sizeof(job.cuid) - 1);
+            job.cuid[sizeof(job.cuid) - 1] = '\0';
+        }
+        else
+        {
+            strncpy(job.cuid, voice::kDefaultCuid, sizeof(job.cuid) - 1);
+            job.cuid[sizeof(job.cuid) - 1] = '\0';
+        }
+
+        if (!ensureAsrTask())
+        {
+            LOG_ERROR("ASR", "asr task start failed, drop job");
+            free(job.pcm);
             pcm_buf_ = nullptr;
             pcm_cap_samples_ = 0;
             pcm_len_samples_ = 0;
             return;
         }
 
-        JsonDocument doc;
-        const DeserializationError err = deserializeJson(doc, http.getString());
-        http.end();
-        if (err)
+        /* 队列容量=1；若上一段识别未完成，直接丢弃旧任务（提示重发） */
+        if (asr_job_pending_)
         {
-            LOG_ERROR("ASR", "json: %s", err.c_str());
-            free(pcm_buf_);
-            pcm_buf_ = nullptr;
-            pcm_cap_samples_ = 0;
-            pcm_len_samples_ = 0;
-            return;
+            LOG_WARNING("ASR", "previous job still running, drop oldest");
+            free(asr_queue_[asr_queue_head_].pcm);
+            asr_queue_[asr_queue_head_] = AsrJob{};
+            asr_queue_head_ = (asr_queue_head_ + 1) % kAsrQueueDepth;
         }
-        if ((doc["err_no"] | -1) != 0)
-        {
-            LOG_ERROR("ASR", "baidu err %d: %s",
-                      doc["err_no"] | -1, doc["err_msg"] | "unknown");
-            free(pcm_buf_);
-            pcm_buf_ = nullptr;
-            pcm_cap_samples_ = 0;
-            pcm_len_samples_ = 0;
-            return;
-        }
+        asr_queue_[asr_queue_tail_] = job;
+        asr_queue_tail_ = (asr_queue_tail_ + 1) % kAsrQueueDepth;
+        asr_job_pending_ = true;
 
-        const char *text = doc["result"][0] | "";
-        if (text[0] == '\0')
-        {
-            LOG_INFO("ASR", "empty result");
-            free(pcm_buf_);
-            pcm_buf_ = nullptr;
-            pcm_cap_samples_ = 0;
-            pcm_len_samples_ = 0;
-            return;
-        }
-        LOG_INFO("ASR", "text: %s", text);
-
-        /* 主通道：CMD_VOICE_TEXT 推送 App */
-        SerialProtocol::instance().sendVoiceText(text);
-
-        /* 兜底：TCP 未连接且纯 ASCII → HID 注入 */
-        const bool tcp_online = TcpChannel::instance().isConnected();
-        bool ascii_only = !tcp_online;
-        for (const char *p = text; ascii_only && *p != '\0'; ++p)
-        {
-            if (static_cast<unsigned char>(*p) > 0x7E)
-            {
-                ascii_only = false;
-            }
-        }
-        if (ascii_only)
-        {
-            IKeyboard *kb = AppContext::instance().keyboard();
-            if (kb != nullptr)
-            {
-                for (const char *p = text; *p != '\0'; ++p)
-                {
-                    const char c = *p;
-                    if (c == ' ')
-                    {
-                        kb->press(0x2C);
-                        kb->release(0x2C);
-                    }
-                    else if (c >= 0x21 && c <= 0x7E)
-                    {
-                        char name[2] = {c, '\0'};
-                        const uint8_t keycode = resolveKeyName(String(name));
-                        if (keycode != 0)
-                        {
-                            kb->press(keycode);
-                            kb->release(keycode);
-                        }
-                    }
-                    delay(voice::kAsciiInjectDelayMs);
-                }
-                if (snap.voice_auto_enter != 0)
-                {
-                    kb->press(0x28); // KEY_RETURN
-                    kb->release(0x28);
-                }
-            }
-        }
-
-        /* A3 修复：识别完成释放 PSRAM 缓冲，下次按需重建 */
-        free(pcm_buf_);
+        /* 移交所有权：录音缓冲清零，下一次 startCapture 重新分配 */
         pcm_buf_ = nullptr;
         pcm_cap_samples_ = 0;
         pcm_len_samples_ = 0;
+
+        /* 唤醒后台任务 */
+        TaskHandle_t h = static_cast<TaskHandle_t>(asr_task_handle_);
+        if (h != nullptr)
+        {
+            xTaskNotifyGive(h);
+        }
+        LOG_INFO("ASR", "capture finished (%ums), job queued",
+                 static_cast<unsigned>(duration_ms));
+    }
+
+    bool VoiceRecognizer::ensureAsrTask()
+    {
+        if (asr_task_handle_ != nullptr)
+        {
+            return true;
+        }
+        BaseType_t ok = xTaskCreate(
+            &VoiceRecognizer::asrTaskEntry,
+            "EKeysAsr",
+            /* 8KB 栈：HTTPClient + ArduinoJson + snprintf 足够；
+             * 北京 ASR 域名 TLS 由 ESP-IDF mbedtls 处理，需要略大栈。 */
+            8192,
+            this,
+            /* 优先级低于 MainTask（1）但不阻塞 UI 主循环 */
+            1,
+            reinterpret_cast<TaskHandle_t *>(&asr_task_handle_));
+        return ok == pdPASS;
+    }
+
+    void VoiceRecognizer::asrTaskEntry(void *arg)
+    {
+        VoiceRecognizer *self = static_cast<VoiceRecognizer *>(arg);
+        if (self != nullptr)
+        {
+            self->asrTaskLoop();
+        }
+        vTaskDelete(nullptr);
+    }
+
+    void VoiceRecognizer::asrTaskLoop()
+    {
+        for (;;)
+        {
+            /* 等待 finishCapture() 的唤醒（无限等待，无任务时挂起不耗 CPU） */
+            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+            while (asr_job_pending_)
+            {
+                const uint8_t idx = asr_queue_head_;
+                AsrJob job = asr_queue_[idx];
+                asr_queue_[idx] = AsrJob{};
+                asr_queue_head_ = (asr_queue_head_ + 1) % kAsrQueueDepth;
+                asr_job_pending_ = false;
+
+                /* token */
+                const char *token = AsrTokenCache::instance().getToken();
+                if (token == nullptr)
+                {
+                    LOG_ERROR("ASR", "no valid token, check baidu keys");
+                    free(job.pcm);
+                    continue;
+                }
+
+                /* URL：dev_pid / cuid 来自抓取时的快照 */
+                char url[256];
+                snprintf(url, sizeof(url), "%s?dev_pid=%u&cuid=%s&token=%s",
+                         voice::kAsrUrlBase,
+                         static_cast<unsigned>(job.dev_pid),
+                         job.cuid, token);
+
+                /* POST raw PCM */
+                const size_t byte_len = job.samples * sizeof(int16_t);
+                HTTPClient http;
+                http.begin(url);
+                http.addHeader("Content-Type", voice::kAsrContentType);
+                http.setTimeout(10000);
+                LOG_INFO("ASR", "recognizing %ums pcm...",
+                         static_cast<unsigned>(job.duration_ms));
+                const int code = http.POST(reinterpret_cast<uint8_t *>(job.pcm),
+                                           byte_len);
+                if (code != 200)
+                {
+                    LOG_ERROR("ASR", "http %d", code);
+                    http.end();
+                    free(job.pcm);
+                    continue;
+                }
+
+                JsonDocument doc;
+                const DeserializationError err = deserializeJson(doc, http.getString());
+                http.end();
+                if (err)
+                {
+                    LOG_ERROR("ASR", "json: %s", err.c_str());
+                    free(job.pcm);
+                    continue;
+                }
+                if ((doc["err_no"] | -1) != 0)
+                {
+                    LOG_ERROR("ASR", "baidu err %d: %s",
+                              doc["err_no"] | -1, doc["err_msg"] | "unknown");
+                    free(job.pcm);
+                    continue;
+                }
+
+                const char *text = doc["result"][0] | "";
+                if (text[0] == '\0')
+                {
+                    LOG_INFO("ASR", "empty result");
+                    free(job.pcm);
+                    continue;
+                }
+                LOG_INFO("ASR", "text: %s", text);
+
+                /* 主通道：CMD_VOICE_TEXT 推送 App */
+                SerialProtocol::instance().sendVoiceText(text);
+
+                /* 兜底：TCP 未连接且纯 ASCII → HID 注入 */
+                const bool tcp_online = TcpChannel::instance().isConnected();
+                bool ascii_only = !tcp_online;
+                for (const char *p = text; ascii_only && *p != '\0'; ++p)
+                {
+                    const unsigned char c = static_cast<unsigned char>(*p);
+                    /* D1 修复：控制字符 (<0x20) 也视为非 ASCII，避免破坏 "纯 ASCII 注入" 语义 */
+                    if (c < 0x20 || c > 0x7E)
+                    {
+                        ascii_only = false;
+                    }
+                }
+                if (ascii_only)
+                {
+                    IKeyboard *kb = AppContext::instance().keyboard();
+                    if (kb != nullptr)
+                    {
+                        for (const char *p = text; *p != '\0'; ++p)
+                        {
+                            const char c = *p;
+                            if (c == ' ')
+                            {
+                                kb->press(0x2C);
+                                kb->release(0x2C);
+                            }
+                            else if (c >= 0x21 && c <= 0x7E)
+                            {
+                                char name[2] = {c, '\0'};
+                                const uint8_t keycode = resolveKeyName(String(name));
+                                if (keycode != 0)
+                                {
+                                    kb->press(keycode);
+                                    kb->release(keycode);
+                                }
+                            }
+                            delay(voice::kAsciiInjectDelayMs);
+                        }
+                        if (job.auto_enter)
+                        {
+                            kb->press(0x28); // KEY_RETURN
+                            kb->release(0x28);
+                        }
+                    }
+                }
+
+                free(job.pcm);
+            }
+        }
     }
 
 } // namespace ekeys
