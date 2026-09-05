@@ -47,6 +47,12 @@ public:
     void suspend() { suspended_ = true; }
     void resume() { suspended_ = false; }
 
+    /*
+     * 录音 / 频谱前停掉 Speaker（I2S BCLK=IO10 共用互斥）。
+     * 公开为静态以便 DisplayTask 进入频谱前也能调用。
+     */
+    static void prepareI2sForMicCapture();
+
 private:
     VoiceRecognizer() = default;
 

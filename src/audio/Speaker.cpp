@@ -12,6 +12,7 @@
 
 #include "hardware/PinMap.h"
 #include "logging/LogManager.h"
+#include "voice/VoiceRecognizer.h"
 
 namespace ekeys {
 
@@ -81,6 +82,12 @@ bool Speaker::PlayRemoteAudio(const char *url)
     {
         return false;
     }
+    /* BCLK=IO10 与 Mic 互斥（PINOUT §2.7）：录音期间拒绝播放 */
+    if (VoiceRecognizer::instance().isCapturing())
+    {
+        LOG_WARNING("SPK", "mic is recording, reject remote play");
+        return false;
+    }
     if (!inited_)
     {
         begin();
@@ -93,6 +100,12 @@ bool Speaker::PlayLocalAudio(const char *path)
 {
     if (path == nullptr || path[0] == '\0')
     {
+        return false;
+    }
+    /* BCLK=IO10 与 Mic 互斥（PINOUT §2.7）：录音期间拒绝播放 */
+    if (VoiceRecognizer::instance().isCapturing())
+    {
+        LOG_WARNING("SPK", "mic is recording, reject local play");
         return false;
     }
     if (!inited_)

@@ -12,6 +12,7 @@
 
 #include "app/AppContext.h"
 #include "audio/Mic.h"
+#include "audio/Speaker.h"
 #include "config/Configuration.h"
 #include "keymap/KeyNameTable.h"
 #include "logging/LogManager.h"
@@ -42,6 +43,22 @@ namespace ekeys
                !suspended_;
     }
 
+    /*
+     * I2S0 Mic 与 I2S1 Speaker 共享 IO10 BCLK（PINOUT §2.7）。
+     * 若 Speaker 正在播放（Audio::isRunning()），Mic.begin() 会导致
+     * 两个 I2S 外设同时驱动 IO10，电平冲突 / 录音数据损坏。
+     * 因此录音 / 频谱前必须先 stop Speaker；反过来录音期间
+     * Speaker::PlayRemoteAudio / PlayLocalAudio 也会被 Mic 守卫拒绝。
+     */
+    void VoiceRecognizer::prepareI2sForMicCapture()
+    {
+        if (Speaker::instance().isRunning())
+        {
+            LOG_INFO("ASR", "speaker is active, stopping before mic capture");
+            Speaker::instance().Stop();
+        }
+    }
+
     void VoiceRecognizer::postRecordingState(bool recording)
     {
         DisplayMessage msg;
@@ -67,6 +84,9 @@ namespace ekeys
             }
             return false;
         }
+
+        /* BCLK=IO10 与 Speaker 互斥（PINOUT §2.7）：先停 Speaker 再 begin Mic */
+        prepareI2sForMicCapture();
 
         if (!Mic::instance().begin())
         {

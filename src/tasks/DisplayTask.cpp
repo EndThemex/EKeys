@@ -508,6 +508,8 @@ namespace ekeys
             }
             /* 挂起语音识别（docs/06：音乐屏 suspend / 离开 resume） */
             VoiceRecognizer::instance().suspend();
+            /* BCLK=IO10 与 Speaker 互斥（PINOUT §2.7）：频谱接管 Mic 前停掉 Speaker */
+            VoiceRecognizer::prepareI2sForMicCapture();
             if (!Mic::instance().begin())
             {
                 return; // 下一轮重试

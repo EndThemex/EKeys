@@ -67,16 +67,18 @@ constexpr int kPinLcdRst = GFX_NOT_DEFINED; // 硬件拉低，无引脚
  * I2S 音频（PINOUT §2.7 — 阶段 06 接入）
  *
  * 功放（MAX98357）：BCLK=IO10 / LRCLK=IO9 / SDOUT=IO14（I2S1 TX）
- * 麦克风（ICS43434）：SCK=IO13 / WS=IO12 / SD=IO11（I2S0 RX）
+ * 麦克风（ICS43434）：BCLK=IO10 / SCK=IO13 / WS=IO12 / SD=IO11（I2S0 RX）
  *
- * 注：IO10 标注"功放/麦克风共用"，但两套 I2S 均为主模式时
- * 同一 GPIO 只能由一个外设驱动，故麦克风时钟走专用 MIC_SCK=IO13。
+ * 注意：麦克风 BCLK（IO10）与功放 BCLK 共用同一 GPIO；
+ * I2S0 / I2S1 各自为主模式输出时钟时会双驱 IO10，
+ * 因此录音前必须先停 Speaker、播放前必须先停录音，
+ * 互斥由 voice::VoiceRecognizer 与 audio::Speaker 互相检查保证。
  * ------------------------------------------------------------
  */
 constexpr uint8_t kPinI2sBclkSpeaker = 10;
 constexpr uint8_t kPinI2sLrclkSpeaker = 9;
 constexpr uint8_t kPinI2sDataSpeaker = 14;
-constexpr uint8_t kPinI2sMicBclk = 13; // 用 MIC_SCK 专用时钟，避免与功放 BCLK(IO10) 双驱冲突
+constexpr uint8_t kPinI2sMicBclk = 10;     // 与 Speaker BCLK 共用，运行时互斥
 constexpr uint8_t kPinI2sMicWs = 12;
 constexpr uint8_t kPinI2sMicSck = 13;
 constexpr uint8_t kPinI2sMicDin = 11;
