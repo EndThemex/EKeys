@@ -7,7 +7,7 @@
  * 屏幕配置：
  *
  *     引脚统一取自 hardware/PinMap.h（LCD_SDA=40, LCD_SCL=41,
- *     LCD_DC=9, LCD_CS=2, LCD_RST=硬件拉低无引脚, LCD_BL=1）
+ *     LCD_DC=42, LCD_CS=2, LCD_RST=硬件拉低无引脚, LCD_BL=1）
  *
  *     TFT_WIDTH  = 142
  *     TFT_HEIGHT = 428
