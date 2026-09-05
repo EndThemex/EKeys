@@ -29,6 +29,12 @@ namespace ekeys
         bool begin();
 
         /*
+         * B4 修复：释放 PSRAM 双缓冲（v_real_ / v_imag_），
+         * 与 DisplayTask 停频谱路径的 Mic::end() 对称。
+         */
+        void end();
+
+        /*
          * 输入一帧 PCM（最多 FFT_SIZE 样本，不足补零）。
          * 输出写入 out_bands[16]（0~1）。
          */

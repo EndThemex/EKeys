@@ -41,6 +41,20 @@ namespace ekeys
     return true;
   }
 
+  void AudioAnalyzer::end()
+  {
+    if (!inited_)
+    {
+      return;
+    }
+    free(v_real_);
+    free(v_imag_);
+    v_real_ = nullptr;
+    v_imag_ = nullptr;
+    inited_ = false;
+    LOG_INFO("ANALYZER", "psram buffers released");
+  }
+
   void AudioAnalyzer::process(const int16_t *samples, size_t count,
                               float *out_bands, size_t band_cap)
   {

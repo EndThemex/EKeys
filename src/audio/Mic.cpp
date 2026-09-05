@@ -7,6 +7,7 @@
 #include "Mic.h"
 
 #include <Arduino.h>
+#include <freertos/FreeRTOS.h>
 #include <driver/i2s.h>
 
 #include "hardware/PinMap.h"
@@ -86,7 +87,13 @@ size_t Mic::Read(int16_t *out, size_t max_samples)
     }
     size_t bytes_read = 0;
     const size_t want_bytes = max_samples * sizeof(int16_t);
-    if (i2s_read(I2S_NUM_0, out, want_bytes, &bytes_read, portMAX_DELAY) != ESP_OK)
+    /*
+     * B1 修复：DMA 一帧约 32ms（512 样本 / 16kHz），用 portMAX_DELAY
+     * 会阻塞 MainTask::loop() 整个 tick，导致按键扫描 / TCP 心跳停摆。
+     * 改用 20ms 超时：未填满返回 0，下次 loop 再读，避免长时间阻塞。
+     */
+    if (i2s_read(I2S_NUM_0, out, want_bytes, &bytes_read,
+                 pdMS_TO_TICKS(20)) != ESP_OK)
     {
         return 0;
     }

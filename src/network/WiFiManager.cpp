@@ -84,7 +84,12 @@ namespace ekeys
             LOG_INFO("WIFI", "stopped");
         }
         state_ = State::Idle;
-        WiFi.disconnect(true);
+        /*
+         * C10 修复：先 WiFi.mode(WIFI_STA) 把射频切回 STA 再 disconnect，
+         * 避免 arduino-esp32 2.0.11 在 OFF 模式下 disconnect 触发的告警。
+         */
+        WiFi.mode(WIFI_STA);
+        WiFi.disconnect();
         WiFi.mode(WIFI_OFF);
     }
 
