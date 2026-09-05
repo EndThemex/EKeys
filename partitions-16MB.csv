@@ -3,20 +3,28 @@
 #       default codec (GBK on zh-CN Windows) and non-ASCII comments will
 #       crash the checkprogsize step (UnicodeDecodeError).
 #
+# LAYOUT CONSTRAINT (espressif32 >= 6.5 / arduino-esp32 2.0.17):
+#   PIO no longer parses this CSV for upload offsets. It hardcodes
+#   boot_app0.bin @ 0xE000 and uses board_upload.offset_address for the app.
+#   So otadata MUST stay at 0xE000, and platformio.ini must set
+#   board_upload.offset_address = 0x20000.
+#
 # Name      Type SubType  Offset    Size
 # ------------------------------------------------------------
-# nvs       data nvs      0x9000    0x6000    ; 24 KB     - key/value store (WiFi/BLE/Config)
-# otadata   data ota      0xF000    0x2000    ; 8 KB      - OTA boot selector
-# phy_init  data phy      0x11000   0x1000    ; 4 KB      - RF calibration data
+# nvs       data nvs      0x9000    0x5000    ; 20 KB     - key/value store (WiFi/BLE/Config)
+# otadata   data ota      0xE000    0x2000    ; 8 KB      - OTA boot selector (fixed @ 0xE000)
+# phy_init  data phy      0x10000   0x1000    ; 4 KB      - RF calibration data
 # ota_0     app  ota_0    0x20000   0x300000  ; 3 MB      - active app firmware
 # ota_1     app  ota_1    0x320000  0x300000  ; 3 MB      - OTA backup slot
 # storage   data spiffs   0x620000  0x3E0000  ; 3.875 MB  - SPIFFS (config / keymap / fonts / WAV / PNG)
+# coredump  data coredump 0xA00000  0x10000   ; 64 KB     - core dump (crash backtrace capture)
 #
-# Total used: ~9.94 MB / 16 MB
+# Total used: ~10 MB / 16 MB
 # Remaining for future expansion: ~6 MB
-nvs,      data, nvs,     0x9000,   0x6000
-otadata,  data, ota,     0xF000,   0x2000
-phy_init, data, phy,     0x11000,  0x1000
+nvs,      data, nvs,     0x9000,   0x5000
+otadata,  data, ota,     0xE000,   0x2000
+phy_init, data, phy,     0x10000,  0x1000
 ota_0,    app,  ota_0,   0x20000,  0x300000
 ota_1,    app,  ota_1,   0x320000, 0x300000
 storage,  data, spiffs,  0x620000, 0x3E0000
+coredump, data, coredump,0xA00000, 0x10000
