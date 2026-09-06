@@ -192,9 +192,9 @@ void ui_MainScreen_screen_init(void)
     ui_LabelSecond = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_LabelSecond, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_LabelSecond, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_LabelSecond, 79);
-    lv_obj_set_y(ui_LabelSecond, -12);
-    lv_obj_set_align(ui_LabelSecond, LV_ALIGN_CENTER);
+    lv_obj_set_x(ui_LabelSecond, 4);
+    lv_obj_set_y(ui_LabelSecond, -6);
+    lv_obj_align_to(ui_LabelSecond, ui_LabelTime, LV_ALIGN_OUT_RIGHT_BOTTOM, 4, -36);
     lv_label_set_text(ui_LabelSecond, "56");
     lv_obj_set_style_text_color(ui_LabelSecond, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_LabelSecond, 255, LV_PART_MAIN | LV_STATE_DEFAULT);

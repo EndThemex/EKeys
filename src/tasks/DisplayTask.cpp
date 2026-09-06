@@ -219,15 +219,14 @@ namespace ekeys
              */
             if (strlen(t) >= 8 && t[2] == ':' && t[5] == ':')
             {
-                static char hm[7];
+                static char hm[6];
                 static char ss[3];
                 hm[0] = t[0];
                 hm[1] = t[1];
-                hm[2] = t[3];
-                hm[3] = t[4];
-                hm[4] = t[6];
-                hm[5] = t[7];
-                hm[6] = '\0';
+                hm[2] = ':';
+                hm[3] = t[3];
+                hm[4] = t[4];
+                hm[5] = '\0';
                 ss[0] = t[6];
                 ss[1] = t[7];
                 ss[2] = '\0';
@@ -257,11 +256,30 @@ namespace ekeys
                 navigateNow(UI_SCREEN_KEYMAPPED_SECONDARY);
                 break;
             }
+            /*
+             * 系统设置二级页里 LEFT/RIGHT 用于调值，但旋钮旋转只发 LEFT/RIGHT
+             * （与 LV_KEY_UP/LV_KEY_DOWN 不同源），如果直接转发会出现"转旋钮
+             * 却不能切换下一项"的体验断点。这里在 SettingScreenSecondary 上
+             * 把旋钮方向键重映射成 UP/DOWN 来切换焦点，应用键 1~11 经 KEYMAPPED
+             * 截胡后不进入这里，因此 LEFT/RIGHT 调值行为不受影响。
+             */
+            uint8_t send_action = action;
+            if (ui_get_active_screen_tag() == UI_SCREEN_SETTING_SECONDARY)
+            {
+                if (send_action == LV_KEY_LEFT)
+                {
+                    send_action = LV_KEY_UP;
+                }
+                else if (send_action == LV_KEY_RIGHT)
+                {
+                    send_action = LV_KEY_DOWN;
+                }
+            }
             lv_obj_t *active_screen = lv_scr_act();
             if (active_screen != nullptr)
             {
                 lv_event_send(active_screen, LV_EVENT_KEY,
-                              (void *)(uintptr_t)action);
+                              (void *)(uintptr_t)send_action);
             }
             break;
         }
