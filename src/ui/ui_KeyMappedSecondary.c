@@ -27,7 +27,12 @@ static lv_obj_t *ui_KeyMappedSecondaryTitle = NULL;
 static lv_obj_t *ui_KeyMappedSecondaryProfileName = NULL;
 static lv_obj_t *ui_KeyMappedSecondaryFileName = NULL;
 static lv_obj_t *ui_KeyMappedSecondaryKeyLabels[KEYMAP_SECONDARY_KEY_NUM] = {NULL};
+static lv_obj_t *ui_KeyMappedSecondaryKeyCells[KEYMAP_SECONDARY_KEY_NUM] = {NULL}; /* A1：cell 用于 focus 高亮 */
 static lv_obj_t *ui_KeyMappedSecondaryLastGroup = NULL;
+static uint8_t s_keymapped_secondary_focus_slot = 0xFFu; /* A1：当前高亮槽位，0xFF = 无 */
+
+/* 前向声明：dispatch_key 在 apply_focus 之前定义，需先声明 */
+static void keymapped_secondary_apply_focus(void);
 static lv_obj_t *s_keymapped_secondary_main_screen_icon = NULL;
 static lv_obj_t *s_keymapped_secondary_main_screen_icon_image = NULL;
 static lv_obj_t *s_keymapped_secondary_main_screen_profile_name = NULL;
@@ -324,6 +329,64 @@ static void keymapped_secondary_forward_key(uint32_t key)
     }
 }
 
+/*
+ * 二级页 key 分派（不在 group 模型下，screen 回调就是唯一的派发点）。
+ * 入口：
+ *   - DisplayTask 经 ActionInput 转 LV_EVENT_KEY（旋钮 / 应用键 1~11）
+ *   - SquareLine ButtonLeft/Right/Enter/Exit 转发 LV_KEY_LEFT/RIGHT/ENTER/ESC
+ * 行为：
+ *   LV_KEY_LEFT/RIGHT → focus_slot 移动 1（3 列布局，超出范围按列换行）
+ *   LV_KEY_ENTER       → 当前槽位标红（占位：未来接"编辑该键"流程）
+ *   LV_KEY_ESC         → 回 KEYMAPPED
+ *   1 ~ 9              → 立即把焦点跳到对应槽位（key_id - 1）
+ *   10 / 11            → 与 1~9 等同（占 9 槽 11 键的折中，11 取模映射）
+ */
+static void keymapped_secondary_dispatch_key(uintptr_t key)
+{
+    if (key == (uintptr_t)LV_KEY_ESC)
+    {
+        ui_set_active_screen_tag(UI_SCREEN_KEYMAPPED);
+        _ui_screen_change(&ui_KeyMapped, LV_SCR_LOAD_ANIM_NONE, 0, 0,
+                          &ui_KeyMapped_screen_init);
+        lv_refr_now(NULL);
+        return;
+    }
+
+    if (key >= 1 && key <= 11)
+    {
+        ui_KeyMappedSecondary_set_focus((unsigned int)key);
+        return;
+    }
+
+    if (s_keymapped_secondary_focus_slot >= KEYMAP_SECONDARY_KEY_NUM)
+    {
+        s_keymapped_secondary_focus_slot = 0;
+    }
+    if (key == (uintptr_t)LV_KEY_RIGHT)
+    {
+        const uint8_t cur = s_keymapped_secondary_focus_slot;
+        const uint8_t col = cur % 3;
+        if (col + 1 < 3)
+        {
+            s_keymapped_secondary_focus_slot = cur + 1;
+        }
+    }
+    else if (key == (uintptr_t)LV_KEY_LEFT)
+    {
+        const uint8_t cur = s_keymapped_secondary_focus_slot;
+        const uint8_t col = cur % 3;
+        if (col > 0)
+        {
+            s_keymapped_secondary_focus_slot = cur - 1;
+        }
+    }
+    else if (key == (uintptr_t)LV_KEY_ENTER)
+    {
+        /* 占位：未来 KEYMAPPED 二级页要支持"重新映射该键"时再接 editing 流程 */
+    }
+    keymapped_secondary_apply_focus();
+}
+
 void ui_event_KeyMappedSecondaryScreen(lv_event_t *e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
@@ -332,13 +395,8 @@ void ui_event_KeyMappedSecondaryScreen(lv_event_t *e)
         return;
     }
 
-    uintptr_t key = (uintptr_t)lv_event_get_param(e);
-    if (key == (uintptr_t)LV_KEY_ESC)
-    {
-        ui_set_active_screen_tag(UI_SCREEN_KEYMAPPED);
-        _ui_screen_change(&ui_KeyMapped, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_KeyMapped_screen_init);
-        lv_refr_now(NULL);
-    }
+    const uintptr_t key = (uintptr_t)lv_event_get_param(e);
+    keymapped_secondary_dispatch_key(key);
 }
 
 void ui_event_ButtonLeftKeyMappedSecondary(lv_event_t *e)
@@ -408,6 +466,52 @@ void ui_KeyMappedSecondary_set_key_label(unsigned int key_index, const char *tex
         return;
     }
     lv_label_set_text(ui_KeyMappedSecondaryKeyLabels[key_index], s_keymapped_secondary_key_labels[key_index]);
+}
+
+/*
+ * A1 修复：把当前高亮槽位的边框刷成主题红，其余还原。
+ * 活动 cell 即 ui_KeyMappedSecondaryKeyCells[slot]。
+ */
+static void keymapped_secondary_apply_focus(void)
+{
+    const lv_color_t focus_color = lv_color_hex(0xD33A31);
+    const lv_color_t default_color = lv_color_hex(0x2B3442);
+
+    for (unsigned int i = 0; i < KEYMAP_SECONDARY_KEY_NUM; ++i)
+    {
+        lv_obj_t *cell = ui_KeyMappedSecondaryKeyCells[i];
+        if (cell == NULL)
+        {
+            continue;
+        }
+        if (i == s_keymapped_secondary_focus_slot)
+        {
+            lv_obj_set_style_border_color(cell, focus_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_border_width(cell, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+        }
+        else
+        {
+            lv_obj_set_style_border_color(cell, default_color, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_border_width(cell, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+        }
+    }
+}
+
+void ui_KeyMappedSecondary_set_focus(unsigned int key_id)
+{
+    /*
+     * 应用键 1~9 → 直接映射 9 个槽位（slot = key_id - 1）。
+     * 10/11 在二级页没有对应槽位时清空高亮，但屏幕仍然跳转。
+     */
+    if (key_id >= 1 && key_id <= KEYMAP_SECONDARY_KEY_NUM)
+    {
+        s_keymapped_secondary_focus_slot = (uint8_t)(key_id - 1);
+    }
+    else
+    {
+        s_keymapped_secondary_focus_slot = 0xFFu;
+    }
+    keymapped_secondary_apply_focus();
 }
 
 void ui_KeyMappedSecondary_screen_init(void)
@@ -484,6 +588,7 @@ void ui_KeyMappedSecondary_screen_init(void)
         lv_obj_set_size(cell, kKeyRects[i].w, kKeyRects[i].h);
         lv_obj_set_pos(cell, kKeyRects[i].x, kKeyRects[i].y);
         keymapped_secondary_style_key_cell(cell);
+        ui_KeyMappedSecondaryKeyCells[i] = cell; /* A1：记录 cell 以做 focus 高亮 */
 
         ui_KeyMappedSecondaryKeyLabels[i] = lv_label_create(cell);
         lv_label_set_text(ui_KeyMappedSecondaryKeyLabels[i], "--");

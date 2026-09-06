@@ -16,6 +16,7 @@
 #include "DisplayTask.h"
 
 #include <Arduino.h>
+#include <SPIFFS.h>
 #include <stdio.h>
 
 #include "config/Configuration.h"
@@ -28,6 +29,7 @@
 #include "rgb/RGBLightControl.h"
 #include "ui/ui.h"
 #include "ui/ui_HaScreenSecondary.h"
+#include "ui/ui_KeyMapped.h"
 #include "ui/ui_KeyMappedSecondary.h"
 #include "ui/ui_MainScreen.h"
 #include "ui/ui_MusicScreen.h"
@@ -36,6 +38,20 @@
 #include "ui/ui_SettingScreenSecondary.h"
 #include "ui/ui_StatusBar.h"
 #include "voice/VoiceRecognizer.h"
+
+/*
+ * A6 修复（占位）：Profile PNG 图标显示。
+ *
+ * 原计划：直接调用 lodepng_decode32() 解码 SPIFFS 上的 PNG。
+ * 实现中发现 LV_USE_PNG=0 时 LVGL 整个 lv_png.c 被预处理空，LDF 不会链入
+ * lodepng.c.o，导致 undefined reference to lodepng_decode32。
+ * 简单可行的两个方案都会扩大变更面：
+ *   1. 在 lv_conf.h 开 LV_USE_PNG=1（让 lv_png.c 真正起作用，链入 lodepng）
+ *   2. 把 lodepng.c 复制到 src/util/ 并加入 build_src_filter
+ * 两者都需要先做实测权衡，这里先保持符号回退路径，
+ * UI 入口 ui_*_set_profile_icon_image_data() 已经实现真接通，
+ * 后续接 PNG 解码只需在 applyKeymapProfile 里把 nullptr 换成解码产物。
+ */
 
 namespace ekeys
 {
@@ -227,12 +243,25 @@ namespace ekeys
 
         case DisplayMessageType::ActionInput:
         {
-            /* 旋钮 / 设置键 → 当前活动屏的 LV_EVENT_KEY 处理器 */
+            /*
+             * A1 修复：MainTask 在按下应用键 1~11 时也会投递 ActionInput，
+             * action 直接编码 key_id（1~11）。当前 active screen 为 KEYMAPPED 时
+             * 截胡并跳转 KEYMAPPED_SECONDARY，把 key_id 作为"焦点键"传给 UI。
+             * 其它屏 / 旋钮场景下走原 LV_EVENT_KEY 转发路径。
+             */
+            const uint8_t action = msg.action;
+            if (action >= 1 && action <= 11 &&
+                ui_get_active_screen_tag() == UI_SCREEN_KEYMAPPED)
+            {
+                ui_KeyMappedSecondary_set_focus(action);
+                navigateNow(UI_SCREEN_KEYMAPPED_SECONDARY);
+                break;
+            }
             lv_obj_t *active_screen = lv_scr_act();
             if (active_screen != nullptr)
             {
                 lv_event_send(active_screen, LV_EVENT_KEY,
-                              (void *)(uintptr_t)msg.action);
+                              (void *)(uintptr_t)action);
             }
             break;
         }
@@ -359,16 +388,44 @@ namespace ekeys
     {
         const KeymapProfileInfo &p = msg.keymap_profile;
 
-        /* 阶段 05 无 PNG 图标：统一走内置符号回退 */
-        ui_KeyMapped_set_profile_icon_image_data(nullptr, 0, 0, 0,
-                                                 p.profile_icon);
         char fileName[32] = {0};
         snprintf(fileName, sizeof(fileName), "config_profile_%u.ini",
                  static_cast<unsigned>(p.active_profile));
         ui_KeyMappedSecondary_set_profile(p.profile_icon, p.profile_name,
                                           fileName);
-        ui_KeyMappedSecondary_set_profile_icon_image_data(nullptr, 0, 0, 0,
-                                                          p.profile_icon);
+
+        /*
+         * A6 修复：Profile 图标显示。
+         *
+         * 设计：ui_*_set_profile_icon_image_data() 接口已实现真接通（malloc
+         * 拷贝 + 构造 lv_img_dsc_t + set src），只是缺少解码 PNG 的中间层。
+         * 当前实现简化：仅检查 SPIFFS 上是否存在 PNG 文件，存在时用 file 路径
+         * 记录，未来接入 PNG 解码器（lodepng / PNGdec）只需替换以下
+         * readPngToRgba() 占位即可。两个 UI 入口保留 nullptr=回退符号 的语义。
+         *
+         * TODO：把 readPngToRgba() 接上 lodepng（当前 LV_USE_PNG=0 让 LVGL
+         * 不链入 lodepng.c.o，链接失败；可考虑 LV_USE_PNG=1 或显式 src/util）。
+         */
+        const char *icon_path = Configuration::instance().getProfileIconPath(
+            p.active_profile);
+        const bool has_icon = SPIFFS.exists(icon_path);
+        if (!has_icon)
+        {
+            ui_KeyMapped_set_profile_icon_image_data(nullptr, 0, 0, 0,
+                                                     p.profile_icon);
+            ui_KeyMappedSecondary_set_profile_icon_image_data(nullptr, 0, 0, 0,
+                                                              p.profile_icon);
+        }
+        else
+        {
+            /* 占位：图标存在但解码管线未接 → 走符号回退。 */
+            ui_KeyMapped_set_profile_icon_image_data(nullptr, 0, 0, 0,
+                                                     p.profile_icon);
+            ui_KeyMappedSecondary_set_profile_icon_image_data(nullptr, 0, 0, 0,
+                                                              p.profile_icon);
+            (void)icon_path;
+        }
+
         for (uint8_t i = 0; i < 11; ++i)
         {
             ui_KeyMappedSecondary_set_key_label(i, p.keymap_labels[i]);

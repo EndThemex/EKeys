@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
 lv_obj_t * ui_KeyMapped = NULL;
 static lv_obj_t * ui_KeyMappedButtonLeft = NULL;
@@ -33,10 +34,13 @@ static void keymapped_release_cached_image(void)
 
 static void keymapped_apply_cached_image(void)
 {
-    if (ui_KeyMappedIcon) {
-        lv_img_cache_invalidate_src(&s_keymapped_icon_image_dsc);
-        lv_img_set_src(ui_KeyMappedIcon, &s_keymapped_icon_image_dsc);
+    if (ui_KeyMappedIcon == NULL) {
+        return;
     }
+    /* 先清掉之前的字符串 src（LV_SYMBOL_KEYBOARD），避免 cache 命中老符号 */
+    lv_img_set_src(ui_KeyMappedIcon, NULL);
+    lv_img_cache_invalidate_src(&s_keymapped_icon_image_dsc);
+    lv_img_set_src(ui_KeyMappedIcon, &s_keymapped_icon_image_dsc);
 }
 
 void ui_KeyMapped_set_profile_icon_source(const char *file_path, const char *fallback_symbol)
@@ -72,14 +76,43 @@ void ui_KeyMapped_set_profile_icon_image_data(const uint8_t *image_data,
                                               uint16_t height,
                                               const char *fallback_symbol)
 {
-    (void)image_data;
-    (void)image_size;
-    (void)width;
-    (void)height;
-
-    ui_KeyMapped_set_profile_icon_source(NULL,
-                                         (fallback_symbol && fallback_symbol[0]) ? LV_SYMBOL_KEYBOARD : LV_SYMBOL_KEYBOARD);
+    /*
+     * A6 修复：把 RGBA 像素数据缓存到 s_keymapped_icon_image_data，
+     * 构造 lv_img_dsc_t 并 set 给 ui_KeyMappedIcon（与二级页同款实现）。
+     * 没有像素数据 / 尺寸为 0 时回退到 fallback_symbol。
+     */
     keymapped_release_cached_image();
+
+    if (image_data == NULL || image_size == 0 || width == 0 || height == 0) {
+        ui_KeyMapped_set_profile_icon_source(
+            NULL,
+            (fallback_symbol && fallback_symbol[0]) ? fallback_symbol : LV_SYMBOL_KEYBOARD);
+        if (ui_KeyMappedIcon != NULL) {
+            lv_obj_clear_flag(ui_KeyMappedIcon, LV_OBJ_FLAG_HIDDEN);
+        }
+        return;
+    }
+
+    s_keymapped_icon_image_data = lv_mem_alloc(image_size);
+    if (s_keymapped_icon_image_data == NULL) {
+        ui_KeyMapped_set_profile_icon_source(
+            NULL,
+            (fallback_symbol && fallback_symbol[0]) ? fallback_symbol : LV_SYMBOL_KEYBOARD);
+        return;
+    }
+    memcpy(s_keymapped_icon_image_data, image_data, image_size);
+    s_keymapped_icon_image_size = image_size;
+    lv_memset_00(&s_keymapped_icon_image_dsc, sizeof(s_keymapped_icon_image_dsc));
+    s_keymapped_icon_image_dsc.header.cf = LV_IMG_CF_TRUE_COLOR_ALPHA;
+    s_keymapped_icon_image_dsc.header.w = width;
+    s_keymapped_icon_image_dsc.header.h = height;
+    s_keymapped_icon_image_dsc.data = s_keymapped_icon_image_data;
+    s_keymapped_icon_image_dsc.data_size = (uint32_t)s_keymapped_icon_image_size;
+
+    keymapped_apply_cached_image();
+    if (ui_KeyMappedIcon != NULL) {
+        lv_obj_clear_flag(ui_KeyMappedIcon, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 static void keymapped_forward_key(uint32_t key)

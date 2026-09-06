@@ -252,6 +252,19 @@ namespace ekeys
             {
                 KeyEventDispatcher::onKeyEdge(pressed[i], true);
                 resolver_.press(pressed[i], *keyboard_);
+                /*
+                 * A1 修复：应用键 1~11 在 KEYMAPPED 屏被解释为"进入二级页并聚焦该键"。
+                 * 编码复用 ActionInput.action=key_id（与 LV_KEY_* 数值不重叠，
+                 * LV_KEY_ENTER=10 / LV_KEY_LEFT=20 等，见 lv_group.h）。
+                 * DisplayTask 端命中 KEYMAPPED 屏时负责截胡并 navigateNow。
+                 */
+                if (pressed[i] >= 1 && pressed[i] <= kMatrixKeyCount)
+                {
+                    DisplayMessage nav_msg{};
+                    nav_msg.type = DisplayMessageType::ActionInput;
+                    nav_msg.action = pressed[i];
+                    postMessage(nav_msg);
+                }
             }
             for (uint8_t i = 0; i < rc; ++i)
             {

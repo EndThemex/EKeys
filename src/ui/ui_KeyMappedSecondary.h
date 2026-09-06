@@ -27,6 +27,14 @@ void ui_KeyMappedSecondary_set_profile_icon_image_data(const uint8_t *image_data
 													   const char *fallback_symbol);
 void ui_KeyMappedSecondary_set_key_label(unsigned int key_index, const char *text);
 
+/*
+ * 把第 key_id 个应用键（1~11）映射到二级页的 3×3 槽位并高亮。
+ * key_id 越界或无对应槽位（10/11）时清空高亮。
+ * A1 修复：让应用键 1~11 直接作为 KEYMAPPED → KEYMAPPED_SECONDARY 的入口
+ * 并把即将被编辑的键标红。
+ */
+void ui_KeyMappedSecondary_set_focus(unsigned int key_id);
+
 #ifdef __cplusplus
 } /*extern "C"*/
 #endif
