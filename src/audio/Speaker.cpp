@@ -82,7 +82,7 @@ bool Speaker::PlayRemoteAudio(const char *url)
     {
         return false;
     }
-    /* BCLK=IO10 与 Mic 互斥（PINOUT §2.7）：录音期间拒绝播放 */
+    /* 录音期间拒绝播放（资源保护：I2S 引脚已独立，但音频通路仍互斥） */
     if (VoiceRecognizer::instance().isCapturing())
     {
         LOG_WARNING("SPK", "mic is recording, reject remote play");
@@ -102,7 +102,7 @@ bool Speaker::PlayLocalAudio(const char *path)
     {
         return false;
     }
-    /* BCLK=IO10 与 Mic 互斥（PINOUT §2.7）：录音期间拒绝播放 */
+    /* 录音期间拒绝播放（同 PlayRemoteAudio） */
     if (VoiceRecognizer::instance().isCapturing())
     {
         LOG_WARNING("SPK", "mic is recording, reject local play");

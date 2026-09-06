@@ -55,7 +55,7 @@ namespace ekeys
     MatrixScanner();
 
     /*
-     * 初始化引脚（行输入上拉、列输出高）。
+     * 初始化引脚（行输出高、列输入上拉）。
      * 必须在 setup() 中调用一次。
      */
     void begin();
@@ -70,6 +70,17 @@ namespace ekeys
      * 当前稳定电平。true = 按下。
      */
     bool getStableState(uint8_t keyId) const;
+
+    /*
+     * 本轮扫描的瞬时电平（未经消抖），用于测试程序诊断。
+     */
+    bool getRawState(uint8_t keyId) const;
+
+    /*
+     * 调试：慢速扫描探针。置 true 后每格保持 300ms（整轮约 3.3s），
+     * 供万用表观察列脉冲与按键拉低，用于矩阵走线/二极管方向诊断。
+     */
+    void setDebugSlowScan(bool slow);
 
     /*
      * 本轮扫描新增的"按下"事件。keyId 范围 1~11。
@@ -96,6 +107,8 @@ namespace ekeys
     void dispatchEdge(uint8_t keyId, bool pressed);
 
     MatrixKeyState states_[kMatrixKeyCount + 1]; // 下标 1~11
+    bool raw_[kMatrixKeyCount + 1];              // 瞬时电平（下标 1~11）
+    bool debug_slow_scan_ = false;               // 调试探针：慢速扫描
     uint8_t pressedKeys_[kMatrixKeyCount];
     uint8_t releasedKeys_[kMatrixKeyCount];
     uint8_t pressedCount_;

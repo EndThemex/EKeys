@@ -3,11 +3,16 @@
  *
  * 矩阵扫描实现（FEATURE_DOC §2.1）：
  *
- *   行引脚（输入，内部上拉）：{46, 39, 38}
- *   列引脚（输出）：{16, 17, 18, 8}
+ *   行引脚（输出，扫描驱动）：{46, 39, 38}
+ *   列引脚（输入，内部上拉）：{16, 17, 18, 8}
  *
- * 扫描方式：依次将每个列拉低，读 3 个行脚的电平。
- * 每行 LOW 表示该位置的按键被按下。
+ * 扫描方式：依次将每个行拉低，读 4 个列脚的电平。
+ * 每列 LOW 表示该位置的按键被按下。
+ *
+ * 二极管方向：每个按键串有二极管，正极在列侧（电流只能 列→行）。
+ * 因此行脚做驱动拉低、列脚做上拉读取：按下时电流从列上拉经二极管、
+ * 开关流向被拉低的行脚，列脚被拉到约一个二极管压降（< VIL）读为 LOW。
+ * 若方向配反（行→列），所有按键都会读不到——2026-09 实测踩坑记录。
  */
 
 #include "MatrixScanner.h"
@@ -34,26 +39,36 @@ MatrixScanner::MatrixScanner()
         states_[i].phase = MatrixKeyState::Phase::Idle;
         states_[i].stable_pressed = false;
         states_[i].phase_started_ms = 0;
+        raw_[i] = false;
     }
 }
 
 void MatrixScanner::begin()
 {
     for (uint8_t r = 0; r < kMatrixRowCount; ++r) {
-        pinMode(kRowPins[r], INPUT_PULLUP);
+        pinMode(kRowPins[r], OUTPUT);
+        digitalWrite(kRowPins[r], HIGH);
     }
     for (uint8_t c = 0; c < kMatrixColCount; ++c) {
-        pinMode(kColPins[c], OUTPUT);
-        digitalWrite(kColPins[c], HIGH);
+        pinMode(kColPins[c], INPUT_PULLUP);
     }
+}
+
+void MatrixScanner::setDebugSlowScan(bool slow)
+{
+    debug_slow_scan_ = slow;
 }
 
 bool MatrixScanner::readMatrixCell(uint8_t row, uint8_t col) const
 {
-    digitalWrite(kColPins[col], LOW);
-    delayMicroseconds(5);
-    bool pressed = (digitalRead(kRowPins[row]) == LOW);
-    digitalWrite(kColPins[col], HIGH);
+    digitalWrite(kRowPins[row], LOW);
+    if (debug_slow_scan_) {
+        delay(300); // 调试探针：让万用表能看到行脉冲与按键拉低
+    } else {
+        delayMicroseconds(5);
+    }
+    bool pressed = (digitalRead(kColPins[col]) == LOW);
+    digitalWrite(kRowPins[row], HIGH);
     return pressed;
 }
 
@@ -101,6 +116,7 @@ void MatrixScanner::scan()
         uint8_t col;
         keyIdToRowCol(keyId, row, col);
         bool pressed_now = readMatrixCell(row, col);
+        raw_[keyId] = pressed_now;
 
         MatrixKeyState &s = states_[keyId];
         switch (s.phase) {
@@ -145,6 +161,14 @@ bool MatrixScanner::getStableState(uint8_t keyId) const
         return false;
     }
     return states_[keyId].stable_pressed;
+}
+
+bool MatrixScanner::getRawState(uint8_t keyId) const
+{
+    if (keyId < 1 || keyId > kMatrixKeyCount) {
+        return false;
+    }
+    return raw_[keyId];
 }
 
 void MatrixScanner::getPressedKeys(uint8_t out[], uint8_t &count) const

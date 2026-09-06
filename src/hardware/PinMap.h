@@ -64,29 +64,26 @@ constexpr int kPinLcdRst = GFX_NOT_DEFINED; // 硬件拉低，无引脚
 
 /*
  * ------------------------------------------------------------
- * I2S 音频（PINOUT §2.7 — 阶段 06 接入）
+ * I2S 音频（PINOUT §2.7）
  *
- * 功放（MAX98357）：BCLK=IO10 / LRCLK=IO9 / SDOUT=IO14（I2S1 TX）
- * 麦克风（ICS43434）：BCLK=IO10 / SCK=IO13 / WS=IO12 / SD=IO11（I2S0 RX）
+ * 功放（MAX98357）：BCLK=IO10 / LRCLK=IO9 / DIN=IO11（I2S1 TX）
+ *   DIN = 功放数据输入（主控 IO11 → 功放）
+ * 麦克风（ICS43434）：SCK=IO13（专用）/ WS=IO12 / SD=IO14（I2S0 RX）
+ *   SD = 麦克风数据输出（麦克风 → 主控 IO14），注意与功放 DIN 区分
+ *   L/R 引脚接帧时钟（WS 网络）→ 立体声模式，左右时隙均输出同路数据
  *
- * 注意：麦克风 BCLK（IO10）与功放 BCLK 共用同一 GPIO；
- * I2S0 / I2S1 各自为主模式输出时钟时会双驱 IO10，
- * 因此录音前必须先停 Speaker、播放前必须先停录音，
- * 互斥由 voice::VoiceRecognizer 与 audio::Speaker 互相检查保证。
+ * 2026-09-06 原理图确认：ICS43434 的 SCK 走 IO13 专用线，
+ * 与功放 BCLK（IO10）物理独立，两个 I2S 外设可同时运行。
+ * 2026-09-06 二次更正：SD 与 DIN 数据线对调（旧版误标 IO11←SD / IO14→DIN，
+ * 导致录音与播放双向无声）。
  * ------------------------------------------------------------
  */
 constexpr uint8_t kPinI2sBclkSpeaker = 10;
 constexpr uint8_t kPinI2sLrclkSpeaker = 9;
-constexpr uint8_t kPinI2sDataSpeaker = 14;
-constexpr uint8_t kPinI2sMicBclk = 10;     // 与 Speaker BCLK 共用，运行时互斥
-constexpr uint8_t kPinI2sMicWs = 12;
-/*
- * D9 修复：kPinI2sMicSck = 13 当前未在固件中引用（Mic.cpp 仅配 BCLK/WS/DIN）。
- * 注释（§2.7）描述硬件 ICS43434 走 IO13 专用线，但本固件仍走 IO10 共享线。
- * 保留常量以便未来切换到独立 SCK 时直接复用；当前"软互斥"是 B5 的核心保险。
- */
+constexpr uint8_t kPinI2sDataSpeaker = 11; /* DIN：主控输出 → 功放输入 */
 constexpr uint8_t kPinI2sMicSck = 13;
-constexpr uint8_t kPinI2sMicDin = 11;
+constexpr uint8_t kPinI2sMicWs = 12;
+constexpr uint8_t kPinI2sMicSd = 14; /* SD：麦克风输出 → 主控输入 */
 
 /*
  * ------------------------------------------------------------

@@ -28,9 +28,11 @@ namespace ekeys
       return;
     }
 
-    /* LED 供电先上电（PINOUT §2.4：先拉高 LED_PWR_CTRL 再驱动 DIN） */
+    /* LED 供电先上电再驱动 DIN。
+     * Q1=AO3401A(P-MOS)：S=+3V3、G=LED_PWR_CTRL(IO21)、D=LED_VCC；
+     * 低电平导通（VGS=-3.3V），高电平截止 —— 注意极性与旧文档相反 */
     pinMode(kPinRgbPowerCtrl, OUTPUT);
-    digitalWrite(kPinRgbPowerCtrl, HIGH);
+    digitalWrite(kPinRgbPowerCtrl, LOW);
     delay(1);
 
     auto *strip = new Adafruit_NeoPixel(kLedCount, kPinRgbDin,

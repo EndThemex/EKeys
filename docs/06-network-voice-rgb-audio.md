@@ -39,7 +39,7 @@
 ### 音频
 
 - [ ] **6.7 `src/audio/Speaker.h/.cpp`**：MAX98357A，封装 `PlayRemoteAudio / PlayLocalAudio / Pause / Resume / Stop`；音量 `SetVolume(0~21)`。
-- [ ] **6.8 `src/audio/Mic.h/.cpp`**：ICS43434 数字 MEMS 麦克风，引脚 `BCLK=IO10 / WS=IO12 / SCK=IO13 / SDOUT=IO11`；16kHz / 512 samples，提供 `Read()` 阻塞读。
+- [ ] **6.8 `src/audio/Mic.h/.cpp`**：ICS43434 数字 MEMS 麦克风，引脚 `SCK=IO13（专用）/ WS=IO12 / SD=IO14`（L/R 引脚接帧时钟，立体声模式；SD/DIN 曾对调误标，2026-09-06 更正）；16kHz / 512 samples，提供 `Read()` 阻塞读。
 - [ ] **6.9 `src/audio/AudioAnalyzer.h/.cpp`**：FFT_SIZE=512 / BANDS=16；本阶段只编译，不在 `MainTask` 调度。
 
 ### 语音

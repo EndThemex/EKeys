@@ -96,12 +96,12 @@ bool Mic::begin()
     }
 
     i2s_pin_config_t pins = {};
-    /* D9 修复：IO10 与 Speaker BCLK 共用，运行时由 prepareI2sForMicCapture() 互斥。
-     * 旧注释"专用 MIC_SCK"语义错误，易让维护者误以为两条 BCLK 独立。 */
-    pins.bck_io_num = kPinI2sMicBclk;   // IO10（与 Speaker BCLK 共用，运行时互斥）
+    /* 2026-09-06 原理图确认：ICS43434 SCK 走 IO13 专用线（旧版误配 IO10
+     * 共用线导致麦克风无时钟、录音全零）。 */
+    pins.bck_io_num = kPinI2sMicSck;    // IO13（专用，与功放 BCLK IO10 无关）
     pins.ws_io_num = kPinI2sMicWs;      // IO12
     pins.data_out_num = I2S_PIN_NO_CHANGE;
-    pins.data_in_num = kPinI2sMicDin;   // IO11
+    pins.data_in_num = kPinI2sMicSd;    // IO14（SD：ICS43434 数据输出 → 主控）
 
     if (i2s_set_pin(I2S_NUM_0, &pins) != ESP_OK)
     {
@@ -113,8 +113,8 @@ bool Mic::begin()
 
     i2s_zero_dma_buffer(I2S_NUM_0);
     inited_ = true;
-    LOG_INFO("MIC", "ICS43434 ready (sck=%u ws=%u din=%u, %ukHz)",
-             kPinI2sMicBclk, kPinI2sMicWs, kPinI2sMicDin,
+    LOG_INFO("MIC", "ICS43434 ready (sck=%u ws=%u sd=%u, %ukHz)",
+             kPinI2sMicSck, kPinI2sMicWs, kPinI2sMicSd,
              static_cast<unsigned>(kSampleRate / 1000));
     /* F4：保持持锁直至 end()；调用方连续 read 不需要反复 take。 */
     return true;
