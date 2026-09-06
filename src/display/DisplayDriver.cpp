@@ -40,7 +40,7 @@ namespace ekeys
     {
         if (bus_ == nullptr)
         {
-            bus_ = new Arduino_ESP32SPI(
+            bus_ = new Arduino_ESP32SPIDMA(
                 kPinLcdDc,
                 kPinLcdCs,
                 kPinLcdSclk,

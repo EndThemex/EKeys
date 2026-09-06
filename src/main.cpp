@@ -30,7 +30,7 @@ void setup()
 
     ekeys::Backlight::instance().begin();
 
-    if (!ekeys::DisplayDriver::instance().begin(10000000))
+    if (!ekeys::DisplayDriver::instance().begin(40000000))
     {
         LOG_ERROR("MAIN", "NV3007 init failed");
         while (true)

@@ -22,7 +22,7 @@ namespace ekeys {
 
 constexpr uint16_t kScreenWidth       = 428;
 constexpr uint16_t kScreenHeight      = 142;
-constexpr uint8_t  kLvglBufferLines   = 20;
+constexpr uint8_t  kLvglBufferLines   = 40;
 
 namespace {
 

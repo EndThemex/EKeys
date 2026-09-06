@@ -80,7 +80,8 @@
 #define LV_FONT_MONTSERRAT_22 0
 #define LV_FONT_MONTSERRAT_24 1
 #define LV_FONT_MONTSERRAT_26 0
-#define LV_FONT_MONTSERRAT_28 1
+/* Montserrat 28：全项目零引用（UI 仅用 14/18/24/48，docs/10 §3.9），关闭省 flash */
+#define LV_FONT_MONTSERRAT_28 0
 #define LV_FONT_MONTSERRAT_30 0
 #define LV_FONT_MONTSERRAT_32 0
 #define LV_FONT_MONTSERRAT_34 0
@@ -92,9 +93,12 @@
 #define LV_FONT_MONTSERRAT_46 0
 #define LV_FONT_MONTSERRAT_48 1
 
-/* 压缩版（bpp=3）体积更小；本阶段不启用 */
+/* 字体解压缩总开关（lv_font_fmt_txt 的 tiny_rle 解码路径，压缩字体必须开启） */
+#define LV_USE_FONT_COMPRESSED 1
+
+/* 压缩版（bpp=3）体积更小；Montserrat 28 启用压缩（docs/10 §3.9） */
 #define LV_FONT_MONTSERRAT_20_COMPRESSED 0
-#define LV_FONT_MONTSERRAT_28_COMPRESSED 0
+#define LV_FONT_MONTSERRAT_28_COMPRESSED 1
 
 /* 默认字体：14 已关闭，指向已启用的 20，否则编译报 undeclared */
 #define LV_FONT_DEFAULT &lv_font_montserrat_20

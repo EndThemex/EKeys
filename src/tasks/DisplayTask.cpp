@@ -46,7 +46,8 @@ namespace ekeys
         constexpr uint32_t kDisplayTaskStackDepth = 8192;
         constexpr uint8_t kDisplayTaskPriority = 1;
         constexpr UBaseType_t kDisplayMessageQueueLen = 10;
-        constexpr TickType_t kDisplayMessageBlockTicks = pdMS_TO_TICKS(50);
+        /* ≤ 期望帧周期 16ms：队列空闲时保证 LVGL tick 节奏（docs/10 §3.7） */
+        constexpr TickType_t kDisplayMessageBlockTicks = pdMS_TO_TICKS(10);
 
         /*
          * DeviceSettings.work_mode（0=USB 1=BLE 2=2.4G）与

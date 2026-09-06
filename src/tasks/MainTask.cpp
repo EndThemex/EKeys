@@ -143,9 +143,10 @@ namespace ekeys
         KeyEventDispatcher::init(&resolver_);
 
         g_main_task = this;
-        encoder_.begin();
+        /* N2：先 setCallback 再 begin，避免 begin 内部 attach 时 callback_ 仍为 nullptr */
         encoder_.setCallback([this](uint8_t key)
                              { sendDisplayAction(key); });
+        encoder_.begin();
         keymap_ui_pending_ = true;
 
         /*

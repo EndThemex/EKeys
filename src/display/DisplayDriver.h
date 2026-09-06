@@ -17,7 +17,7 @@ class DisplayDriver {
 public:
     static DisplayDriver &instance();
 
-    bool begin(uint32_t spi_hz = 10000000);
+    bool begin(uint32_t spi_hz = 40000000);
 
     Arduino_GFX *gfx() const { return gfx_; }
 

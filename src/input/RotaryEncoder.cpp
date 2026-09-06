@@ -70,10 +70,17 @@ namespace ekeys
                 (now - lastRotationTime_) > kRotationTimeout ||
                 accumulatedSteps_ >= kEncoderStepThreshold)
             {
+                /* N1 修复：loopTask 被阻塞后快速旋转会积攒多个齿的计数，
+                 * 按阈值整数倍补发，避免丢步。accumulatedSteps_ < 阈值时
+                 * （换向残留 / 首发半齿）依旧吞掉，防抖语义不变。 */
                 if (callback_ && accumulatedSteps_ >= kEncoderStepThreshold)
                 {
-                    callback_(currentDirection > 0 ? LV_KEY_RIGHT
-                                                   : LV_KEY_LEFT);
+                    const int keys = accumulatedSteps_ / kEncoderStepThreshold;
+                    for (int i = 0; i < keys; ++i)
+                    {
+                        callback_(currentDirection > 0 ? LV_KEY_RIGHT
+                                                       : LV_KEY_LEFT);
+                    }
                 }
 
                 rotationActive_ = true;
