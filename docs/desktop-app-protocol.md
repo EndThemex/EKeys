@@ -45,9 +45,10 @@ USB CDC 是当前最简单、最稳定的调试和配置方式。
 - ESP32-S3 原生 USB 控制器；
 - USB D- 为 IO19，USB D+ 为 IO20，参考 [PINOUT.md](../PINOUT.md#L60-L67)；
 - 固件构建选项：
-  - `ARDUINO_USB_MODE=1`
+  - `ARDUINO_USB_MODE=0`（TinyUSB CDC，注意不是硬件 HWCDC）
   - `ARDUINO_USB_CDC_ON_BOOT=1`
 - 配置位于 [platformio.ini](../platformio.ini#L38-L50)；
+- **主机必须断言 DTR**：TinyUSB CDC 下固件的 `USBCDC::write()` 在 host 未拉高 DTR 时会静默丢弃全部输出（`tud_cdc_n_connected()` 等价于 DTR 状态）。App 打开串口后必须设置 DTR/RTS（Rust `serialport` crate：`write_data_terminal_ready(true)`；pyserial 默认已拉高，无需处理），否则固件能收到请求但 App 收不到任何回复和日志。
 - `main.cpp` 中使用 `Serial.begin(115200)` 初始化，见 [main.cpp](../src/main.cpp#L24-L27)。
 
 CDC 本身不依赖波特率，桌面 App 可以按 115200 打开。实际串口枚举时应优先匹配 USB VID `0x303A`。
