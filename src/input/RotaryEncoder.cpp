@@ -35,8 +35,12 @@ namespace ekeys
 
         ESP32Encoder::isrServiceCpuCore = ISR_CORE_USE_DEFAULT;
         ESP32Encoder::useInternalWeakPullResistors = UP;
-        /* A 相作 CLK，B 相作 DT；实测方向相反时对调两参数即可 */
-        encoder_.attachHalfQuad(kPinEc11A, kPinEc11B);
+        /*
+         * A 相作 DT，B 相作 CLK —— 实测逆时针旋转会触发 delta>0，
+         * 即 CW 触发 LEFT/数值减小，与预期相反，对调两参数修正。
+         * (2026-09-07 调整：原 attachHalfQuad(A,B) → CW=RIGHT。)
+         */
+        encoder_.attachHalfQuad(kPinEc11B, kPinEc11A);
         encoder_.setFilter(1023);
         encoder_.setCount(0);
         encoderEnabled_ = true;
