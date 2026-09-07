@@ -32,7 +32,5 @@ Arduino_GFX *create_default_Arduino_GFX()
   return new Arduino_ST7789(bus, DF_GFX_RST, 0 /* rotation */, true /* IPS */, 240, 240, 0, 80);
 #elif defined(WAVESHARE_RP2040_LCD_1_28)
   return new Arduino_ST7789(bus, DF_GFX_RST, 0 /* rotation */, true /* IPS */, 240, 240, 0, 80);
-#else
-  return new Arduino_GC9A01(bus, DF_GFX_RST, 0 /* rotation */, true /* IPS */);
 #endif
 }

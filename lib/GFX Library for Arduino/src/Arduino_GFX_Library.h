@@ -51,12 +51,6 @@
 #include "display/Arduino_AXS15231B.h"
 #include "display/Arduino_CO5300.h"
 #include "display/Arduino_DSI_Display.h"
-#include "display/Arduino_GC9A01.h"
-#include "display/Arduino_GC9C01.h"
-#include "display/Arduino_GC9106.h"
-#include "display/Arduino_GC9107.h"
-#include "display/Arduino_JBT6K71.h"
-#include "display/Arduino_JD9613.h"
 #include "display/Arduino_NV3007.h"
 #include "display/Arduino_NV3023.h"
 #include "display/Arduino_NV3041A.h"
@@ -65,11 +59,6 @@
 #include "display/Arduino_RM67162.h"
 #include "display/Arduino_RM690B0.h"
 #include "display/Arduino_RGB_Display.h"
-#include "display/Arduino_SEPS525.h"
-#include "display/Arduino_SH1106.h"
-#include "display/Arduino_SPD2010.h"
-#include "display/Arduino_SSD1283A.h"
-#include "display/Arduino_SSD1306.h"
 
 #if defined(ARDUINO_ARCH_SAMD) && defined(SEEED_GROVE_UI_WIRELESS)
 #define DISPLAY_DEV_KIT
