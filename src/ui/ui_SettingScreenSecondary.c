@@ -654,6 +654,25 @@ static void setting_secondary_screen_event_cb(lv_event_t *e)
 
 static void setting_secondary_handle_key(int32_t key)
 {
+    /*
+     * 矩阵键 7 / 11 在 SettingScreenSecondary 上映射为 UP / DOWN，
+     * 用于在无触屏硬件上切换焦点项。MainTask 在 SettingScreenSecondary
+     * 不截胡 1~11，key_id 直接进到这里。
+     */
+    if (key == 7)
+    {
+        s_setting_focus = (uint8_t)((s_setting_focus == 0) ? (SETTING_ITEM_COUNT - 1) : (s_setting_focus - 1));
+        setting_secondary_refresh();
+        return;
+    }
+
+    if (key == 11)
+    {
+        s_setting_focus = (uint8_t)((s_setting_focus + 1) % SETTING_ITEM_COUNT);
+        setting_secondary_refresh();
+        return;
+    }
+
     if (key == LV_KEY_UP)
     {
         s_setting_focus = (uint8_t)((s_setting_focus == 0) ? (SETTING_ITEM_COUNT - 1) : (s_setting_focus - 1));

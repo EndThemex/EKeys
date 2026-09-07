@@ -36,6 +36,7 @@
 #include "network/WiFiManager.h"
 #include "output/IKeyboard.h"
 #include "protocol/SerialProtocol.h"
+#include "ui/ui_KeyMapped.h"
 #include "voice/VoiceRecognizer.h"
 
 namespace ekeys
@@ -250,8 +251,18 @@ namespace ekeys
 
             for (uint8_t i = 0; i < pc; ++i)
             {
-                KeyEventDispatcher::onKeyEdge(pressed[i], true);
-                resolver_.press(pressed[i], *keyboard_);
+                /*
+                 * SettingScreenSecondary 下，矩阵键仅用于 UI 导航（按键 7/11
+                 * 切焦点等），不向主机发送 HID。离开该屏后 release 仍正常派发，
+                 * 避免卡键。
+                 */
+                const bool suppress_hid =
+                    ui_get_active_screen_tag() == UI_SCREEN_SETTING_SECONDARY;
+                if (!suppress_hid)
+                {
+                    KeyEventDispatcher::onKeyEdge(pressed[i], true);
+                    resolver_.press(pressed[i], *keyboard_);
+                }
                 /*
                  * A1 修复：应用键 1~11 在 KEYMAPPED 屏被解释为"进入二级页并聚焦该键"。
                  * 编码复用 ActionInput.action=key_id（与 LV_KEY_* 数值不重叠，

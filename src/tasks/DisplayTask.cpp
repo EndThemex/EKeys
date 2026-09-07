@@ -257,29 +257,16 @@ namespace ekeys
                 break;
             }
             /*
-             * 系统设置二级页里 LEFT/RIGHT 用于调值，但旋钮旋转只发 LEFT/RIGHT
-             * （与 LV_KEY_UP/LV_KEY_DOWN 不同源），如果直接转发会出现"转旋钮
-             * 却不能切换下一项"的体验断点。这里在 SettingScreenSecondary 上
-             * 把旋钮方向键重映射成 UP/DOWN 来切换焦点，应用键 1~11 经 KEYMAPPED
-             * 截胡后不进入这里，因此 LEFT/RIGHT 调值行为不受影响。
+             * SettingScreenSecondary 旋钮行为：旋转直接发出 LV_KEY_LEFT/RIGHT
+             * 进 UI，由 setting_secondary_handle_key 走调值分支
+             * （adjust_value ±1）。SettingScreenSecondary 上的
+             * LV_KEY_UP/DOWN 分支保留但当前无物理输入触发。
              */
-            uint8_t send_action = action;
-            if (ui_get_active_screen_tag() == UI_SCREEN_SETTING_SECONDARY)
-            {
-                if (send_action == LV_KEY_LEFT)
-                {
-                    send_action = LV_KEY_UP;
-                }
-                else if (send_action == LV_KEY_RIGHT)
-                {
-                    send_action = LV_KEY_DOWN;
-                }
-            }
             lv_obj_t *active_screen = lv_scr_act();
             if (active_screen != nullptr)
             {
                 lv_event_send(active_screen, LV_EVENT_KEY,
-                              (void *)(uintptr_t)send_action);
+                              (void *)(uintptr_t)action);
             }
             break;
         }
