@@ -126,17 +126,20 @@ namespace ekeys
 
     void Configuration::loadGlobalSettings_locked()
     {
+        /*
+         * 首启无 config.ini / 文件损坏时不再提前 return：
+         * 用空 ini 继续走逐段读取，让 GetLongValue 的默认值生效
+         * （如 tft_brightness=80）。否则 settings_ 停留构造时的全 0，
+         * 背光会被 Backlight 钳到最小 5%。
+         */
+        CSimpleIniA ini(true, false, false);
         if (!ConfigStore::exists(kGlobalConfigPath))
         {
             LOG_INFO("CONFIG", "Using default config");
-            return;
         }
-
-        CSimpleIniA ini(true, false, false);
-        if (!ConfigStore::loadGlobal(kGlobalConfigPath, ini))
+        else if (!ConfigStore::loadGlobal(kGlobalConfigPath, ini))
         {
             LOG_WARNING("CONFIG", "config.ini unreadable, using defaults");
-            return;
         }
 
         /* 逐段读取已知字段（FEATURE_DOC §6） */
@@ -173,7 +176,7 @@ namespace ekeys
         settings_.tft_theme =
             static_cast<uint8_t>(ini.GetLongValue("display", "tft_theme", 0));
         settings_.tft_brightness =
-            static_cast<uint8_t>(ini.GetLongValue("display", "tft_brightness", 0));
+            static_cast<uint8_t>(ini.GetLongValue("display", "tft_brightness", 80));
 
         settings_.device_volume =
             static_cast<uint8_t>(ini.GetLongValue("audio", "device_volume", 0));
