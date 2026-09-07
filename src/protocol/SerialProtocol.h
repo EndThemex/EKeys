@@ -41,6 +41,7 @@ namespace ekeys
         CMD_PROFILE_STATE = 0x10,
         CMD_PROFILE_ICON_SET = 0x11,
         CMD_HA_STATUS = 0x12,
+        CMD_TIME_SET = 0x13, /* App→主控：写入系统时间（epoch + tz） */
     };
 
     class SerialProtocol

@@ -40,7 +40,7 @@ namespace ekeys
         HaStatus = 7,
         MusicPlayer = 8,
         KeymapProfile = 9,
-        Navigate = 10, /* 屏幕路由（docs/05 §5.2），载荷 navigate_target */
+        Navigate = 10,      /* 屏幕路由（docs/05 §5.2），载荷 navigate_target */
         BatteryStatus = 11, /* 电池电量（5s 节流，载荷 battery_percent） */
     };
 
@@ -114,9 +114,11 @@ namespace ekeys
     {
         DisplayMessageType type{DisplayMessageType::SettingUpdate};
 
-        char time_text[16]{}; /* TimeUpdate："HH:MM:SS" + '\0' */
-        uint8_t action{0};    /* ActionInput：LV_KEY_LEFT/RIGHT/ENTER/ESC */
-        uint32_t key_value{0}; /* KeyInput：按键位掩码（RGB 高亮，阶段 06） */
+        char time_text[16]{};       /* TimeUpdate："HH:MM:SS" + '\0' */
+        char date_text[12]{};       /* TimeUpdate："YYYY-MM-DD" + '\0'；未同步为空串 */
+        char week_text[4]{};        /* TimeUpdate："MON"/"TUE" + '\0'；未同步为空串 */
+        uint8_t action{0};          /* ActionInput：LV_KEY_LEFT/RIGHT/ENTER/ESC */
+        uint32_t key_value{0};      /* KeyInput：按键位掩码（RGB 高亮，阶段 06） */
         uint8_t navigate_target{0}; /* Navigate：ui_screen_tag_t */
         bool asr_recording{false};
         uint8_t battery_percent{0}; /* BatteryStatus：0~100 */

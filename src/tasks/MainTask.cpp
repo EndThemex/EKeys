@@ -21,6 +21,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "app/AppContext.h"
 #include "audio/Speaker.h"
@@ -29,6 +30,7 @@
 #include "keymap/KeyEventDispatcher.h"
 #include "logging/LogManager.h"
 #include "message_types.h"
+#include <time.h>
 #include "network/DiscoveryService.h"
 #include "network/NetDiagnostics.h"
 #include "network/NtpSync.h"
@@ -295,6 +297,26 @@ namespace ekeys
             {
                 formatUptimeString(msg.time_text,
                                    sizeof(msg.time_text), now);
+            }
+            else
+            {
+                /* 已同步：补齐日期 "YYYY-MM-DD" + 星期缩写 "MON"…"SUN" */
+                struct tm tm_now;
+                if (getLocalTime(&tm_now, 20))
+                {
+                    snprintf(msg.date_text, sizeof(msg.date_text),
+                             "%04d-%02d-%02d",
+                             tm_now.tm_year + 1900,
+                             tm_now.tm_mon + 1,
+                             tm_now.tm_mday);
+                    static const char *const kWeek[7] = {
+                        "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+                    if (tm_now.tm_wday >= 0 && tm_now.tm_wday < 7)
+                    {
+                        snprintf(msg.week_text, sizeof(msg.week_text),
+                                 "%s", kWeek[tm_now.tm_wday]);
+                    }
+                }
             }
             postMessage(msg);
         }

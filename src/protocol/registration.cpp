@@ -16,6 +16,7 @@
 #include "commands/cmd_music.h"
 #include "commands/cmd_pc_status.h"
 #include "commands/cmd_profile.h"
+#include "commands/cmd_time.h"
 
 namespace ekeys::protocol::registration
 {
@@ -29,6 +30,7 @@ namespace ekeys::protocol::registration
         commands::registerPcStatusHandlers();
         commands::registerMusicHandlers();
         commands::registerProfileHandlers();
+        commands::registerTimeHandlers();
         LOG_INFO("REG", "all command handlers registered (%u)",
                  static_cast<unsigned>(CommandRegistry::instance().handlerCount()));
     }

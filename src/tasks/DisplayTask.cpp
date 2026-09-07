@@ -18,6 +18,7 @@
 #include <Arduino.h>
 #include <SPIFFS.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "config/Configuration.h"
 #include "audio/AudioAnalyzer.h"
@@ -232,6 +233,34 @@ namespace ekeys
                 ss[2] = '\0';
                 lv_label_set_text(ui_LabelTime, hm);
                 lv_label_set_text(ui_LabelSecond, ss);
+            }
+
+            /*
+             * 日期 + 星期：协议载荷 "YYYY-MM-DD" → UI "MMM DD"（ui_LabelData），
+             * week_text（"MON"…"SUN"）→ ui_LabelWeek。
+             * 任意字段为空（未同步）时跳过，避免覆盖初始占位。
+             */
+            if (msg.date_text[0] != '\0' && strlen(msg.date_text) >= 10 &&
+                msg.date_text[4] == '-' && msg.date_text[7] == '-')
+            {
+                static const char *const kMonth[12] = {
+                    "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+                    "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
+                char mm_str[3] = {msg.date_text[5], msg.date_text[6], '\0'};
+                char dd_str[3] = {msg.date_text[8], msg.date_text[9], '\0'};
+                int mm = atoi(mm_str);
+                int dd = atoi(dd_str);
+                if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31)
+                {
+                    char data_text[8];
+                    snprintf(data_text, sizeof(data_text), "%s %02d",
+                             kMonth[mm - 1], dd);
+                    lv_label_set_text(ui_LabelData, data_text);
+                }
+            }
+            if (msg.week_text[0] != '\0')
+            {
+                lv_label_set_text(ui_LabelWeek, msg.week_text);
             }
             break;
         }
