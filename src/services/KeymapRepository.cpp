@@ -5,10 +5,14 @@
  *
  *   [key1]
  *   function_key=KEY_FUNCTION_ASR
+ *   text=hello@example.com
  *   normal_key=a+b
- *   macros_key=Ctrl+c
+ *   normal_key=Ctrl+c
  *
- * function_key 非空时优先使用；normal_key / macros_key 用 "+" 分隔。
+ * function_key 非空时优先使用；其次 text（文本注入，ASCII）；normal_key / macros_key 用 "+" 分隔。
+ * 组合键写在 normal_key（"Ctrl"+"c" 拆两槽，修饰键槽经 KeyNameTable
+ * 解析为 0xE0~0xE7）；macros_key 仅存储/协议透传，KeyResolver 未实现
+ * 宏播放。
  */
 
 #include "KeymapRepository.h"
@@ -92,10 +96,11 @@ namespace ekeys
 
             KeyMapping &m = out[i];
             const char *fk = ini.GetValue(section, "function_key", nullptr);
+            const char *tx = ini.GetValue(section, "text", nullptr);
             const char *nk = ini.GetValue(section, "normal_key", nullptr);
             const char *mk = ini.GetValue(section, "macros_key", nullptr);
 
-            if (fk == nullptr && nk == nullptr && mk == nullptr)
+            if (fk == nullptr && tx == nullptr && nk == nullptr && mk == nullptr)
             {
                 /*
                  * [keyN] 段/键缺失 = 该键从未配置过（用户显式清空时
@@ -110,9 +115,11 @@ namespace ekeys
             }
 
             m.function_key = (fk != nullptr) ? fk : "";
+            m.text_key = (tx != nullptr) ? tx : "";
             splitPlus((nk != nullptr) ? nk : "", m.normal_key);
             splitPlus((mk != nullptr) ? mk : "", m.macros_key);
             m.valid = (m.function_key.length() > 0) ||
+                      (m.text_key.length() > 0) ||
                       (m.normal_key[0].length() > 0) ||
                       (m.macros_key[0].length() > 0);
             if (m.valid)
@@ -148,6 +155,7 @@ namespace ekeys
                  static_cast<unsigned>(keyId));
 
         ini.SetValue(section, "function_key", mapping.function_key.c_str());
+        ini.SetValue(section, "text", mapping.text_key.c_str());
 
         String nk;
         for (uint8_t n = 0; n < kKeyMappingNormalCount; ++n)

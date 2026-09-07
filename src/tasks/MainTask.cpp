@@ -342,6 +342,11 @@ namespace ekeys
             {
                 combo = mapping.function_key;
             }
+            else if (!mapping.text_key.isEmpty())
+            {
+                /* 文本注入键直接显示内容（超长由 snprintf 截断） */
+                combo = mapping.text_key;
+            }
             else
             {
                 for (uint8_t j = 0; j < kKeyMappingNormalCount; ++j)

@@ -3,9 +3,11 @@
  *
  * 报文（参考工程 sendCurrentKeymapSnapshot / parseKeymapSetCommand）：
  *   0x05 响应：{"cmd":0x85,"seq":N,"status":0,"keymap":[
- *     {"physical":1,"normal":"a+b","macro":"Ctrl+c","function":""}, ...]}
- *   0x06 请求：data.keymap = [{physical(1~11), normal?, macro?, function?}]
+ *     {"physical":1,"normal":"a+b","macro":"","text":"hi","function":""}, ...]}
+ *   0x06 请求：data.keymap = [{physical(1~11), normal?, macro?, text?, function?}]
  *   0x06 响应：通用成功（cmd|0x80）。
+ *
+ * 优先级：function > text（文本注入，ASCII，≤128 字符）> normal / macro。
  *
  * 键映射写入当前激活 Profile 的 keymap{N}.ini，成功后
  * MainTask::reloadKeymap() 刷新 KeyResolver 并推送键映射屏标签。
@@ -29,6 +31,9 @@ namespace ekeys::protocol::commands
 
     namespace
     {
+
+        /* text 字段（文本注入）长度上限；HID 键盘仅支持 ASCII */
+        constexpr size_t kMaxTextLen = 128;
 
         /* 把 "a+b+c" 数组拼回 "+" 串（跳过空项）；容量模板复用 GET/SET */
         template <size_t N>
@@ -108,6 +113,7 @@ namespace ekeys::protocol::commands
                 key["physical"] = key_id;
                 key["normal"] = joinPlus(m.normal_key);
                 key["macro"] = joinPlus(m.macros_key);
+                key["text"] = m.text_key;
                 key["function"] = m.function_key;
             }
             SerialProtocol::instance().sendDocument(doc);

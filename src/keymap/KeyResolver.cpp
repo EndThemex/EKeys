@@ -90,6 +90,16 @@ namespace ekeys
             }
             return;
         }
+        /*
+         * 文本注入通道：按键触发整串输出一次（ASCII），
+         * release 无对应动作，仅回写 LED 边沿。
+         */
+        if (m.text_key.length() > 0)
+        {
+            keyboard.type(m.text_key);
+            notifyLedEdge(keyId, true);
+            return;
+        }
         for (uint8_t n = 0; n < kKeyMappingNormalCount; ++n)
         {
             if (m.normal_key[n].length() == 0)
@@ -125,6 +135,12 @@ namespace ekeys
             {
                 keyboard.release(r.keycode);
             }
+            return;
+        }
+        if (m.text_key.length() > 0)
+        {
+            /* 文本在 press 时已整串输出完毕，release 无键可松 */
+            notifyLedEdge(keyId, false);
             return;
         }
         for (uint8_t n = 0; n < kKeyMappingNormalCount; ++n)

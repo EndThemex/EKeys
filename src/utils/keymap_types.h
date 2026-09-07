@@ -29,10 +29,12 @@ namespace ekeys
    *   非空时优先使用，并忽略 normal_key / macros_key。
    *
    * normal_key[]:
-   *   普通键序列，最多 6 个，支持 "+" 分隔同时按下。
+   *   普通键序列，最多 6 个，支持 "+" 分隔同时按下；
+   *   修饰键名（Ctrl/Shift/Alt/Win）单独成槽即组合键（如 "Ctrl"+"c"）。
    *
    * macros_key[]:
-   *   宏键序列，最多 5 个，按顺序先压后弹。
+   *   宏键序列，最多 5 个，按顺序先压后弹；
+   *   仅存储/协议透传，KeyResolver 尚未实现宏播放。
    *
    * valid:
    *   仅供 KeyResolver 内部标注"已加载"状态。
@@ -40,6 +42,7 @@ namespace ekeys
   struct KeyMapping
   {
     String function_key;
+    String text_key;
     std::array<String, kKeyMappingNormalCount> normal_key;
     std::array<String, kKeyMappingMacrosCount> macros_key;
     bool valid;
