@@ -123,12 +123,12 @@ namespace ekeys
             for (uint8_t i = 0; i < RGBDriver::kLedCount; ++i)
             {
                 uint8_t r, g, b;
-                hueToRgb(hueWheel(elapsed_ms_ / 2 + i * 23), r, g, b);
+                hueToRgb(hueWheel(elapsed_ms_ / 8 + i * 23), r, g, b);
                 if (mode_ == RGB_RAINBOWWARE_MODE)
                 {
-                    /* 波形亮度：沿灯带传播的正弦（约 1.25s 一周） */
+                    /* 波形亮度：沿灯带传播的正弦（约 5s 一周） */
                     const float wave = 0.55f + 0.45f *
-                                                   sinf((elapsed_ms_ * 0.005f) + i * 0.6f);
+                                                   sinf((elapsed_ms_ * 0.00125f) + i * 0.6f);
                     r = static_cast<uint8_t>(r * wave);
                     g = static_cast<uint8_t>(g * wave);
                     b = static_cast<uint8_t>(b * wave);
@@ -141,7 +141,7 @@ namespace ekeys
         case RGB_COLORCYCLE_MODE:
         {
             uint8_t r, g, b;
-            hueToRgb(hueWheel(elapsed_ms_ / 2), r, g, b);
+            hueToRgb(hueWheel(elapsed_ms_ / 8), r, g, b);
             led.setAll(r, g, b);
             break;
         }
