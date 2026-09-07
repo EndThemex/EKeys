@@ -21,7 +21,8 @@ public:
 
     /*
      * 读取 profile 对应的 keymap{N}.ini。
-     * 文件不存在或为空映射时返回 false，调用方回退默认映射。
+     * 文件不存在或所有段均被显式清空时返回 false，调用方回退默认映射；
+     * 文件内缺失的 [keyN] 段（该键从未配置过）由本函数补默认 a~k。
      */
     bool loadProfile(const char *path, KeymapArray &out);
 

@@ -91,13 +91,27 @@ namespace ekeys
                      static_cast<unsigned>(i));
 
             KeyMapping &m = out[i];
-            const char *fk = ini.GetValue(section, "function_key", "");
-            const char *nk = ini.GetValue(section, "normal_key", "");
-            const char *mk = ini.GetValue(section, "macros_key", "");
+            const char *fk = ini.GetValue(section, "function_key", nullptr);
+            const char *nk = ini.GetValue(section, "normal_key", nullptr);
+            const char *mk = ini.GetValue(section, "macros_key", nullptr);
 
-            m.function_key = fk;
-            splitPlus(nk, m.normal_key);
-            splitPlus(mk, m.macros_key);
+            if (fk == nullptr && nk == nullptr && mk == nullptr)
+            {
+                /*
+                 * [keyN] 段/键缺失 = 该键从未配置过（用户显式清空时
+                 * saveKey 仍会写入空串键），回落默认 a~k，避免
+                 * "只保存过部分键"的 ini 让其余键加载后静默失效。
+                 */
+                m = KeyMapping{};
+                m.function_key = kDefaultKeyMapping[i];
+                m.valid = true;
+                ++valid_cnt;
+                continue;
+            }
+
+            m.function_key = (fk != nullptr) ? fk : "";
+            splitPlus((nk != nullptr) ? nk : "", m.normal_key);
+            splitPlus((mk != nullptr) ? mk : "", m.macros_key);
             m.valid = (m.function_key.length() > 0) ||
                       (m.normal_key[0].length() > 0) ||
                       (m.macros_key[0].length() > 0);

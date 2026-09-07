@@ -95,11 +95,16 @@ namespace ekeys
         {
             return;
         }
-        g_usb_keyboard.pressRaw(keycode);
+        /*
+         * 修饰键必须先于普通键下发：pressRaw 每次立即 sendReport，
+         * 若先 pressRaw(keycode)，主机会先收到无修饰键的裸键报告
+         * （映射 "A"/"Shift+Enter" 时实际输出 "aA" 两个字符）。
+         */
         if (modifier)
         {
             applyModifier(modifier, true);
         }
+        g_usb_keyboard.pressRaw(keycode);
         for (auto &entry : g_pressed)
         {
             if (entry.keycode == 0)

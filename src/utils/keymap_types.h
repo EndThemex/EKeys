@@ -13,6 +13,8 @@
 #include <Arduino.h>
 #include <array>
 
+#include "input/MatrixScanner.h" // kMatrixKeyCount
+
 namespace ekeys
 {
 
@@ -42,6 +44,33 @@ namespace ekeys
     std::array<String, kKeyMappingMacrosCount> macros_key;
     bool valid;
   };
+
+  /*
+   * 默认映射表（FEATURE_DOC §3.1）：Key ID 1~11 → "a"~"k"。
+   * 运行时回退 / 协议 0x05 上报 / 存储层补段共用，唯一事实源。
+   */
+  inline constexpr const char *kDefaultKeyMapping[kMatrixKeyCount + 1] = {
+      "",
+      "a", "b", "c", "d", "e",
+      "f", "g", "h", "i", "j",
+      "k"};
+
+  /*
+   * 用默认映射（a~k，走 function_key 通道）填满 1~11 号键，
+   * 下标 0 置为无效占位。
+   */
+  inline void keymapFillDefaults(
+      std::array<KeyMapping, kMatrixKeyCount + 1> &out)
+  {
+    out[0] = KeyMapping{};
+    for (uint8_t i = 1; i <= kMatrixKeyCount; ++i)
+    {
+      KeyMapping m{};
+      m.function_key = kDefaultKeyMapping[i];
+      m.valid = true;
+      out[i] = m;
+    }
+  }
 
 } // namespace ekeys
 

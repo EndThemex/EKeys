@@ -20,11 +20,8 @@ namespace ekeys
 
     namespace
     {
-        constexpr const char *kDefaultMapping[kMatrixKeyCount + 1] = {
-            "",
-            "a", "b", "c", "d", "e",
-            "f", "g", "h", "i", "j",
-            "k"};
+        // 默认表（a~k）收口在 utils/keymap_types.h 的 kDefaultKeyMapping，
+        // 与协议 0x05 上报、KeymapRepository 补段共用。
     } // namespace
 
     KeyResolver::KeyResolver(Configuration &config)
@@ -64,20 +61,7 @@ namespace ekeys
 
     void KeyResolver::loadDefaults()
     {
-        for (uint8_t i = 1; i <= kMatrixKeyCount; ++i)
-        {
-            KeyMapping &m = map_[i];
-            m.function_key = kDefaultMapping[i];
-            for (uint8_t n = 0; n < kKeyMappingNormalCount; ++n)
-            {
-                m.normal_key[n] = (n == 0) ? String(kDefaultMapping[i]) : String();
-            }
-            for (uint8_t n = 0; n < kKeyMappingMacrosCount; ++n)
-            {
-                m.macros_key[n] = String();
-            }
-            m.valid = true;
-        }
+        keymapFillDefaults(map_);
     }
 
     const KeyMapping &KeyResolver::get(uint8_t keyId) const

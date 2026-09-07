@@ -85,7 +85,16 @@ namespace ekeys::protocol::commands
             (void)cmd;
 
             Configuration::KeymapArray map{};
-            Configuration::instance().loadActiveProfileKeyMapping(map);
+            if (!Configuration::instance().loadActiveProfileKeyMapping(map))
+            {
+                /*
+                 * keymap{N}.ini 缺失/全空：设备运行时（KeyResolver）此时
+                 * 用的是默认 a~k，这里上报同样的默认值，保证 App 看到的
+                 * 与设备实际行为一致。
+                 */
+                LOG_WARNING("KEYMAP", "profile keymap unavailable, report defaults");
+                keymapFillDefaults(map);
+            }
 
             JsonDocument doc;
             doc["cmd"] = CMD_KEYMAP_GET | 0x80;

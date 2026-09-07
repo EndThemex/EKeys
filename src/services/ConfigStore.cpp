@@ -10,6 +10,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <string>
+#include <vector>
+
 #include "logging/LogManager.h"
 
 namespace ekeys
@@ -27,30 +30,39 @@ namespace ekeys
             char tmp_path[96];
             snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
 
-            /* 1) 写临时文件 */
-            SI_Error rc = ini.SaveFile(tmp_path);
-            if (rc < 0)
+            /* 1) 序列化到内存（SimpleIni 的 SaveFile 内部用裸 fopen，
+             *    无法访问 SPIFFS 挂载点，必须经 Arduino FS 写入；
+             *    4.19 的字符串保存接口为 Save(std::string&)） */
+            std::string data;
+            SI_Error rc = ini.Save(data);
+            if (rc < 0 || data.empty())
             {
-                LOG_ERROR("CFGSTORE", "save tmp %s failed rc=%d",
-                          tmp_path, static_cast<int>(rc));
+                LOG_ERROR("CFGSTORE", "serialize %s failed rc=%d",
+                          path, static_cast<int>(rc));
                 return false;
             }
 
-            /* 2) 校验临时文件大小非 0 */
-            File tmp = SPIFFS.open(tmp_path, "r");
-            if (!tmp)
+            /* 2) 经 SPIFFS 写临时文件并校验写入长度 */
             {
-                LOG_ERROR("CFGSTORE", "open tmp %s for verify failed", tmp_path);
-                return false;
+                File tmp = SPIFFS.open(tmp_path, "w");
+                if (!tmp)
+                {
+                    LOG_ERROR("CFGSTORE", "open tmp %s for write failed", tmp_path);
+                    return false;
+                }
+                const size_t written = tmp.write(
+                    reinterpret_cast<const uint8_t *>(data.data()), data.size());
+                tmp.close();
+                if (written != data.size())
+                {
+                    LOG_ERROR("CFGSTORE", "write tmp %s short (%u/%u)",
+                              tmp_path, static_cast<unsigned>(written),
+                              static_cast<unsigned>(data.size()));
+                    SPIFFS.remove(tmp_path);
+                    return false;
+                }
             }
-            const size_t tmp_size = tmp.size();
-            tmp.close();
-            if (tmp_size == 0)
-            {
-                LOG_ERROR("CFGSTORE", "tmp %s is empty", tmp_path);
-                SPIFFS.remove(tmp_path);
-                return false;
-            }
+            const size_t tmp_size = data.size();
 
             /* 3) 备份原文件（如果存在）→ 写入新内容 → 删除备份 / 临时文件 */
             char bak_path[96];
@@ -166,10 +178,42 @@ namespace ekeys
         {
             return false;
         }
-        SI_Error rc = ini.LoadFile(path);
+
+        /*
+         * SimpleIni 的 LoadFile 内部用裸 fopen，而 SPIFFS 挂载在 /spiffs，
+         * 只有经 Arduino FS 包装（SPIFFS.open）才会补挂载点前缀，
+         * 裸 fopen("/config.ini") 必然返回 SI_FILE(-3)。
+         * 这里改为经 SPIFFS 读入内存后 LoadData 解析。
+         */
+        File f = SPIFFS.open(path, "r");
+        if (!f)
+        {
+            LOG_ERROR("CFGSTORE", "open %s failed", path);
+            return false;
+        }
+        const size_t size = f.size();
+        if (size == 0)
+        {
+            LOG_ERROR("CFGSTORE", "%s is empty", path);
+            f.close();
+            return false;
+        }
+
+        std::vector<char> buf(size);
+        const size_t n = f.read(reinterpret_cast<uint8_t *>(buf.data()), size);
+        f.close();
+        if (n != size)
+        {
+            LOG_ERROR("CFGSTORE", "read %s short (%u/%u)", path,
+                      static_cast<unsigned>(n), static_cast<unsigned>(size));
+            return false;
+        }
+
+        SI_Error rc = ini.LoadData(buf.data(), n);
         if (rc < 0)
         {
-            LOG_ERROR("CFGSTORE", "load %s failed rc=%d", path, static_cast<int>(rc));
+            LOG_ERROR("CFGSTORE", "parse %s failed rc=%d", path,
+                      static_cast<int>(rc));
             return false;
         }
         return true;
