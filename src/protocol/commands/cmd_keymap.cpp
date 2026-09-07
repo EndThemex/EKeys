@@ -141,13 +141,26 @@ namespace ekeys::protocol::commands
                 m.function_key = key["function"].as<const char *>();
             }
 
-            /* function_key 非空时优先，normal / macro 留空 */
-            if (m.function_key.isEmpty() && key["normal"].is<const char *>())
+            /* function_key 非空时优先，text / normal / macro 留空；
+             * text 为文本注入串（ASCII，≤128 字符，超长截断） */
+            if (m.function_key.isEmpty() && key["text"].is<const char *>())
+            {
+                m.text_key = key["text"].as<const char *>();
+                if (m.text_key.length() > kMaxTextLen)
+                {
+                    m.text_key = m.text_key.substring(0, kMaxTextLen);
+                    LOG_WARNING("KEYMAP", "text too long, truncated to %u",
+                                static_cast<unsigned>(kMaxTextLen));
+                }
+            }
+            if (m.function_key.isEmpty() && m.text_key.isEmpty() &&
+                key["normal"].is<const char *>())
             {
                 splitPlus<kKeyMappingNormalCount>(
                     key["normal"].as<const char *>(), m.normal_key);
             }
-            if (m.function_key.isEmpty() && key["macro"].is<const char *>())
+            if (m.function_key.isEmpty() && m.text_key.isEmpty() &&
+                key["macro"].is<const char *>())
             {
                 splitPlus<kKeyMappingMacrosCount>(
                     key["macro"].as<const char *>(), m.macros_key);
