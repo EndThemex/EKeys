@@ -1,4 +1,5 @@
 # 项目规则
+
 主控是esp32-s3 n16r8.
 不主动编译项目，除非我明确要求。
 引脚定义请参考 `PINOUT.md`。
@@ -9,10 +10,11 @@
 代码需要根据功能和层级进行组织，避免代码结构混乱。
 代码需要考虑代码的可读性和可维护性，单个文件不要放置过多代码。
 参数配置最好用单独的文件完成，方便后续检查和修改。
+新增方法时，不要忘记在头文件中声明。
 
 ## 输入交互规则（旋钮 / 矩阵键 / 设置二级页）
 
-硬件无触屏（[PINOUT.md](file:///d:/search/esp/Keys/EKeys/PINOUT.md) 无 TP_* 引脚，[LvglPort.cpp](file:///d:/search/esp/Keys/EKeys/src/display/LvglPort.cpp) 未注册 `lv_indev_*`），系统内仅两类物理输入。
+硬件无触屏（[PINOUT.md](file:///d:/search/esp/Keys/EKeys/PINOUT.md) 无 TP*\* 引脚，[LvglPort.cpp](file:///d:/search/esp/Keys/EKeys/src/display/LvglPort.cpp) 未注册 `lv_indev*\*`），系统内仅两类物理输入。
 
 ### 1. 输入源语义
 
@@ -27,15 +29,15 @@
 
 所有 UI 屏幕只识别 6 种语义，编码来自 `lv_group.h`：
 
-| 语义 | LVGL 编码 | 旋钮 | 矩阵键 1~11 | 触屏兜底按钮 |
-|---|---|---|---|---|
-| LEFT | `LV_KEY_LEFT` (20) | 逆时针 | — | `ButtonLeft*` |
-| RIGHT | `LV_KEY_RIGHT` (19) | 顺时针 | — | `ButtonRight*` |
-| UP | `LV_KEY_UP` (17) | — | key_id=7 | — |
-| DOWN | `LV_KEY_DOWN` (18) | — | key_id=11 | — |
-| ENTER | `LV_KEY_ENTER` (10) | 单击 | — | `ButtonEnter*` |
-| ESC | `LV_KEY_ESC` (27) | 双击 | — | `ButtonExit*` |
-| 焦点跳转 | `action = key_id` (1~11) | — | KEYMAPPED 截胡 | — |
+| 语义     | LVGL 编码                | 旋钮   | 矩阵键 1~11    | 触屏兜底按钮   |
+| -------- | ------------------------ | ------ | -------------- | -------------- |
+| LEFT     | `LV_KEY_LEFT` (20)       | 逆时针 | —              | `ButtonLeft*`  |
+| RIGHT    | `LV_KEY_RIGHT` (19)      | 顺时针 | —              | `ButtonRight*` |
+| UP       | `LV_KEY_UP` (17)         | —      | key_id=7       | —              |
+| DOWN     | `LV_KEY_DOWN` (18)       | —      | key_id=11      | —              |
+| ENTER    | `LV_KEY_ENTER` (10)      | 单击   | —              | `ButtonEnter*` |
+| ESC      | `LV_KEY_ESC` (27)        | 双击   | —              | `ButtonExit*`  |
+| 焦点跳转 | `action = key_id` (1~11) | —      | KEYMAPPED 截胡 | —              |
 
 矩阵键 `key_id`（1~11）与 `LV_KEY_*` 数值不重叠（`LV_KEY_ENTER=10` 例外，详见 [MainTask.cpp#L255-L267](file:///d:/search/esp/Keys/EKeys/src/tasks/MainTask.cpp#L255-L267) 注释）。
 
@@ -51,14 +53,14 @@
 
 [`setting_secondary_handle_key`](file:///d:/search/esp/Keys/EKeys/src/ui/ui_SettingScreenSecondary.c#L655-L695) 当前分发规则：
 
-| 输入 | 行为 |
-|---|---|
-| 旋钮顺时针 | 当前项数值 +1（亮度+5%、模式递增、开关取反） |
-| 旋钮逆时针 | 当前项数值 -1 |
-| 旋钮单击/双击 | ENTER/ESC |
-| 矩阵键 7 | 焦点上移一项（首项跳末项） |
-| 矩阵键 11 | 焦点下移一项（末项跳首项） |
-| 矩阵键 1~6、8~10 | no-op（不发 HID，不切焦点） |
+| 输入             | 行为                                         |
+| ---------------- | -------------------------------------------- |
+| 旋钮顺时针       | 当前项数值 +1（亮度+5%、模式递增、开关取反） |
+| 旋钮逆时针       | 当前项数值 -1                                |
+| 旋钮单击/双击    | ENTER/ESC                                    |
+| 矩阵键 7         | 焦点上移一项（首项跳末项）                   |
+| 矩阵键 11        | 焦点下移一项（末项跳首项）                   |
+| 矩阵键 1~6、8~10 | no-op（不发 HID，不切焦点）                  |
 
 `LV_KEY_UP/DOWN` 分支保留但当前无物理输入触发，等价于死代码，清理时一并删除。
 
