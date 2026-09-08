@@ -1,127 +1,140 @@
 # EKeys
 
 基于 **ESP32-S3-WROOM-1 (N16R8)** 的 11 键 HID 键盘 + 旋钮 + LCD 触摸显示固件（Arduino + PlatformIO 6.x）。
-支持 USB HID / BLE 双键盘、LVGL 8.3 图形界面、按键矩阵扫描、EC11 旋钮、RGB LED (WS2812B)、I2S 麦克风/功放、Wi-Fi 配网与 TCP 桌面 App 协议。
-
-> 完整功能与开发计划见 [`FEATURE_DOC.md`](./FEATURE_DOC.md) / [`ARCHITECTURE.md`](./ARCHITECTURE.md) / [`docs/`](./docs/)
->
-> 硬件引脚定义见 [`PINOUT.md`](./PINOUT.md)
+支持 USB HID / BLE 双键盘、LVGL 8.3 图形界面、按键矩阵扫描、EC11 旋钮、WS2812B RGB LED、I2S 麦克风/功放、Wi-Fi 配网与 TCP 桌面 App 协议。
 
 ---
 
-## 一、编译烧录
+## 1. 项目简介
 
-### 1. 前置准备
+EKeys 是一个面向 **桌面 / 平板场景** 的多功能宏键盘主控：11 个物理按键 + 1 个 EC11 旋钮 + 一块 SPI LCD + 一圈 RGB 灯，既可以当普通 HID 键盘使用，也可以通过 Wi-Fi / USB 与桌面 App 联动，在 11 个 Profile 中一键切换键映射、灯光、主题与 PC 状态显示。
 
-| 工具 | 版本 / 说明 |
-| --- | --- |
-| **PlatformIO Core (CLI)** | 6.x，可通过 `pip install platformio` 安装，也可使用 VS Code / Cursor 插件 |
-| **Python** | 仅 PlatformIO 需要，3.x 即可 |
-| **Git** | 拉取 `lib_deps` 里的 GitHub 依赖（BLE-Keyboard / simpleini / ESP32Encoder 等） |
-| **USB 驱动** | ESP32-S3 内置 USB CDC，Win10/11 通常免驱；Win7/8.1 需安装 [CP210x / CH343 驱动](https://www.silabs.com/developers/usb-to-uart-bridge-vcp-drivers) |
-| **数据线** | USB Type-C，支持数据（非纯充电线） |
+整套固件运行在 ESP32-S3 (N16R8) 上，使用 Arduino + PlatformIO 工具链开发。
 
-确认 USB 数据线连接后，设备管理器中出现新的 COM 端口（Linux/macOS 为 `/dev/ttyACM*` / `/dev/cu.usbmodem*`）。
+---
 
-### 2. 克隆与首次构建
+## 2. 核心功能
+
+### 2.1 输入
+
+- **3×4 矩阵（11 键）**：行列扫描 + 10 ms 消抖，1~11 应用键 ID
+- **板载 EC11 旋钮**：单击/双击/旋转，仅用于屏幕导航（**不进入 HID 键映射**）
+- **外挂模块（I2C）**：ModA（旋钮 + 滑动电位器，`0x06`）、ModB（机械旋钮，`0x08`）
+- **语音触发**：默认键 11 触发 ASR（百度短语音 REST API）
+
+### 2.2 输出
+
+- **USB HID 键盘 + 消费控制**（TinyUSB CDC + HID）
+- **BLE HID 键盘**（`t-vk/ESP32 BLE Keyboard`，自动释放经典蓝牙内存）
+- **WS2812B × 11**：单色 / 彩虹 / 颜色循环 / 火焰 / 呼吸 / 按键点击高亮
+- **I2S 音频**：MAX98357 功放 + ICS43434 麦克风；本地 WAV + 远程音频流
+
+### 2.3 显示
+
+- **SPI LCD (NV3007, 428×142)**：Arduino_GFX 驱动
+- **LVGL 8.3.11 UI**：SquareLine Studio 生成的 11 屏界面
+  - 主屏 / 键映射 / 音乐 / PC 状态 / HA 状态 / 设置（含二级页）
+- **状态条**：工作模式 / 音量 / WiFi / TCP / 模块在线 / 录音动画
+
+### 2.4 存储与配置
+
+- **SPIFFS**：`config.ini` + 8 套 `keymapN.ini` + Profile 图标 + 音频
+- **SimpleIni** 读写，互斥量保护
+- **NVS**：DeviceSettings 持久化
+- **8 套 Profile**：自定义图标 + 显示名 + 独立键映射
+
+### 2.5 网络与协议
+
+- **Wi-Fi STA**：自动重连，NTP 同步（GMT+8）
+- **TCP Server (30000)**：桌面 App 控制通道
+- **UDP 广播发现 (30001)**：自动协商 IP
+- **USB CDC 115200**：双通道与 TCP 并行；JSON 行协议 + 心跳
+- **18 类命令**：键映射 / 配置 / Profile / 设备信息 / 固件 / PC 状态 / 音乐 / HA 状态 / 语音文本 / OTA
+
+### 2.6 其它
+
+- **OTA 升级**：HTTP 流式下载 + MD5 校验，失败不覆盖原固件
+- **日志系统**：分级（DEBUG/INFO/WARN/ERROR），可注册回调
+- **电源模式**：NORMAL / LOW / LIGHT / DEEPSLEEP（占位，5V 升压可控）
+- **双 FreeRTOS 任务**：`MainTask` (Core 1) + `DisplayTask` (Core 0)，消息队列通信
+
+---
+
+## 3. 项目特点
+
+- **硬件无触屏**：UI 操作仅依赖 EC11 旋钮 + 11 键矩阵，SquareLine 触屏按钮保留作未来扩展
+- **桌面 App 联动**：通过自研协议在局域网内与 PC 双向同步键事件、键映射、设置、状态
+- **键映射灵活**：每键支持 `function_key` / `normal_key[]` / `macros_key[]` 三种内容，互斥生效
+- **8 套 Profile**：按场景一键切换（如：默认 / 剪辑 / 设计 / 代码 / …）
+- **PC 状态屏**：显示 CapsLock、网络速率、CPU / 内存 / 温度 / 磁盘 IO（数据由桌面 App 推送）
+- **可替换架构**：USB / BLE 键盘后端通过 `IKeyboard` 抽象，按 `WORK_MODE` 动态切换
+- **构建可追溯**：依赖版本固定、分区表 ASCII、字体白名单、烧录参数集中
+- **完整文档体系**：FEATURE_DOC（功能）/ ARCHITECTURE（结构）/ PINOUT（引脚）/ docs（阶段计划）
+
+---
+
+## 4. 快速开始
 
 ```bash
+# 1. 克隆仓库
 git clone <repo-url> EKeys
 cd EKeys
-pio pkg install        # 可选：提前下载 platform / 依赖，避免编译时等待
+
+# 2. 编译
 pio run -e esp32-s3-wroom-1-n16r8
-```
 
-首次编译耗时较长（需下载 `espressif32@6.8.0` 平台与若干 `lib_deps`）。后续增量编译通常 < 30s。
-
-### 3. 烧录固件
-
-```bash
-# 自动检测串口（推荐）
+# 3. 烧录固件
 pio run -e esp32-s3-wroom-1-n16r8 -t upload
 
-# 或显式指定端口
-pio run -e esp32-s3-wroom-1-n16r8 -t upload --upload-port COM7        # Windows
-pio run -e esp32-s3-wroom-1-n16r8 -t upload --upload-port /dev/ttyACM0 # Linux
-```
-
-烧录参数见 [`platformio.ini`](./platformio.ini)：`flash_mode=dio`、`f_flash=80MHz`、`flash_size=16MB`、`upload_speed=921600`、`board_upload.offset_address=0x20000`。
-
-> 烧录失败时按 `BOOT` 键重新上电进入下载模式，或按住 `BOOT` 再短按 `RESET`。
-
-### 4. 上传 SPIFFS 资源（config / keymap）
-
-```bash
+# 4. 上传 SPIFFS 资源（首次必做）
 pio run -e esp32-s3-wroom-1-n16r8 -t uploadfs
+
+# 5. 串口监视
+pio device monitor -b 115200
 ```
 
-源文件位于 [`data/`](./data/)（`config.ini`、各 `keymapN.ini`、profile 图标、音效等）。
-
-### 5. 串口监视器
-
-```bash
-pio device monitor -b 115200                          # 默认端口
-pio device monitor -b 115200 -p COM7                  # Windows
-pio device monitor -b 115200 -p /dev/ttyACM0          # Linux
-```
-
-由于启用了 `ARDUINO_USB_CDC_ON_BOOT=1`，日志通过 USB CDC 输出；UART0 仅作烧录。
-
-### 6. 擦除 Flash（首次 / 恢复出厂）
-
-```bash
-pio run -e esp32-s3-wroom-1-n16r8 -t erase
-pio run -e esp32-s3-wroom-1-n16r8 -t uploadfs   # SPIFFS 会被擦除，需重新 uploadfs
-pio run -e esp32-s3-wroom-1-n16r8 -t upload
-```
+> 详细编译参数、烧录失败排查、擦除 Flash 等见 [`docs/COMPILING.md`](./docs/COMPILING.md)。
 
 ---
 
-## 二、注意事项
+## 5. 文档导航
 
-### 1. 硬件相关
+| 文档                                                               | 说明                                     |
+| ------------------------------------------------------------------ | ---------------------------------------- |
+| [**FEATURE_DOC.md**](./FEATURE_DOC.md)                             | 功能需求总览（输入文档，按 18 节展开）   |
+| [**ARCHITECTURE.md**](./ARCHITECTURE.md)                           | 项目结构设计 / 模块划分 / 依赖与同步策略 |
+| [**PINOUT.md**](./PINOUT.md)                                       | 全部硬件引脚分配（按模块 / 按引脚号）    |
+| [**docs/COMPILING.md**](./docs/COMPILING.md)                       | 编译、烧录、SPIFFS 上传、串口监视、擦除  |
+| [**docs/PROJECT_LAYOUT.md**](./docs/PROJECT_LAYOUT.md)             | 目录速览 / 关键文件 / 文档体系           |
+| [**docs/TROUBLESHOOTING.md**](./docs/TROUBLESHOOTING.md)           | 硬件 / 软件注意事项 / 常见问题速查       |
+| [**docs/desktop-app-protocol.md**](./docs/desktop-app-protocol.md) | 桌面 App 通信协议（命令与字段约定）      |
+| [**docs/README.md**](./docs/README.md)                             | 阶段任务计划索引（01 ~ 07）              |
 
-- **Flash 必须使用 DIO**：本板厂商 ID 0x46 的闪存在 QIO@80MHz 下 ROM 加载失败（`ets_loader.c:78`），[`platformio.ini`](./platformio.ini) 已显式 `board_build.flash_mode = dio`，**不要改回 QIO**。
-- **`board_upload.offset_address = 0x20000` 必须保留**：espressif32 ≥ 6.5 不再解析自定义分区表计算 app 偏移，不显式指定会把固件写到 0x10000 破坏 `phy_init` 分区。
-- **PSRAM 配置**：`memory_type=dio_opi` + `psram_type=opi`，匹配 N16R8（Octal PSRAM）。LVGL 帧缓冲分配在 PSRAM 中。
-- **LCD_RST 未分配引脚**：阶段 01 末 `kPinLcdRst = GFX_NOT_DEFINED`，`Arduino_GFX::begin()` 跳过软件复位。若硬件改造需软件复位，在 [`src/hardware/PinMap.h`](./src/hardware/PinMap.h) 重指派并同步 [`PINOUT.md`](./PINOUT.md)。
-- **按键矩阵二极管方向**：每键串联 1N4148，**正极在列侧**，电流方向 `列→行`。行脚拉低、读列脚上拉电平。方向配反将导致所有按键无响应。
-- **WS2812B 电源极性**：`LED_PWR_CTRL` (IO21) 为 P-MOS 高边开关，**拉低导通**（VGS=-3.3V），拉高截止。使能灯条应先拉低 `LED_PWR_CTRL` 再驱动 DIN。
-- **Strapping 引脚**：`GPIO3`（5V 使能）、`GPIO45`（INT）、`GPIO46`（ROW0，默认 Boot 模式 strapping）上电时需保持手册规定的电平，避免启动异常。
-- **无触摸屏**：硬件无 TP_* 引脚，[`LvglPort.cpp`](./src/display/LvglPort.cpp) 未注册 `lv_indev_*`。UI 操作仅依赖 EC11 旋钮 + 11 键矩阵，SquareLine 生成的 `ButtonLeft/Right/Enter/Exit` 触屏兜底按钮**永远不会被触发**（保留以便未来扩展）。
+### 阶段任务
 
-### 2. 软件 / 构建相关
-
-- **依赖版本固定**：[`platformio.ini`](./platformio.ini) 中 `espressif32@6.8.0`、LVGL 8.3.11、GFX Library for Arduino 1.6.0、BLE-Keyboard 指定 commit hash。升级任一版本都可能引入头文件变更。
-- **字体白名单**：`build_src_filter` 已排除 `BebasNeueFont32/64/80` 与 `FontCKJGT32/40/48/64/80`，主固件不参与编译。如需新增超大字体需同步检查 PSRAM 占用。
-- **分区表仅 ASCII**：[`partitions-16MB.csv`](./partitions-16MB.csv) 顶部注释明确，Windows zh-CN 系统默认 GBK 解码，非 ASCII 注释会在 `checkprogsize` 阶段报 `UnicodeDecodeError`。
-- **首次上电若 SPIFFS 为空**：[`src/main.cpp`](./src/main.cpp) 在挂载失败时 LOG_ERROR 后死循环。请先执行 `pio run -t uploadfs` 写入 `data/` 内容。
-- **不主动编译**：按项目规则，本项目不主动执行 `pio run`，除非明确要求。
-
-### 3. 桌面 App / 协议
-
-- 设备作为 **TCP Server**（默认端口见 [`data/config.ini`](./data/config.ini)），通过局域网发现协议广播；详见 [`docs/desktop-app-protocol.md`](./docs/desktop-app-protocol.md)。
-- USB CDC 与 TCP 同时可用，互不冲突。串口监视器 115200 bps。
-
-### 4. 开发与维护
-
-- 新增硬件功能：在 [`src/hardware/PinMap.h`](./src/hardware/PinMap.h) 集中定义引脚，并在 [`PINOUT.md`](./PINOUT.md) 同步记录。
-- 修改配置项默认值：编辑 [`src/config/DeviceSettings.h`](./src/config/DeviceSettings.h)，**不要** 直接写死在调用处。
-- UI 改动：使用 SquareLine Studio 打开工程，生成产物覆盖 [`src/ui/`](./src/ui/)，避免手工改动被生成器覆盖。
-- 阶段性计划：在 [`docs/`](./docs/) 对应阶段文档的 `变更记录` 追加条目，按 `NN-阶段名.md` 命名。
+| 阶段 | 文档                                                                  | 目标                                |
+| ---- | --------------------------------------------------------------------- | ----------------------------------- |
+| 01   | [01-minimal-hid.md](./docs/01-minimal-hid.md)                         | 按键矩阵 → USB HID 键盘             |
+| 02   | [02-display-lvgl-port.md](./docs/02-display-lvgl-port.md)             | NV3007 + LVGL 初始化迁出 `main.cpp` |
+| 03   | [03-config-persistence.md](./docs/03-config-persistence.md)           | SPIFFS + SimpleIni 持久化键映射     |
+| 04   | [04-protocol-config-sync.md](./docs/04-protocol-config-sync.md)       | 私有协议 `CMD_CONFIG_SET` 同步      |
+| 05   | [05-ui-screens.md](./docs/05-ui-screens.md)                           | 音乐 / PC 状态 / HA / 设置屏        |
+| 06   | [06-network-voice-rgb-audio.md](./docs/06-network-voice-rgb-audio.md) | WiFi / BLE / 语音 / RGB / 音频      |
+| 07   | [07-placeholder-completion.md](./docs/07-placeholder-completion.md)   | 2.4G / 频谱 / OTA / 占位命令补齐    |
 
 ---
 
-## 三、目录速览
+## 6. 仓库结构（速览）
 
 ```
 EKeys/
 ├── platformio.ini              # 构建配置
 ├── partitions-16MB.csv         # 16MB Flash 分区表
-├── PINOUT.md                   # 硬件引脚
+├── README.md                   # 主页（本文件）
 ├── FEATURE_DOC.md              # 功能需求
 ├── ARCHITECTURE.md             # 项目结构
-├── docs/                       # 分阶段任务计划 & 协议说明
+├── PINOUT.md                   # 硬件引脚
+├── docs/                       # 阶段任务 / 协议 / 编译指南 / 排错
 ├── data/                       # SPIFFS 资源（config.ini / keymapN.ini / …）
 ├── include/                    # 全局头（lv_conf.h）
 ├── lib/                        # 本地库（GFX Library for Arduino）
@@ -132,17 +145,4 @@ EKeys/
 └── test/                       # 单元测试占位
 ```
 
----
-
-## 四、常见问题
-
-| 现象 | 排查 |
-| --- | --- |
-| 上电黑屏 | 检查 LCD 排线、SPI 接线；查看串口日志是否 `NV3007 init failed` |
-| USB 不识别 | 确认数据线支持数据；Win7 安装 CP210x 驱动；确认 `ARDUINO_USB_CDC_ON_BOOT=1` |
-| 烧录超时 | 按住 `BOOT` 短按 `RESET` 进入下载模式；降低 `upload_speed` 至 115200 |
-| 按键全部无响应 | 检查矩阵二极管方向（列→行）；确认 `DEBOUNCE_TIME_MS=10` |
-| Wi-Fi 配网失败 | [`data/config.ini`](./data/config.ini) 中 `wifi_switch=1` 且填写正确 SSID / 密码 |
-| SPIFFS 相关错误 | 执行 `pio run -t uploadfs`；或在首次烧录后等待 SPIFFS 格式化完成 |
-
-更多历史问题已沉淀在 `.trae/rules/rules.md`。
+> 完整目录与文件用途见 [`docs/PROJECT_LAYOUT.md`](./docs/PROJECT_LAYOUT.md)。

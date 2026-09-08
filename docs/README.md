@@ -18,6 +18,9 @@
 
 | 文档 | 说明 |
 | ---- | ---- |
+| [COMPILING.md](./COMPILING.md) | 编译、烧录、SPIFFS 上传、串口监视、擦除 Flash |
+| [PROJECT_LAYOUT.md](./PROJECT_LAYOUT.md) | 仓库目录速览 / 关键文件 / 文档体系 |
+| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | 硬件 / 软件注意事项与常见问题速查 |
 | [desktop-app-protocol.md](./desktop-app-protocol.md) | 桌面 App 开发对接：通信协议、命令与字段约定 |
 
 ## 使用方式
