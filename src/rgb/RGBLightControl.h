@@ -95,8 +95,9 @@ namespace ekeys
         bool highlight_[11] = {false};
         uint32_t last_render_ms_ = 0;
         uint8_t fire_seed_[11] = {0};
-        /* NONE 模式下上帧渲染的高亮掩码（位 i = highlight_[i]），无变化帧跳过重发 */
-        uint8_t last_none_mask_ = 0xFF;
+        /* NONE 模式下上帧渲染的高亮掩码（位 i = highlight_[i]）。
+         * 11 颗 LED 需 11 位，必须 uint16_t（uint8_t 会截断 LED 8~10） */
+        uint16_t last_none_mask_ = 0xFFFF;
     };
 
 } // namespace ekeys

@@ -79,7 +79,7 @@ namespace ekeys
         if (mode_changed && mode_ == RGB_NONE_MODE)
         {
             /* 强制 NONE 分支首帧重绘，避免切回后高亮掩码恰好相同被跳过 */
-            last_none_mask_ = 0xFF;
+            last_none_mask_ = 0xFFFF;
             RGBDriver::instance().clearAll();
             RGBDriver::instance().show();
         }
@@ -114,12 +114,14 @@ namespace ekeys
          */
         if (mode_ == RGB_NONE_MODE)
         {
-            uint8_t mask = 0;
+            /* 11 颗 LED 需 11 位掩码，必须用 uint16_t（uint8_t 会把
+             * LED 8~10 的位截断为 0，导致键 9~11 高亮失效） */
+            uint16_t mask = 0;
             for (uint8_t i = 0; i < RGBDriver::kLedCount; ++i)
             {
                 if (highlight_[i])
                 {
-                    mask |= static_cast<uint8_t>(1u << i);
+                    mask |= static_cast<uint16_t>(1u << i);
                 }
             }
             if (mask == last_none_mask_)
