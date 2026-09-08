@@ -450,20 +450,70 @@ namespace ekeys
                 http.addHeader("X-TC-Region", voice::kTencentAsrRegion);
                 http.addHeader("Authorization", sig.authorization);
                 http.setTimeout(voice::kTencentAsrTimeoutMs);
-                LOG_INFO("ASR", "recognizing %ums pcm (%uKB payload)...",
+
+                /* 诊断 1/2：DNS 预解析，把 connect 失败拆分为 DNS / TCP+TLS 两段定位
+                 * （返回 1=成功 0=失败；结果由 LwIP 缓存，重复解析开销极小） */
+                IPAddress resolved;
+                const uint32_t dns_t0 = millis();
+                const int dns_rc =
+                    WiFi.hostByName(voice::kTencentAsrHost, resolved);
+                const uint32_t dns_ms = millis() - dns_t0;
+                if (dns_rc == 1)
+                {
+                    LOG_INFO("ASR", "dns %s -> %s (%ums)",
+                             voice::kTencentAsrHost,
+                             resolved.toString().c_str(),
+                             static_cast<unsigned>(dns_ms));
+                }
+                else
+                {
+                    LOG_ERROR("ASR", "dns %s failed rc=%d (%ums)",
+                              voice::kTencentAsrHost, dns_rc,
+                              static_cast<unsigned>(dns_ms));
+                }
+
+                /* 诊断 2/2：连接前资源快照（TLS 握手需 ~40KB 连续内部 RAM） */
+                LOG_INFO("ASR",
+                         "recognizing %ums pcm (%uKB payload) "
+                         "heap=%uKB blk=%uKB psram=%uKB rssi=%d",
                          static_cast<unsigned>(job.duration_ms),
-                         static_cast<unsigned>(payload_len / 1024));
+                         static_cast<unsigned>(payload_len / 1024),
+                         static_cast<unsigned>(ESP.getFreeHeap() / 1024),
+                         static_cast<unsigned>(ESP.getMaxAllocHeap() / 1024),
+                         static_cast<unsigned>(ESP.getFreePsram() / 1024),
+                         WiFi.RSSI());
+
+                const uint32_t post_t0 = millis();
                 const int code = http.POST(
                     reinterpret_cast<uint8_t *>(payload),
                     static_cast<size_t>(payload_len));
+                const uint32_t post_ms = millis() - post_t0;
                 free(payload);
                 if (code <= 0)
                 {
-                    LOG_ERROR("ASR", "http %d", code);
+                    /* errorToString 区分失败阶段（-1=connection refused，即
+                     * connect() 未建立），lastError 给出 mbedtls 底层错误；
+                     * stack_hwm 排查 12KB ASR 任务栈是否被 TLS 握手耗尽 */
+                    char tls_err[96] = {0};
+                    const int tls_ec =
+                        tlsClient.lastError(tls_err, sizeof(tls_err));
+                    String err_str = http.errorToString(code);
+                    LOG_ERROR("ASR",
+                              "http %d (%s) after %ums; mbedtls=%s(%d); "
+                              "heap=%uKB blk=%uKB stack_hwm=%u",
+                              code, err_str.c_str(),
+                              static_cast<unsigned>(post_ms),
+                              tls_err[0] != '\0' ? tls_err : "none", tls_ec,
+                              static_cast<unsigned>(ESP.getFreeHeap() / 1024),
+                              static_cast<unsigned>(ESP.getMaxAllocHeap() / 1024),
+                              static_cast<unsigned>(
+                                  uxTaskGetStackHighWaterMark(nullptr)));
                     http.end();
                     free(job.pcm);
                     continue;
                 }
+                LOG_INFO("ASR", "http %d in %ums", code,
+                         static_cast<unsigned>(post_ms));
 
                 /* 错误响应（4xx）也带 JSON body，一并读取解析 */
                 JsonDocument doc;

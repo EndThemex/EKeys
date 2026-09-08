@@ -2,7 +2,9 @@
  * TencentAsrSigner.cpp
  *
  * 见 TencentAsrSigner.h。三步实现（docs/08 §4.2）：
- *   Step1 CanonicalRequest = POST\n/\n<headers>\n\n<signed>\n<sha256(payload)>
+ *   Step1 CanonicalRequest = POST\n/\n\n<headers>\n\n<signed>\n<sha256(payload)>
+ *          （/\n 后的空行是 POST 固定为空的 CanonicalQueryString，缺失会被
+ *           服务端判 SignatureFailure）
  *   Step2 StringToSign     = TC3-HMAC-SHA256\n<ts>\n<date>/asr/tc3_request\n<sha256(canonical)>
  *   Step3 签名链           = HMAC("TC3"+SecretKey, date) → "asr" → "tc3_request" → StringToSign
  */
@@ -100,6 +102,7 @@ bool signRequest(const char *secret_id, const char *secret_key,
     const int canon_len = snprintf(
         canonical, sizeof(canonical),
         "POST\n/\n"
+        "\n" /* CanonicalQueryString：POST 固定空串，独占一行 */
         "content-type:%s\n"
         "host:%s\n"
         "\n"
