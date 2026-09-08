@@ -362,11 +362,8 @@ namespace ekeys
 
         /* 主屏文字 */
         ui_MainScreen_set_work_mode((char *)workModeText(s.work_mode));
-        char light[16] = {0};
-        snprintf(light, sizeof(light), "RGB_LIGHT:%d%%", s.rgb_brightness);
-        ui_MainScreen_set_rgb_light(light);
-        snprintf(light, sizeof(light), "TFT_LIGHT:%d%%", s.tft_brightness);
-        ui_MainScreen_set_tft_light(light);
+        ui_MainScreen_set_rgb_light(s.rgb_brightness);
+        ui_MainScreen_set_tft_light(s.tft_brightness);
 
         /* 设置屏反向显示当前快照 */
         ui_SettingScreenSecondary_set_snapshot(&s);

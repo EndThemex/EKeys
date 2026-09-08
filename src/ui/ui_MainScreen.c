@@ -6,32 +6,21 @@
 #include "ui.h"
 #include <stdint.h>
 
-// 声明字体
-LV_FONT_DECLARE(ui_font_FontAbrilFatface20);
-LV_FONT_DECLARE(ui_font_FontAbrilFatface24);
-LV_FONT_DECLARE(ui_font_FontAbrilFatface52);
-
 lv_obj_t *ui_MainScreen = NULL;
 lv_obj_t *ui_ButtonLeft1 = NULL;
 lv_obj_t *ui_ButtonRight1 = NULL;
 lv_obj_t *ui_ButtonEnter1 = NULL;
 lv_obj_t *ui_ButtonExit1 = NULL;
-lv_obj_t *ui_ImageHome = NULL;
 static lv_obj_t *s_ui_MainScreenProfileIconLabel = NULL;
 static lv_obj_t *s_ui_MainScreenProfileIconImage = NULL;
 static lv_obj_t *s_ui_MainScreenProfileName = NULL;
 static lv_obj_t *s_ui_MainScreenHostConnectionIcon = NULL;
 static lv_obj_t *s_ui_MainScreenHostConnectionLabel = NULL;
 static bool s_ui_MainScreenHostConnected = false;
-// lv_obj_t * ui_ImageVolume = NULL;
-// lv_obj_t * ui_ImageWifi = NULL;
-// lv_obj_t * ui_ImagePower = NULL;
-// lv_obj_t * ui_ImageWorkmode = NULL;
 lv_obj_t *ui_LabelTime = NULL;
 lv_obj_t *ui_LabelData = NULL;
 lv_obj_t *ui_LabelSecond = NULL;
 lv_obj_t *ui_LabelWeek = NULL;
-lv_obj_t *ui_LabelKeyboard = NULL;
 lv_obj_t *ui_LabelWorkmode = NULL;
 lv_obj_t *ui_LabelRGBLight = NULL;
 lv_obj_t *ui_LabelTFTLight = NULL;
@@ -75,6 +64,18 @@ void ui_event_MainScreen(lv_event_t *e)
         lv_refr_now(NULL);
     }
     if (event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_LEFT)
+    {
+        _ui_screen_change(&ui_SettingScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_SettingScreen_screen_init);
+        lv_refr_now(NULL);
+    }
+    // 主页 ENTER = 进入 KEYMAPPED（与旋钮单击对齐），ESC = 进入 SettingScreen（与双击对齐）
+    if (event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_ENTER)
+    {
+        ui_set_active_screen_tag(UI_SCREEN_KEYMAPPED);
+        _ui_screen_change(&ui_KeyMapped, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_KeyMapped_screen_init);
+        lv_refr_now(NULL);
+    }
+    if (event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_ESC)
     {
         _ui_screen_change(&ui_SettingScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_SettingScreen_screen_init);
         lv_refr_now(NULL);
@@ -213,17 +214,6 @@ void ui_MainScreen_screen_init(void)
     lv_obj_set_style_text_opa(ui_LabelWeek, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_LabelWeek, &ui_font_BebasNeueFont36, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    // ui_LabelKeyboard = lv_label_create(ui_MainScreen);
-    // lv_obj_set_width(ui_LabelKeyboard, LV_SIZE_CONTENT);   /// 1
-    // lv_obj_set_height(ui_LabelKeyboard, LV_SIZE_CONTENT);    /// 1
-    // lv_obj_set_x(ui_LabelKeyboard, -157);
-    // lv_obj_set_y(ui_LabelKeyboard, -40);
-    // lv_obj_set_align(ui_LabelKeyboard, LV_ALIGN_CENTER);
-    // lv_label_set_text(ui_LabelKeyboard, "Keyboard:");
-    // lv_obj_set_style_text_color(ui_LabelKeyboard, lv_color_hex(0x6ADAE1), LV_PART_MAIN | LV_STATE_DEFAULT);
-    // lv_obj_set_style_text_opa(ui_LabelKeyboard, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    // lv_obj_set_style_text_font(ui_LabelKeyboard, &ui_font_BebasNeueFont28, LV_PART_MAIN | LV_STATE_DEFAULT);
-
     ui_LabelWorkmode = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_LabelWorkmode, LV_SIZE_CONTENT);  /// 1
     lv_obj_set_height(ui_LabelWorkmode, LV_SIZE_CONTENT); /// 1
@@ -280,26 +270,6 @@ void ui_MainScreen_screen_init(void)
     lv_obj_add_flag(s_ui_MainScreenProfileIconImage, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(s_ui_MainScreenProfileIconImage, LV_OBJ_FLAG_SCROLLABLE);
 
-    // ui_ImageHome = lv_img_create(ui_MainScreen);
-    // lv_img_set_src(ui_ImageHome, LV_SYMBOL_KEYBOARD);
-    // static lv_style_t home_icon_style;
-    // static bool home_icon_style_ready = false;
-    // if (!home_icon_style_ready) {
-    //     lv_style_init(&home_icon_style);
-    //     lv_style_set_text_font(&home_icon_style, &lv_font_montserrat_32);
-    //     home_icon_style_ready = true;
-    // }
-    // lv_obj_add_style(ui_ImageHome, &home_icon_style, 0);
-    // lv_obj_set_width(ui_ImageHome, 48);
-    // lv_obj_set_height(ui_ImageHome, 48);
-    // lv_obj_set_x(ui_ImageHome, -176);
-    // lv_obj_set_y(ui_ImageHome, 0);
-    // lv_obj_set_align(ui_ImageHome, LV_ALIGN_CENTER);
-    // lv_obj_add_flag(ui_ImageHome, LV_OBJ_FLAG_ADV_HITTEST);
-    // lv_obj_clear_flag(ui_ImageHome, LV_OBJ_FLAG_SCROLLABLE);
-    // lv_obj_set_style_img_recolor(ui_ImageHome, lv_color_hex(0xECCC5A), 0);
-    // lv_obj_set_style_img_recolor_opa(ui_ImageHome, LV_OPA_COVER, 0);
-
     s_ui_MainScreenProfileName = lv_label_create(ui_MainScreen);
     lv_obj_set_width(s_ui_MainScreenProfileName, 108);
     lv_obj_set_height(s_ui_MainScreenProfileName, LV_SIZE_CONTENT); /// 1
@@ -313,23 +283,25 @@ void ui_MainScreen_screen_init(void)
     lv_obj_set_style_text_opa(s_ui_MainScreenProfileName, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(s_ui_MainScreenProfileName, &ui_font_BebasNeueFont24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    // ui_LabelRGBLight = lv_label_create(ui_MainScreen);
-    // lv_obj_set_width(ui_LabelRGBLight, LV_SIZE_CONTENT);   /// 1
-    // lv_obj_set_height(ui_LabelRGBLight, LV_SIZE_CONTENT);    /// 1
-    // lv_obj_set_x(ui_LabelRGBLight, -153);
-    // lv_obj_set_y(ui_LabelRGBLight, 43);
-    // lv_obj_set_align(ui_LabelRGBLight, LV_ALIGN_CENTER);
-    // lv_label_set_text(ui_LabelRGBLight, "RGB_Light:75%");
-    // lv_obj_set_style_text_font(ui_LabelRGBLight, &ui_font_BebasNeueFont16, LV_PART_MAIN | LV_STATE_DEFAULT);
+    ui_LabelRGBLight = lv_label_create(ui_MainScreen);
+    lv_obj_set_width(ui_LabelRGBLight, LV_SIZE_CONTENT);  /// 1
+    lv_obj_set_height(ui_LabelRGBLight, LV_SIZE_CONTENT); /// 1
+    lv_obj_set_x(ui_LabelRGBLight, 155);
+    lv_obj_set_y(ui_LabelRGBLight, -50);
+    lv_obj_set_align(ui_LabelRGBLight, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_LabelRGBLight, "RGB 75%");
+    lv_obj_set_style_text_color(ui_LabelRGBLight, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_LabelRGBLight, &ui_font_BebasNeueFont16, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    // ui_LabelTFTLight = lv_label_create(ui_MainScreen);
-    // lv_obj_set_width(ui_LabelTFTLight, LV_SIZE_CONTENT);   /// 1
-    // lv_obj_set_height(ui_LabelTFTLight, LV_SIZE_CONTENT);    /// 1
-    // lv_obj_set_x(ui_LabelTFTLight, -153);
-    // lv_obj_set_y(ui_LabelTFTLight, 55);
-    // lv_obj_set_align(ui_LabelTFTLight, LV_ALIGN_CENTER);
-    // lv_label_set_text(ui_LabelTFTLight, "TFT_Light:75%");
-    // lv_obj_set_style_text_font(ui_LabelTFTLight, &ui_font_BebasNeueFont16, LV_PART_MAIN | LV_STATE_DEFAULT);
+    ui_LabelTFTLight = lv_label_create(ui_MainScreen);
+    lv_obj_set_width(ui_LabelTFTLight, LV_SIZE_CONTENT);  /// 1
+    lv_obj_set_height(ui_LabelTFTLight, LV_SIZE_CONTENT); /// 1
+    lv_obj_set_x(ui_LabelTFTLight, 155);
+    lv_obj_set_y(ui_LabelTFTLight, -32);
+    lv_obj_set_align(ui_LabelTFTLight, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_LabelTFTLight, "TFT 75%");
+    lv_obj_set_style_text_color(ui_LabelTFTLight, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_LabelTFTLight, &ui_font_BebasNeueFont16, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_KeyMappedSecondary_bind_main_screen_summary(s_ui_MainScreenProfileIconLabel,
                                                    s_ui_MainScreenProfileIconImage,
@@ -342,14 +314,6 @@ void ui_MainScreen_screen_init(void)
     lv_obj_set_y(ui_line1, -26);
     lv_obj_set_align(ui_line1, LV_ALIGN_CENTER);
     lv_obj_clear_flag(ui_line1, LV_OBJ_FLAG_SCROLLABLE); /// Flags
-
-    // ui_line2 = lv_obj_create(ui_MainScreen);
-    // lv_obj_set_width(ui_line2, 108);
-    // lv_obj_set_height(ui_line2, 1);
-    // lv_obj_set_x(ui_line2, -152);
-    // lv_obj_set_y(ui_line2, 30);
-    // lv_obj_set_align(ui_line2, LV_ALIGN_CENTER);
-    // lv_obj_clear_flag(ui_line2, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
     ui_line2 = lv_obj_create(ui_MainScreen);
     lv_obj_set_width(ui_line2, 1);
@@ -375,14 +339,6 @@ void ui_MainScreen_screen_init(void)
     lv_obj_set_align(ui_line4, LV_ALIGN_CENTER);
     lv_obj_clear_flag(ui_line4, LV_OBJ_FLAG_SCROLLABLE); /// Flags
 
-    // ui_line5 = lv_obj_create(ui_MainScreen);
-    // lv_obj_set_width(ui_line5, 417);
-    // lv_obj_set_height(ui_line5, 1);
-    // lv_obj_set_x(ui_line5, 0);
-    // lv_obj_set_y(ui_line5, 66);
-    // lv_obj_set_align(ui_line5, LV_ALIGN_CENTER);
-    // lv_obj_clear_flag(ui_line5, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-
     ui_line6 = lv_obj_create(ui_MainScreen);
     lv_obj_set_width(ui_line6, 1);
     lv_obj_set_height(ui_line6, 60);
@@ -401,19 +357,19 @@ void ui_MainScreen_set_work_mode(char *mode)
     lv_label_set_text(ui_LabelWorkmode, mode);
 }
 
-void ui_MainScreen_set_rgb_light(char *value)
+void ui_MainScreen_set_rgb_light(uint8_t percent)
 {
     if (ui_LabelRGBLight != NULL)
     {
-        lv_label_set_text(ui_LabelRGBLight, value);
+        lv_label_set_text_fmt(ui_LabelRGBLight, "RGB %u%%", (unsigned)percent);
     }
 }
 
-void ui_MainScreen_set_tft_light(char *value)
+void ui_MainScreen_set_tft_light(uint8_t percent)
 {
     if (ui_LabelTFTLight != NULL)
     {
-        lv_label_set_text(ui_LabelTFTLight, value);
+        lv_label_set_text_fmt(ui_LabelTFTLight, "TFT %u%%", (unsigned)percent);
     }
 }
 
@@ -435,21 +391,15 @@ void ui_MainScreen_screen_destroy(void)
     ui_ButtonRight1 = NULL;
     ui_ButtonEnter1 = NULL;
     ui_ButtonExit1 = NULL;
-    ui_ImageHome = NULL;
     s_ui_MainScreenProfileIconLabel = NULL;
     s_ui_MainScreenProfileIconImage = NULL;
     s_ui_MainScreenProfileName = NULL;
     s_ui_MainScreenHostConnectionIcon = NULL;
     s_ui_MainScreenHostConnectionLabel = NULL;
-    // ui_ImageVolume = NULL;
-    // ui_ImageWifi = NULL;
-    // ui_ImagePower = NULL;
-    // ui_ImageWorkmode = NULL;
     ui_LabelTime = NULL;
     ui_LabelData = NULL;
     ui_LabelSecond = NULL;
     ui_LabelWeek = NULL;
-    ui_LabelKeyboard = NULL;
     ui_LabelWorkmode = NULL;
     ui_LabelRGBLight = NULL;
     ui_LabelTFTLight = NULL;
