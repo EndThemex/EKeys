@@ -133,7 +133,7 @@ namespace ekeys
 
     /*
      * DeviceSettings → ui_settings_snapshot_t（SettingUpdate 载荷填充）。
-     * rgb_single_colar 为调色板索引（0~255），转成字符串供设置屏比较。
+     * rgb_single_color 为调色板索引（0~255），转成字符串供设置屏比较。
      */
     inline void fillSettingPayload(const DeviceSettings &s,
                                    ui_settings_snapshot_t &out)
@@ -151,7 +151,7 @@ namespace ekeys
         out.voice_enable = s.voice_enable != 0;
         out.active_keymap_profile = s.active_keymap_profile;
         snprintf(out.rgb_single_color, sizeof(out.rgb_single_color),
-                 "%u", static_cast<unsigned>(s.rgb_single_colar));
+                 "%u", static_cast<unsigned>(s.rgb_single_color));
     }
 
 } // namespace ekeys

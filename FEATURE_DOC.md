@@ -215,7 +215,7 @@
 
 - **WiFi / 主机连接**：`wifi_switch`、`connect_host`、`wifi_ssid`、`wifi_password`（变化时立即调度连接 / 断开）
 - **工作模式**：`work_mode`（触发 `setWorkMode()` 重建键盘实例）
-- **RGB LED**：`rgb_mode`、`rgb_single_colar`、`rgb_click_mode`、`rgb_brightness`
+- **RGB LED**：`rgb_mode`、`rgb_single_color`、`rgb_click_mode`、`rgb_brightness`
 - **屏幕**：`tft_theme`、`tft_brightness`（下限 5，避免 OLED 烧屏）
 - **音频**：`device_volume`（联动 `speaker_.SetVolume(volume/5)`）、`audio_enable`、`power_mode`
 - **语音**：`voice_enable`、`voice_trigger_key`、`voice_max_record_ms`、`voice_auto_enter`、`voice_dev_pid`、`voice_cuid`、`voice_baidu_api_key`、`voice_baidu_secret_key`

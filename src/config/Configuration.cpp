@@ -166,8 +166,8 @@ namespace ekeys
 
         settings_.rgb_mode =
             static_cast<uint8_t>(ini.GetLongValue("rgb", "rgb_mode", 0));
-        settings_.rgb_single_colar =
-            static_cast<uint8_t>(ini.GetLongValue("rgb", "rgb_single_colar", 0));
+        settings_.rgb_single_color =
+            static_cast<uint8_t>(ini.GetLongValue("rgb", "rgb_single_color", 0));
         settings_.rgb_click_mode =
             static_cast<uint8_t>(ini.GetLongValue("rgb", "rgb_click_mode", 0));
         settings_.rgb_brightness =
@@ -282,14 +282,16 @@ namespace ekeys
         return repo_->loadProfile(getProfileConfigPath(activeProfile()), out);
     }
 
-    bool Configuration::saveKeyMapping(uint8_t keyId, const KeyMapping &mapping)
+    bool Configuration::saveKeyMappings(const KeymapArray &mappings,
+                                        uint16_t keyMask)
     {
         if (repo_ == nullptr)
         {
             LOG_ERROR("CONFIG", "KeymapRepository not injected");
             return false;
         }
-        return repo_->saveKey(getProfileConfigPath(activeProfile()), keyId, mapping);
+        return repo_->saveKeys(getProfileConfigPath(activeProfile()),
+                               mappings, keyMask);
     }
 
     bool Configuration::switchActiveProfile(uint8_t idx)

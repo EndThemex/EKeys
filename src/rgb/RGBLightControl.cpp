@@ -71,7 +71,7 @@ namespace ekeys
         const RGBMode new_mode = static_cast<RGBMode>(snap.rgb_mode);
         const bool mode_changed = (new_mode != mode_);
         mode_ = new_mode;
-        single_index_ = snap.rgb_single_colar % 24;
+        single_index_ = snap.rgb_single_color % 24;
         brightness_ = (snap.rgb_brightness > 100) ? 100 : snap.rgb_brightness;
 
         RGBDriver::instance().begin();

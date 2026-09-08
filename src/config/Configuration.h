@@ -62,9 +62,10 @@ namespace ekeys
         bool loadActiveProfileKeyMapping(KeymapArray &out);
 
         /*
-         * 保存当前 Profile 单键映射到 keymap{N}.ini。
+         * 批量保存当前 Profile 键映射到 keymap{N}.ini（单次文件读/写）。
+         * keyMask 为位掩码，bit i（1~kMatrixKeyCount）置位表示保存 mappings[i]。
          */
-        bool saveKeyMapping(uint8_t keyId, const KeyMapping &mapping);
+        bool saveKeyMappings(const KeymapArray &mappings, uint16_t keyMask);
 
         /*
          * 切换激活 Profile：更新内存 + 持久化 active_keymap_profile。

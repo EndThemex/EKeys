@@ -49,7 +49,7 @@
 - 2026-08-31：`KeyboardFactory::recreate()` 语义落地为 `AppContext::applyWorkMode(uint8_t)`（create + 释放旧实例 + setKeyboard）；BLE / 2.4G 后端仍回退 USB 并 WARN（阶段 06 接入）。
 - 2026-08-31：`wifi_switch` / `connect_host` / `wifi_ssid` / `wifi_password` 变更仅记录日志并持久化；`network::WiFiManager::schedule()` 于阶段 06 接入 WiFi 时实现。
 - 2026-08-31：`Transport.h`（ITransport）随 TCP 一起延后至阶段 06；本阶段 `SerialProtocol` 直接绑定 USB CDC，接口预留 `poll()` / `sendDocument()` 便于届时扩展双通道。
-- 2026-08-31：`rgb_single_colar` 在本项目 `DeviceSettings` 中为 `uint8_t`（参考工程为颜色字符串），协议仍按数值解析。
+- 2026-08-31：`rgb_single_color` 在本项目 `DeviceSettings` 中为 `uint8_t`（参考工程为颜色字符串），协议仍按数值解析。
 
 ## 备注
 

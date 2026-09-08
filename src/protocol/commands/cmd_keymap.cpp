@@ -120,8 +120,9 @@ namespace ekeys::protocol::commands
             return 0;
         }
 
-        /* 解析单键映射并写入激活 Profile；成功返回 0 */
-        int parseSingleKeyMapping(JsonObject key)
+        /* 解析单键映射写入 out[key_id] 并置位 mask；成功返回 0 */
+        int parseSingleKeyMapping(JsonObject key, Configuration::KeymapArray &out,
+                                  uint16_t &mask)
         {
             if (!key["physical"].is<int>())
             {
@@ -166,12 +167,8 @@ namespace ekeys::protocol::commands
                     key["macro"].as<const char *>(), m.macros_key);
             }
 
-            if (!Configuration::instance().saveKeyMapping(
-                    static_cast<uint8_t>(key_id), m))
-            {
-                LOG_ERROR("KEYMAP", "save key %d failed", key_id);
-                return -1;
-            }
+            out[static_cast<uint8_t>(key_id)] = m;
+            mask |= static_cast<uint16_t>(1u << key_id);
             return 0;
         }
 
@@ -185,10 +182,17 @@ namespace ekeys::protocol::commands
                 return -1;
             }
 
+            /*
+             * 先全部解析进内存，再一次批量落盘：
+             * 逐键 saveKey 会对 keymap{N}.ini 做 N 次完整读/写，
+             * SPIFFS 写入开销大，批量后仅一次。
+             */
+            Configuration::KeymapArray map{};
+            uint16_t mask = 0;
             int ok_count = 0;
             for (JsonObject key : arr)
             {
-                if (parseSingleKeyMapping(key) == 0)
+                if (parseSingleKeyMapping(key, map, mask) == 0)
                 {
                     ++ok_count;
                 }
@@ -197,6 +201,14 @@ namespace ekeys::protocol::commands
             {
                 SerialProtocol::instance().sendErrorResponse(
                     cmd, seq, "no valid key mapping");
+                return -1;
+            }
+
+            if (!Configuration::instance().saveKeyMappings(map, mask))
+            {
+                LOG_ERROR("KEYMAP", "save %d mappings failed", ok_count);
+                SerialProtocol::instance().sendErrorResponse(
+                    cmd, seq, "save keymap failed");
                 return -1;
             }
 

@@ -328,7 +328,7 @@ App 应始终按 `cmd`、`seq`、`status` 解析，不要依赖响应字段的�
     "wifi_password": "12345678",
     "work_mode": 0,
     "rgb_mode": 1,
-    "rgb_single_colar": 12,
+    "rgb_single_color": 12,
     "rgb_click_mode": 0,
     "rgb_brightness": 80,
     "tft_theme": 0,
@@ -362,7 +362,7 @@ App 应始终按 `cmd`、`seq`、`status` 解析，不要依赖响应字段的�
 | `wifi_password`                  | string | WiFi 密码，最大 64 字节                             |
 | `work_mode`                      | int    | `0` USB、`1` BLE、`2` 2.4G                          |
 | `rgb_mode`                       | int    | RGB 灯效模式                                        |
-| `rgb_single_colar`               | int    | 单色颜色索引；字段名中的 `colar` 是当前协议既有拼写 |
+| `rgb_single_color`               | int    | 单色颜色索引；字段名中的 `colar` 是当前协议既有拼写 |
 | `rgb_click_mode`                 | int    | 按键点击 RGB 模式                                   |
 | `rgb_brightness`                 | int    | RGB 亮度                                            |
 | `tft_theme`                      | int    | TFT 主题                                            |

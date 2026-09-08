@@ -429,9 +429,9 @@ namespace ekeys
                 d.rgb_mode = static_cast<uint8_t>(s.rgb_mode);
                 changed = true;
             }
-            if (d.rgb_single_colar != static_cast<uint8_t>(rgbSingleColor))
+            if (d.rgb_single_color != static_cast<uint8_t>(rgbSingleColor))
             {
-                d.rgb_single_colar = static_cast<uint8_t>(rgbSingleColor);
+                d.rgb_single_color = static_cast<uint8_t>(rgbSingleColor);
                 changed = true;
             }
             if (d.rgb_click_mode != static_cast<uint8_t>(s.rgb_click_mode))
@@ -506,7 +506,7 @@ namespace ekeys
         {
             config.saveSetting("work_mode", static_cast<int>(s.work_mode));
             config.saveSetting("rgb_mode", static_cast<int>(s.rgb_mode));
-            config.saveSetting("rgb_single_colar", rgbSingleColor);
+            config.saveSetting("rgb_single_color", rgbSingleColor);
             config.saveSetting("rgb_click_mode", static_cast<int>(s.rgb_click_mode));
             config.saveSetting("rgb_brightness", static_cast<int>(s.rgb_brightness));
             config.saveSetting("tft_theme", static_cast<int>(s.tft_theme));

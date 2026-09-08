@@ -14,49 +14,56 @@
 // 配置层接口与 DeviceSettings
 #include "config/Configuration.h"
 
-namespace ekeys {
-
-namespace {
-
-constexpr size_t kMaxIntChanges = 20;
-constexpr size_t kMaxStrChanges = 5;
-constexpr size_t kMaxMaskChanges = 2;
-
-struct IntChange {
-    const char *key;
-    int value;
-};
-struct StrChange {
-    const char *key;
-    const char *value;
-};
-struct MaskChange {
-    const char *key;
-    uint32_t value;
-};
-
-}  // namespace
-
-bool parseConfigSetCommand(JsonObject cfg, ConfigSetResult &result)
+namespace ekeys
 {
-    if (cfg.isNull()) {
-        LOG_ERROR("CFG_SET", "config object missing");
-        return false;
-    }
 
-    IntChange int_changes[kMaxIntChanges];
-    size_t n_int = 0;
-    StrChange str_changes[kMaxStrChanges];
-    size_t n_str = 0;
-    MaskChange mask_changes[kMaxMaskChanges];
-    size_t n_mask = 0;
-    char mask_bufs[kMaxMaskChanges][12];
-    bool want_profile = false;
-    uint8_t new_profile = 0;
+    namespace
+    {
 
-    Configuration &config = Configuration::instance();
+        constexpr size_t kMaxIntChanges = 20;
+        constexpr size_t kMaxStrChanges = 5;
+        constexpr size_t kMaxMaskChanges = 2;
 
-    config.mutateSettings([&](DeviceSettings &s) {
+        struct IntChange
+        {
+            const char *key;
+            int value;
+        };
+        struct StrChange
+        {
+            const char *key;
+            const char *value;
+        };
+        struct MaskChange
+        {
+            const char *key;
+            uint32_t value;
+        };
+
+    } // namespace
+
+    bool parseConfigSetCommand(JsonObject cfg, ConfigSetResult &result)
+    {
+        if (cfg.isNull())
+        {
+            LOG_ERROR("CFG_SET", "config object missing");
+            return false;
+        }
+
+        IntChange int_changes[kMaxIntChanges];
+        size_t n_int = 0;
+        StrChange str_changes[kMaxStrChanges];
+        size_t n_str = 0;
+        MaskChange mask_changes[kMaxMaskChanges];
+        size_t n_mask = 0;
+        char mask_bufs[kMaxMaskChanges][12];
+        bool want_profile = false;
+        uint8_t new_profile = 0;
+
+        Configuration &config = Configuration::instance();
+
+        config.mutateSettings([&](DeviceSettings &s)
+                              {
         /* ---- WiFi / 主机连接 ---- */
         if (!cfg["wifi_switch"].isNull()) {
             int v = cfg["wifi_switch"].as<int>();
@@ -145,15 +152,15 @@ bool parseConfigSetCommand(JsonObject cfg, ConfigSetResult &result)
                 }
             }
         }
-        if (!cfg["rgb_single_colar"].isNull()) {
-            int v = cfg["rgb_single_colar"].as<int>();
-            if (s.rgb_single_colar != v) {
-                LOG_INFO("CFG_SET", "rgb_single_colar: %u -> %d",
-                         s.rgb_single_colar, v);
-                s.rgb_single_colar = static_cast<uint8_t>(v);
+        if (!cfg["rgb_single_color"].isNull()) {
+            int v = cfg["rgb_single_color"].as<int>();
+            if (s.rgb_single_color != v) {
+                LOG_INFO("CFG_SET", "rgb_single_color: %u -> %d",
+                         s.rgb_single_color, v);
+                s.rgb_single_color = static_cast<uint8_t>(v);
                 result.any_changed = true;
                 if (n_int < kMaxIntChanges) {
-                    int_changes[n_int++] = {"rgb_single_colar", v};
+                    int_changes[n_int++] = {"rgb_single_color", v};
                 }
             }
         }
@@ -402,28 +409,31 @@ bool parseConfigSetCommand(JsonObject cfg, ConfigSetResult &result)
                             "active_keymap_profile %d out of range, ignored",
                             v);
             }
+        } });
+
+        /* ---- 逐键持久化（saveSetting 内部自行加锁） ---- */
+        for (size_t i = 0; i < n_int; ++i)
+        {
+            config.saveSetting(int_changes[i].key, int_changes[i].value);
         }
-    });
+        for (size_t i = 0; i < n_str; ++i)
+        {
+            config.saveSetting(str_changes[i].key, str_changes[i].value);
+        }
+        for (size_t i = 0; i < n_mask; ++i)
+        {
+            snprintf(mask_bufs[i], sizeof(mask_bufs[i]), "%lu",
+                     static_cast<unsigned long>(mask_changes[i].value));
+            config.saveSetting(mask_changes[i].key, mask_bufs[i]);
+        }
+        if (want_profile)
+        {
+            config.switchActiveProfile(new_profile);
+            result.profile_changed = true;
+            result.any_changed = true;
+        }
 
-    /* ---- 逐键持久化（saveSetting 内部自行加锁） ---- */
-    for (size_t i = 0; i < n_int; ++i) {
-        config.saveSetting(int_changes[i].key, int_changes[i].value);
-    }
-    for (size_t i = 0; i < n_str; ++i) {
-        config.saveSetting(str_changes[i].key, str_changes[i].value);
-    }
-    for (size_t i = 0; i < n_mask; ++i) {
-        snprintf(mask_bufs[i], sizeof(mask_bufs[i]), "%lu",
-                 static_cast<unsigned long>(mask_changes[i].value));
-        config.saveSetting(mask_changes[i].key, mask_bufs[i]);
-    }
-    if (want_profile) {
-        config.switchActiveProfile(new_profile);
-        result.profile_changed = true;
-        result.any_changed = true;
+        return true;
     }
 
-    return true;
-}
-
-}  // namespace ekeys
+} // namespace ekeys

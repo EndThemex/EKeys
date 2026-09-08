@@ -52,7 +52,7 @@ namespace ekeys::protocol::commands
             cfg["wifi_password"] = snap.wifi_password;
             cfg["work_mode"] = snap.work_mode;
             cfg["rgb_mode"] = snap.rgb_mode;
-            cfg["rgb_single_colar"] = snap.rgb_single_colar;
+            cfg["rgb_single_color"] = snap.rgb_single_color;
             cfg["rgb_click_mode"] = snap.rgb_click_mode;
             cfg["rgb_brightness"] = snap.rgb_brightness;
             cfg["tft_theme"] = snap.tft_theme;
@@ -100,6 +100,18 @@ namespace ekeys::protocol::commands
         int handleConfigSet(int cmd, int seq, JsonObject data)
         {
             JsonObject cfg = data["config"].as<JsonObject>();
+
+            /*
+             * C6 修复：副作用统一到 AppContext::applyUiSideEffects。
+             * prev 必须在 parseConfigSetCommand **之前** 抓取：
+             * parseConfigSetCommand 经 mutateSettings 原地改写 settings_
+             * （profile 变更还走 switchActiveProfile），之后抓到的 prev
+             * 与 curr 恒相等、diff 恒为空，导致 work_mode 重建键盘 /
+             * profile 重载键映射 / WiFi 重连永远不会触发。
+             */
+            DeviceSettings prev{};
+            Configuration::instance().snapshot(prev);
+
             ConfigSetResult result;
             if (!parseConfigSetCommand(cfg, result))
             {
@@ -117,23 +129,8 @@ namespace ekeys::protocol::commands
                 SerialProtocol::instance().sendDocument(resp);
             }
 
-            /*
-             * C6 修复：副作用统一到 AppContext::applyUiSideEffects，
-             * 与 MainTask::applyUiSettingsSnapshot 走同一路径，避免两份代码漂移。
-             * 关键修复：在 parseConfigSetCommand（已落定 settings_）**之前** 抓 prev，
-             * 之后用 prev 构造 curr 并叠加 result.*_changed 的新值，diff 才非空。
-             */
-            DeviceSettings prev{};
-            Configuration::instance().snapshot(prev);
-            DeviceSettings curr = prev;
-            Configuration &cfg_inst = Configuration::instance();
-            cfg_inst.snapshot(curr);
-            if (result.work_mode_changed)
-            {
-                curr.work_mode = result.work_mode;
-            }
-            /* profile_changed 由 parseConfigSetCommand 走 switchActiveProfile，
-             * 已在设置里写好；snapshot(curr) 已读到最新值。 */
+            DeviceSettings curr{};
+            Configuration::instance().snapshot(curr);
             AppContext::instance().applyUiSideEffects(prev, curr);
             if (result.wifi_changed)
             {

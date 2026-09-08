@@ -49,7 +49,7 @@
   - **5.4**：`MainTask::sendKeymapProfileUi()` 组装 11 键标签（`"K{i}:function"` 或 `"K{i}:a+s"`，空映射为 `--`）+ Profile 名 / 图标符号，经 `KEYMAP_PROFILE_UPDATE` 投递；图标走内置 `LV_SYMBOL_SETTINGS` 回退（PNG 上传阶段 06 后启用）。
   - **5.5~5.7**：`PcStatusInfo` / `HaStatusInfo` / `MusicPlayerInfo` 渲染路径就绪（消息类型与字段对齐参考工程），阶段 06 协议 / 网络模块接入后即可投递。
   - **5.8**：`ui_settings_request_apply()/save()`（C 链接，定义在 `MainTask.cpp`，`g_ui_settings_lock` spinlock 临界区）→ `MainTask::loop()` 消费 → `applyUiSettingsSnapshot()`：与 `parseConfigSetCommand` 相同的取值约束，经 `Configuration::mutateSettings()` 原子写入，`persist=true` 时逐键 `saveSetting()` 持久化；work_mode 变更走 `AppContext::applyWorkMode()`，Profile 变更走 `reloadKeymap()`，随后投递全量 `SETTING_UPDATE`（背光 / 状态条 / 设置屏快照立即刷新）。
-  - **5.9**：设置屏二级页随 SquareLine 文件导入，Profile / WiFi / RGB 调色板控件与 `ui_settings_snapshot_t` 双向绑定（RGB 调色板提交索引字符串，与 `DeviceSettings.rgb_single_colar`（uint8 索引）对齐）。
+  - **5.9**：设置屏二级页随 SquareLine 文件导入，Profile / WiFi / RGB 调色板控件与 `ui_settings_snapshot_t` 双向绑定（RGB 调色板提交索引字符串，与 `DeviceSettings.rgb_single_color`（uint8 索引）对齐）。
   - **旋钮**：新增 `src/input/RotaryEncoder.{h,cpp}`（ESP32Encoder PCNT 半四分 + OneButton；引脚 `kPinEc11*`：SW=5 / A=6 / B=7），单击→ENTER、双击→ESC、旋转→LEFT/RIGHT（≥2 步去抖）；`platformio.ini` 新增 `ESP32Encoder@^0.10.2`、`OneButton@^2.6.1`。
   - **消息层**：`message_types.h` 载荷由 union 改为平铺结构（各 Info 结构带 NSDMI，放入 union 在 C++ 中非法）；`fillSettingPayload()` 统一 DeviceSettings → `ui_settings_snapshot_t` 转换（cmd_config / DisplayTask / MainTask 共用）。`DisplayMessage` 约 1.2KB，队列长度 10。
   - **时间**：主屏时间仍为 MainTask 1s 投递的 millis() 推算值（"HH:MM:SS"），DisplayTask 拆分到 `ui_LabelTime`（HH:MM）+ `ui_LabelSecond`（SS）；日期 / 周待阶段 06 NTP。

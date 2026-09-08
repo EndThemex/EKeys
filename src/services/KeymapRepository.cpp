@@ -104,7 +104,7 @@ namespace ekeys
             {
                 /*
                  * [keyN] 段/键缺失 = 该键从未配置过（用户显式清空时
-                 * saveKey 仍会写入空串键），回落默认 a~k，避免
+                 * saveKeys 仍会写入空串键），回落默认 a~k，避免
                  * "只保存过部分键"的 ini 让其余键加载后静默失效。
                  */
                 m = KeyMapping{};
@@ -136,10 +136,12 @@ namespace ekeys
         return true;
     }
 
-    bool KeymapRepository::saveKey(const char *path, uint8_t keyId,
-                                   const KeyMapping &mapping)
+    bool KeymapRepository::saveKeys(const char *path, const KeymapArray &mappings,
+                                    uint16_t keyMask)
     {
-        if (keyId < 1 || keyId > kMatrixKeyCount)
+        constexpr uint16_t kValidMask =
+            static_cast<uint16_t>((1u << (kMatrixKeyCount + 1)) - 1) & ~1u;
+        if (keyMask == 0 || (keyMask & ~kValidMask) != 0)
         {
             return false;
         }
@@ -150,42 +152,52 @@ namespace ekeys
             ConfigStore::loadGlobal(path, ini);
         }
 
-        char section[12];
-        snprintf(section, sizeof(section), "%s%u", kKeySectionPrefix,
-                 static_cast<unsigned>(keyId));
-
-        ini.SetValue(section, "function_key", mapping.function_key.c_str());
-        ini.SetValue(section, "text", mapping.text_key.c_str());
-
-        String nk;
-        for (uint8_t n = 0; n < kKeyMappingNormalCount; ++n)
+        for (uint8_t i = 1; i <= kMatrixKeyCount; ++i)
         {
-            if (mapping.normal_key[n].length() == 0)
+            if ((keyMask & (1u << i)) == 0)
             {
-                break;
+                continue;
             }
-            if (n > 0)
-            {
-                nk += '+';
-            }
-            nk += mapping.normal_key[n];
-        }
-        ini.SetValue(section, "normal_key", nk.c_str());
+            const KeyMapping &mapping = mappings[i];
 
-        String mk;
-        for (uint8_t n = 0; n < kKeyMappingMacrosCount; ++n)
-        {
-            if (mapping.macros_key[n].length() == 0)
+            char section[12];
+            snprintf(section, sizeof(section), "%s%u", kKeySectionPrefix,
+                     static_cast<unsigned>(i));
+
+            /* 空串键也写入：loadProfile 依赖"键存在但为空"区分显式清空 */
+            ini.SetValue(section, "function_key", mapping.function_key.c_str());
+            ini.SetValue(section, "text", mapping.text_key.c_str());
+
+            String nk;
+            for (uint8_t n = 0; n < kKeyMappingNormalCount; ++n)
             {
-                break;
+                if (mapping.normal_key[n].length() == 0)
+                {
+                    break;
+                }
+                if (n > 0)
+                {
+                    nk += '+';
+                }
+                nk += mapping.normal_key[n];
             }
-            if (n > 0)
+            ini.SetValue(section, "normal_key", nk.c_str());
+
+            String mk;
+            for (uint8_t n = 0; n < kKeyMappingMacrosCount; ++n)
             {
-                mk += '+';
+                if (mapping.macros_key[n].length() == 0)
+                {
+                    break;
+                }
+                if (n > 0)
+                {
+                    mk += '+';
+                }
+                mk += mapping.macros_key[n];
             }
-            mk += mapping.macros_key[n];
+            ini.SetValue(section, "macros_key", mk.c_str());
         }
-        ini.SetValue(section, "macros_key", mk.c_str());
 
         return ConfigStore::saveGlobal(path, ini);
     }
