@@ -232,11 +232,56 @@ namespace ekeys
         /* 阶段 06 服务调度（网络 / 扬声器 / ASR，不依赖 keyboard_ 注入） */
         tick();
 
+        uint32_t now = millis();
+
+        /*
+         * 1s tick：投递 TIME_UPDATE（NTP 已同步用真实时间，否则开机时长）。
+         *
+         * F10 修复：必须放在 `if (keyboard_ == nullptr) return;` 之前。
+         * applyWorkMode() 在 USBKeyboardImpl::begin() 失败时会把 keyboard_ 设成 nullptr
+         * （BLE/2.4G 模式下切换回 USB，USB host 未就绪），后续循环在早期 return 处
+         * 一直跳出，导致 1s tick 永不再触发，主屏时间永远停留在最后一次 TIME_UPDATE
+         * 的值——典型表现是"App 连接后再切回 work_mode=USB，主屏时间不再变化"。
+         * HA 状态 / 电池 / 频谱也类似，但用户体验上时间最显眼。
+         */
+        if ((now - last_time_post_ms_) >= kMainTaskTimePostPeriodMs)
+        {
+            last_time_post_ms_ = now;
+            DisplayMessage msg;
+            msg.type = DisplayMessageType::TimeUpdate;
+            if (!NtpSync::instance().getLocalTimeStr(
+                    msg.time_text, sizeof(msg.time_text)))
+            {
+                formatUptimeString(msg.time_text,
+                                   sizeof(msg.time_text), now);
+            }
+            else
+            {
+                /* 已同步：补齐日期 "YYYY-MM-DD" + 星期缩写 "MON"…"SUN" */
+                struct tm tm_now;
+                if (getLocalTime(&tm_now, 20))
+                {
+                    snprintf(msg.date_text, sizeof(msg.date_text),
+                             "%04d-%02d-%02d",
+                             tm_now.tm_year + 1900,
+                             tm_now.tm_mon + 1,
+                             tm_now.tm_mday);
+                    static const char *const kWeek[7] = {
+                        "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+                    if (tm_now.tm_wday >= 0 && tm_now.tm_wday < 7)
+                    {
+                        snprintf(msg.week_text, sizeof(msg.week_text),
+                                 "%s", kWeek[tm_now.tm_wday]);
+                    }
+                }
+            }
+            postMessage(msg);
+        }
+
         if (keyboard_ == nullptr)
         {
             return;
         }
-        uint32_t now = millis();
 
         /* 5ms tick */
         if ((now - last_tick_ms_) >= kMainTaskTickPeriodMs)
@@ -284,41 +329,6 @@ namespace ekeys
                 KeyEventDispatcher::onKeyEdge(released[i], false);
                 resolver_.release(released[i], *keyboard_);
             }
-        }
-
-        /* 1s tick：投递 TIME_UPDATE（NTP 已同步用真实时间，否则开机时长） */
-        if ((now - last_time_post_ms_) >= kMainTaskTimePostPeriodMs)
-        {
-            last_time_post_ms_ = now;
-            DisplayMessage msg;
-            msg.type = DisplayMessageType::TimeUpdate;
-            if (!NtpSync::instance().getLocalTimeStr(
-                    msg.time_text, sizeof(msg.time_text)))
-            {
-                formatUptimeString(msg.time_text,
-                                   sizeof(msg.time_text), now);
-            }
-            else
-            {
-                /* 已同步：补齐日期 "YYYY-MM-DD" + 星期缩写 "MON"…"SUN" */
-                struct tm tm_now;
-                if (getLocalTime(&tm_now, 20))
-                {
-                    snprintf(msg.date_text, sizeof(msg.date_text),
-                             "%04d-%02d-%02d",
-                             tm_now.tm_year + 1900,
-                             tm_now.tm_mon + 1,
-                             tm_now.tm_mday);
-                    static const char *const kWeek[7] = {
-                        "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
-                    if (tm_now.tm_wday >= 0 && tm_now.tm_wday < 7)
-                    {
-                        snprintf(msg.week_text, sizeof(msg.week_text),
-                                 "%s", kWeek[tm_now.tm_wday]);
-                    }
-                }
-            }
-            postMessage(msg);
         }
     }
 

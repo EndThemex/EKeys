@@ -16,12 +16,17 @@ namespace ekeys
 {
 
     namespace
-    {
+        {
 
         constexpr uint32_t kWifiRetryIntervalMs = 5000; // FEATURE_DOC §7.1
         constexpr uint32_t kWifiConnectTimeoutMs = 10000;
         constexpr uint32_t kWifiLinkGraceMs = 15000; // 断链自恢复宽限（docs/07 7.6）
+        constexpr uint32_t kWifiHeartbeatMs = 30000; // 等待/连接中的节流心跳，避免反复重试时刷屏
         constexpr uint8_t kWorkModeBluetooth = 1;
+
+        uint32_t s_last_wifi_log_ms = 0;  // process() 心跳节流
+        bool s_logged_disabled = false;   // wifi_switch=0 已经打过日志，避免每次 loop 输出
+        bool s_logged_ble = false;        // BLE 模式已经打过日志
 
     } // namespace
 
@@ -36,7 +41,14 @@ namespace ekeys
         /* 不在 begin 时自动连接；由 MainTask 根据配置调度 */
         WiFi.mode(WIFI_OFF);
         state_ = State::Idle;
-        LOG_INFO("WIFI", "manager ready (default off)");
+        s_last_wifi_log_ms = 0;
+        s_logged_disabled = false;
+        s_logged_ble = false;
+        DeviceSettings snap;
+        Configuration::instance().snapshot(snap);
+        LOG_INFO("WIFI", "manager ready (mode_off, wifi_switch=%u work_mode=%u ssid=%s)",
+                 snap.wifi_switch, snap.work_mode,
+                 snap.wifi_ssid[0] ? snap.wifi_ssid : "(empty)");
     }
 
     bool WiFiManager::isEnabled() const
@@ -88,6 +100,7 @@ namespace ekeys
             return; // 正在连接同一目标
         }
         last_request_serial_ = serial;
+        s_last_wifi_log_ms = 0; // 重新调度后立即允许下一次心跳输出
         state_ = State::WaitingRetry;
         state_entered_ms_ = 0; // 下一拍 process() 立即尝试
         LOG_INFO("WIFI", "connect scheduled (ssid=%s)", snap.wifi_ssid);
@@ -126,6 +139,7 @@ namespace ekeys
         state_entered_ms_ = now;
         last_connect_attempt_ms_ = now;
         logged_fail_ = false;
+        s_last_wifi_log_ms = 0;
         LOG_INFO("WIFI", "connecting to %s ...", snap.wifi_ssid);
     }
 
@@ -183,7 +197,28 @@ namespace ekeys
                 {
                     stopReconnect();
                 }
+                if (!s_logged_ble)
+                {
+                    LOG_INFO("WIFI", "BLE mode, wifi permanently off");
+                    s_logged_ble = true;
+                }
+                s_logged_disabled = false;
                 return;
+            }
+            /* 非 BLE：wifi_switch=0 → 用户主动关闭，打一次日志便于诊断 WiFi 不工作 */
+            s_logged_ble = false;
+            if (snap.wifi_switch == 0)
+            {
+                if (!s_logged_disabled)
+                {
+                    LOG_INFO("WIFI", "wifi_switch=0, wifi disabled by config");
+                    s_logged_disabled = true;
+                }
+            }
+            else
+            {
+                /* 开关重新打开后允许再次输出禁用日志 */
+                s_logged_disabled = false;
             }
         }
 
@@ -201,6 +236,17 @@ namespace ekeys
             {
                 startConnect(now);
             }
+            else if ((now - s_last_wifi_log_ms) >= kWifiHeartbeatMs)
+            {
+                s_last_wifi_log_ms = now;
+                DeviceSettings snap;
+                Configuration::instance().snapshot(snap);
+                LOG_INFO("WIFI", "waiting retry (%lus, next in %lus, ssid=%s)",
+                         static_cast<unsigned long>((now - state_entered_ms_) / 1000U),
+                         static_cast<unsigned long>(
+                             (kWifiRetryIntervalMs - (now - last_connect_attempt_ms_)) / 1000U),
+                         snap.wifi_ssid);
+            }
             break;
 
         case State::Connecting:
@@ -208,6 +254,7 @@ namespace ekeys
             {
                 state_ = State::Connected;
                 link_lost_ms_ = 0;
+                s_last_wifi_log_ms = 0;
                 LOG_INFO("WIFI", "connected, ip=%s rssi=%d",
                          WiFi.localIP().toString().c_str(), WiFi.RSSI());
                 if (on_connected_ != nullptr)
@@ -223,6 +270,13 @@ namespace ekeys
                 state_ = State::WaitingRetry;
                 state_entered_ms_ = now;
                 last_connect_attempt_ms_ = now;
+                s_last_wifi_log_ms = 0;
+            }
+            else if ((now - s_last_wifi_log_ms) >= kWifiHeartbeatMs)
+            {
+                s_last_wifi_log_ms = now;
+                LOG_INFO("WIFI", "connecting... %lus elapsed",
+                         static_cast<unsigned long>((now - state_entered_ms_) / 1000U));
             }
             break;
 

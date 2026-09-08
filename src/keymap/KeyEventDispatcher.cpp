@@ -62,10 +62,12 @@ namespace ekeys
         {
             if (pressed)
             {
+                LOG_INFO("ASR", "trigger key %u pressed", static_cast<unsigned>(key_id));
                 VoiceRecognizer::instance().startCapture();
             }
             else
             {
+                LOG_INFO("ASR", "trigger key %u released", static_cast<unsigned>(key_id));
                 VoiceRecognizer::instance().finishCapture();
             }
             return;

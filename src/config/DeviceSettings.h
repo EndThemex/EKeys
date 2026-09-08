@@ -16,7 +16,7 @@ namespace ekeys
     /*
      * 字符串字段容量：
      *   SSID ≤ 32 字节（IEEE 802.11），密码 ≤ 64 字节（PSK），
-     *   百度 ASR 凭证各预留 64 字节。
+     *   腾讯云 ASR 凭证（SecretId/SecretKey）各预留 64 字节。
      */
     struct DeviceSettings
     {
@@ -44,15 +44,14 @@ namespace ekeys
         uint8_t audio_enable;
         uint8_t power_mode;
 
-        /* 语音 */
+        /* 语音（阶段 08：腾讯云一句话识别） */
         uint8_t voice_enable;
         uint8_t voice_trigger_key;
         uint16_t voice_max_record_ms;
         uint8_t voice_auto_enter;
-        uint16_t voice_dev_pid;
-        char voice_cuid[33];
-        char voice_baidu_api_key[65];
-        char voice_baidu_secret_key[65];
+        char voice_cuid[33]; /* 腾讯云 TC3 协议不使用，保留占位 */
+        char voice_tencent_secret_id[65];
+        char voice_tencent_secret_key[65];
 
         /* PC 状态位掩码 */
         uint32_t pc_status_mask;

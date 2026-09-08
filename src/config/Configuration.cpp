@@ -194,19 +194,19 @@ namespace ekeys
             static_cast<uint16_t>(ini.GetLongValue("voice", "voice_max_record_ms", 0));
         settings_.voice_auto_enter =
             static_cast<uint8_t>(ini.GetLongValue("voice", "voice_auto_enter", 0));
-        settings_.voice_dev_pid =
-            static_cast<uint16_t>(ini.GetLongValue("voice", "voice_dev_pid", 0));
         strncpy(settings_.voice_cuid, ini.GetValue("voice", "voice_cuid", ""),
                 sizeof(settings_.voice_cuid) - 1);
         settings_.voice_cuid[sizeof(settings_.voice_cuid) - 1] = '\0';
-        strncpy(settings_.voice_baidu_api_key,
-                ini.GetValue("voice", "voice_baidu_api_key", ""),
-                sizeof(settings_.voice_baidu_api_key) - 1);
-        settings_.voice_baidu_api_key[sizeof(settings_.voice_baidu_api_key) - 1] = '\0';
-        strncpy(settings_.voice_baidu_secret_key,
-                ini.GetValue("voice", "voice_baidu_secret_key", ""),
-                sizeof(settings_.voice_baidu_secret_key) - 1);
-        settings_.voice_baidu_secret_key[sizeof(settings_.voice_baidu_secret_key) - 1] = '\0';
+        strncpy(settings_.voice_tencent_secret_id,
+                ini.GetValue("voice", "voice_tencent_secret_id", ""),
+                sizeof(settings_.voice_tencent_secret_id) - 1);
+        settings_.voice_tencent_secret_id[
+            sizeof(settings_.voice_tencent_secret_id) - 1] = '\0';
+        strncpy(settings_.voice_tencent_secret_key,
+                ini.GetValue("voice", "voice_tencent_secret_key", ""),
+                sizeof(settings_.voice_tencent_secret_key) - 1);
+        settings_.voice_tencent_secret_key[
+            sizeof(settings_.voice_tencent_secret_key) - 1] = '\0';
 
         strncpy(settings_.device_name, ini.GetValue("system", "device_name", ""),
                 sizeof(settings_.device_name) - 1);

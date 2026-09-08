@@ -64,10 +64,9 @@ namespace ekeys::protocol::commands
             cfg["voice_trigger_key"] = snap.voice_trigger_key;
             cfg["voice_max_record_ms"] = snap.voice_max_record_ms;
             cfg["voice_auto_enter"] = snap.voice_auto_enter;
-            cfg["voice_dev_pid"] = snap.voice_dev_pid;
             cfg["voice_cuid"] = snap.voice_cuid;
-            cfg["voice_baidu_api_key"] = snap.voice_baidu_api_key;
-            cfg["voice_baidu_secret_key"] = snap.voice_baidu_secret_key;
+            cfg["voice_tencent_secret_id"] = snap.voice_tencent_secret_id;
+            cfg["voice_tencent_secret_key"] = snap.voice_tencent_secret_key;
             cfg["pc_status_mask"] = snap.pc_status_mask;
             cfg["active_keymap_profile"] = profile;
             cfg["active_profile_name"] =

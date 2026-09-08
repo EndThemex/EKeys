@@ -11,6 +11,7 @@
 #include <HTTPClient.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <mbedtls/base64.h>
 
 #include "app/AppContext.h"
 #include "audio/Mic.h"
@@ -23,7 +24,7 @@
 #include "network/WiFiManager.h"
 #include "protocol/SerialProtocol.h"
 #include "tasks/DisplayTask.h"
-#include "voice/AsrTokenCache.h"
+#include "voice/TencentAsrSigner.h"
 #include "voice/VoiceConfig.h"
 
 namespace ekeys
@@ -99,9 +100,22 @@ namespace ekeys
         Configuration::instance().snapshot(snap);
         if (!canWork())
         {
+            /* 输出每条具体失败原因，便于诊断语音未触发问题 */
             if (snap.work_mode != 0)
             {
-                LOG_INFO("ASR", "voice only available in USB mode");
+                LOG_WARNING("ASR", "rejected: work_mode=%u (need USB=0)", snap.work_mode);
+            }
+            if (snap.voice_enable == 0)
+            {
+                LOG_WARNING("ASR", "rejected: voice_enable=0");
+            }
+            if (!WiFiManager::instance().isConnected())
+            {
+                LOG_WARNING("ASR", "rejected: wifi not connected");
+            }
+            if (suspended_)
+            {
+                LOG_WARNING("ASR", "rejected: suspended (music screen)");
             }
             /* F3 修复：失败回滚 capturing_ */
             taskENTER_CRITICAL(&asr_lock_);
@@ -150,6 +164,7 @@ namespace ekeys
 
         pcm_len_samples_ = 0;
         capture_start_ms_ = millis();
+        last_heartbeat_ms_ = 0;
         captured_work_mode_ = snap.work_mode;
         /* capturing_ 已在入口置位 */
         postRecordingState(true);
@@ -186,6 +201,17 @@ namespace ekeys
         {
             memcpy(pcm_buf_ + pcm_len_samples_, chunk, copy * sizeof(int16_t));
             pcm_len_samples_ += copy;
+        }
+        /* 每 2s 打一次心跳，确认录音仍在进行（避免只看到末尾"capture finished"难以判断时长） */
+        const uint32_t now = millis();
+        if ((now - capture_start_ms_) - last_heartbeat_ms_ >= 2000U)
+        {
+            last_heartbeat_ms_ = (now - capture_start_ms_);
+            LOG_DEBUG("ASR", "recording... %ums / %ums (%u/%u samples)",
+                      static_cast<unsigned>((now - capture_start_ms_)),
+                      static_cast<unsigned>(pcm_cap_samples_ / voice::kPcmSampleRate * 1000U),
+                      static_cast<unsigned>(pcm_len_samples_),
+                      static_cast<unsigned>(pcm_cap_samples_));
         }
     }
 
@@ -224,7 +250,7 @@ namespace ekeys
             return;
         }
 
-        /* 抓取设备快照（cuid / dev_pid / auto_enter），后台识别时 Configuration 可能变更 */
+        /* 抓取设备快照（凭证 / cuid / auto_enter），后台识别时 Configuration 可能变更 */
         DeviceSettings snap;
         Configuration::instance().snapshot(snap);
 
@@ -235,8 +261,12 @@ namespace ekeys
         job.samples = pcm_len_samples_;
         job.duration_ms = duration_ms;
         job.auto_enter = (snap.voice_auto_enter != 0);
-        job.dev_pid = (snap.voice_dev_pid != 0) ? snap.voice_dev_pid
-                                                : voice::kDefaultDevPid;
+        strncpy(job.secret_id, snap.voice_tencent_secret_id,
+                sizeof(job.secret_id) - 1);
+        job.secret_id[sizeof(job.secret_id) - 1] = '\0';
+        strncpy(job.secret_key, snap.voice_tencent_secret_key,
+                sizeof(job.secret_key) - 1);
+        job.secret_key[sizeof(job.secret_key) - 1] = '\0';
         if (snap.voice_cuid[0] != '\0')
         {
             strncpy(job.cuid, snap.voice_cuid, sizeof(job.cuid) - 1);
@@ -297,9 +327,10 @@ namespace ekeys
         BaseType_t ok = xTaskCreate(
             &VoiceRecognizer::asrTaskEntry,
             "EKeysAsr",
-            /* 8KB 栈：HTTPClient + ArduinoJson + snprintf 足够；
-             * 北京 ASR 域名 TLS 由 ESP-IDF mbedtls 处理，需要略大栈。 */
-            8192,
+            /* 12KB 栈（阶段 08）：base64 编码临时区 + HTTPClient TLS +
+             * TencentAsrSigner（canonical / stringToSign 缓冲）。
+             * 腾讯云域名 TLS 由 ESP-IDF mbedtls 处理，需要略大栈。 */
+            12288,
             this,
             /* 优先级低于 MainTask（1）但不阻塞 UI 主循环 */
             1,
@@ -342,33 +373,86 @@ namespace ekeys
                 asr_job_pending_ = false;
                 taskEXIT_CRITICAL(&asr_lock_);
 
-                /* token */
-                const char *token = AsrTokenCache::instance().getToken();
-                if (token == nullptr)
+                /* 空凭证短路（App 未配置腾讯云 SecretId/Key） */
+                if (job.secret_id[0] == '\0' || job.secret_key[0] == '\0')
                 {
-                    LOG_ERROR("ASR", "no valid token, check baidu keys");
+                    LOG_ERROR("ASR", "no secret, skip (set voice_tencent_secret_id/key)");
                     free(job.pcm);
                     continue;
                 }
 
-                /* URL：dev_pid / cuid 来自抓取时的快照 */
-                char url[256];
-                snprintf(url, sizeof(url), "%s?dev_pid=%u&cuid=%s&token=%s",
-                         voice::kAsrUrlBase,
-                         static_cast<unsigned>(job.dev_pid),
-                         job.cuid, token);
+                /* 构造请求 JSON：prefix + base64(PCM) + suffix，PSRAM 单缓冲
+                 * 直写，避免中间 base64 副本（30s → base64 ≈ 1.28MB） */
+                const size_t pcm_bytes = job.samples * sizeof(int16_t);
+                const size_t b64_len = ((pcm_bytes + 2) / 3) * 4;
+                /* prefix ≈ 90B（引擎/格式字段） + suffix ≈ 24B（DataLen 收尾） */
+                const size_t json_overhead = 160;
+                char *payload = static_cast<char *>(
+                    ps_malloc(json_overhead + b64_len + 1));
+                if (payload == nullptr)
+                {
+                    LOG_ERROR("ASR", "payload alloc failed (%uKB)",
+                              static_cast<unsigned>((b64_len + json_overhead) / 1024));
+                    free(job.pcm);
+                    continue;
+                }
+                const int prefix_len = snprintf(
+                    payload, json_overhead,
+                    "{\"EngSerViceType\":\"%s\",\"SourceType\":1,"
+                    "\"VoiceFormat\":\"%s\",\"Data\":\"",
+                    voice::kTencentAsrEngine, voice::kTencentAsrVoiceFormat);
+                size_t b64_written = 0;
+                const int b64_rc = mbedtls_base64_encode(
+                    reinterpret_cast<unsigned char *>(payload + prefix_len),
+                    b64_len + 1, &b64_written,
+                    reinterpret_cast<const unsigned char *>(job.pcm), pcm_bytes);
+                const int suffix_len =
+                    snprintf(payload + prefix_len + b64_written,
+                             json_overhead - prefix_len,
+                             "\",\"DataLen\":%u}",
+                             static_cast<unsigned>(pcm_bytes));
+                if (prefix_len <= 0 || b64_rc != 0 || suffix_len <= 0)
+                {
+                    LOG_ERROR("ASR", "payload build failed (b64=%d)", b64_rc);
+                    free(payload);
+                    free(job.pcm);
+                    continue;
+                }
+                const size_t payload_len =
+                    static_cast<size_t>(prefix_len) + b64_written +
+                    static_cast<size_t>(suffix_len);
 
-                /* POST raw PCM */
-                const size_t byte_len = job.samples * sizeof(int16_t);
+                /* TC3 签名（失败：凭证空 / NTP 未同步） */
+                voice::SignedRequest sig;
+                if (!voice::signRequest(job.secret_id, job.secret_key,
+                                        payload, payload_len, sig))
+                {
+                    LOG_ERROR("ASR", "sign failed (no secret / ntp not synced)");
+                    free(payload);
+                    free(job.pcm);
+                    continue;
+                }
+
+                /* POST JSON（Host 头由 HTTPClient 按 URL 自动携带，勿重复添加） */
+                char url[64];
+                snprintf(url, sizeof(url), "https://%s", voice::kTencentAsrHost);
                 HTTPClient http;
                 http.begin(url);
-                http.addHeader("Content-Type", voice::kAsrContentType);
-                http.setTimeout(10000);
-                LOG_INFO("ASR", "recognizing %ums pcm...",
-                         static_cast<unsigned>(job.duration_ms));
-                const int code = http.POST(reinterpret_cast<uint8_t *>(job.pcm),
-                                           byte_len);
-                if (code != 200)
+                http.addHeader("Content-Type", voice::kTencentAsrContentType);
+                http.addHeader("X-TC-Action", voice::kTencentAsrAction);
+                http.addHeader("X-TC-Timestamp", sig.timestamp);
+                http.addHeader("X-TC-Version", voice::kTencentAsrVersion);
+                http.addHeader("X-TC-Region", voice::kTencentAsrRegion);
+                http.addHeader("Authorization", sig.authorization);
+                http.setTimeout(voice::kTencentAsrTimeoutMs);
+                LOG_INFO("ASR", "recognizing %ums pcm (%uKB payload)...",
+                         static_cast<unsigned>(job.duration_ms),
+                         static_cast<unsigned>(payload_len / 1024));
+                const int code = http.POST(
+                    reinterpret_cast<uint8_t *>(payload),
+                    static_cast<size_t>(payload_len));
+                free(payload);
+                if (code <= 0)
                 {
                     LOG_ERROR("ASR", "http %d", code);
                     http.end();
@@ -376,8 +460,10 @@ namespace ekeys
                     continue;
                 }
 
+                /* 错误响应（4xx）也带 JSON body，一并读取解析 */
                 JsonDocument doc;
-                const DeserializationError err = deserializeJson(doc, http.getString());
+                const DeserializationError err =
+                    deserializeJson(doc, http.getString());
                 http.end();
                 if (err)
                 {
@@ -385,15 +471,23 @@ namespace ekeys
                     free(job.pcm);
                     continue;
                 }
-                if ((doc["err_no"] | -1) != 0)
+                const char *err_code =
+                    doc["Response"]["Error"]["Code"] | "";
+                if (err_code[0] != '\0')
                 {
-                    LOG_ERROR("ASR", "baidu err %d: %s",
-                              doc["err_no"] | -1, doc["err_msg"] | "unknown");
+                    LOG_ERROR("ASR", "tencent err %s: %s", err_code,
+                              doc["Response"]["Error"]["Message"] | "unknown");
+                    free(job.pcm);
+                    continue;
+                }
+                if (code != 200)
+                {
+                    LOG_ERROR("ASR", "http %d", code);
                     free(job.pcm);
                     continue;
                 }
 
-                const char *text = doc["result"][0] | "";
+                const char *text = doc["Response"]["Result"] | "";
                 if (text[0] == '\0')
                 {
                     LOG_INFO("ASR", "empty result");

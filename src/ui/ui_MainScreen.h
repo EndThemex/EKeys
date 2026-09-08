@@ -18,6 +18,7 @@ extern "C"
   extern void ui_MainScreen_set_rgb_light(uint8_t percent);
   extern void ui_MainScreen_set_tft_light(uint8_t percent);
   extern void ui_MainScreen_set_host_connection(bool connected);
+  extern void ui_MainScreen_set_wifi_status(bool enabled, bool connected, int rssi);
   extern void ui_event_MainScreen(lv_event_t *e);
   extern lv_obj_t *ui_MainScreen;
   extern void ui_event_ButtonLeft1(lv_event_t *e);

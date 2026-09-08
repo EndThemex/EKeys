@@ -577,6 +577,10 @@ namespace ekeys
         const HaStatusInfo &ha = msg.ha_status;
 
         ui_MainScreen_set_host_connection(ha.tcp_connected);
+        /* 主页右下角 WiFi 状态（与 HA 二级页共用 wifi_enabled/connected/rssi 字段） */
+        ui_MainScreen_set_wifi_status(ha.wifi_enabled,
+                                       ha.wifi_connected,
+                                       ha.wifi_rssi);
         ui_HaScreenSecondary_set_wifi_status(ha.wifi_enabled,
                                              ha.wifi_connected,
                                              ha.wifi_rssi,

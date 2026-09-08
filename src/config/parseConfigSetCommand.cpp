@@ -319,21 +319,6 @@ namespace ekeys
                 }
             }
         }
-        if (!cfg["voice_dev_pid"].isNull()) {
-            int v = cfg["voice_dev_pid"].as<int>();
-            /* C2 修复：dev_pid 上界 65535，避免越界截断 */
-            if (v < 0) v = 0;
-            if (v > 65535) v = 65535;
-            if (s.voice_dev_pid != static_cast<uint16_t>(v)) {
-                LOG_INFO("CFG_SET", "voice_dev_pid: %u -> %d",
-                         s.voice_dev_pid, v);
-                s.voice_dev_pid = static_cast<uint16_t>(v);
-                result.any_changed = true;
-                if (n_int < kMaxIntChanges) {
-                    int_changes[n_int++] = {"voice_dev_pid", v};
-                }
-            }
-        }
         if (!cfg["voice_cuid"].isNull()) {
             const char *v = cfg["voice_cuid"].as<const char *>();
             if (v != nullptr && strcmp(s.voice_cuid, v) != 0) {
@@ -347,34 +332,35 @@ namespace ekeys
                 }
             }
         }
-        if (!cfg["voice_baidu_api_key"].isNull()) {
-            const char *v = cfg["voice_baidu_api_key"].as<const char *>();
-            if (v != nullptr && strcmp(s.voice_baidu_api_key, v) != 0) {
-                LOG_INFO("CFG_SET", "voice_baidu_api_key changed (len %u)",
+        if (!cfg["voice_tencent_secret_id"].isNull()) {
+            const char *v = cfg["voice_tencent_secret_id"].as<const char *>();
+            if (v != nullptr && strcmp(s.voice_tencent_secret_id, v) != 0) {
+                LOG_INFO("CFG_SET", "voice_tencent_secret_id changed (len %u)",
                          strlen(v));
-                strncpy(s.voice_baidu_api_key, v,
-                        sizeof(s.voice_baidu_api_key) - 1);
-                s.voice_baidu_api_key[sizeof(s.voice_baidu_api_key) - 1] = '\0';
+                strncpy(s.voice_tencent_secret_id, v,
+                        sizeof(s.voice_tencent_secret_id) - 1);
+                s.voice_tencent_secret_id[
+                    sizeof(s.voice_tencent_secret_id) - 1] = '\0';
                 result.any_changed = true;
                 if (n_str < kMaxStrChanges) {
-                    str_changes[n_str++] = {"voice_baidu_api_key",
-                                            s.voice_baidu_api_key};
+                    str_changes[n_str++] = {"voice_tencent_secret_id",
+                                            s.voice_tencent_secret_id};
                 }
             }
         }
-        if (!cfg["voice_baidu_secret_key"].isNull()) {
-            const char *v = cfg["voice_baidu_secret_key"].as<const char *>();
-            if (v != nullptr && strcmp(s.voice_baidu_secret_key, v) != 0) {
-                LOG_INFO("CFG_SET", "voice_baidu_secret_key changed (len %u)",
+        if (!cfg["voice_tencent_secret_key"].isNull()) {
+            const char *v = cfg["voice_tencent_secret_key"].as<const char *>();
+            if (v != nullptr && strcmp(s.voice_tencent_secret_key, v) != 0) {
+                LOG_INFO("CFG_SET", "voice_tencent_secret_key changed (len %u)",
                          strlen(v));
-                strncpy(s.voice_baidu_secret_key, v,
-                        sizeof(s.voice_baidu_secret_key) - 1);
-                s.voice_baidu_secret_key[
-                    sizeof(s.voice_baidu_secret_key) - 1] = '\0';
+                strncpy(s.voice_tencent_secret_key, v,
+                        sizeof(s.voice_tencent_secret_key) - 1);
+                s.voice_tencent_secret_key[
+                    sizeof(s.voice_tencent_secret_key) - 1] = '\0';
                 result.any_changed = true;
                 if (n_str < kMaxStrChanges) {
-                    str_changes[n_str++] = {"voice_baidu_secret_key",
-                                            s.voice_baidu_secret_key};
+                    str_changes[n_str++] = {"voice_tencent_secret_key",
+                                            s.voice_tencent_secret_key};
                 }
             }
         }

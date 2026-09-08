@@ -86,8 +86,9 @@ private:
         size_t samples = 0;
         uint32_t duration_ms = 0;
         bool auto_enter = false;
-        char cuid[32] = {0};
-        uint16_t dev_pid = 0;
+        char cuid[32] = {0};        // 腾讯云 TC3 协议不使用，保留占位
+        char secret_id[65] = {0};   // 腾讯云凭证快照（识别期间 Configuration 可能变更）
+        char secret_key[65] = {0};
     };
 
     /* 队列槽位（单元素，避免 heap 抖动；新录音需等前一段识别完成） */
@@ -96,6 +97,7 @@ private:
     bool capturing_ = false;
     bool suspended_ = false;
     uint32_t capture_start_ms_ = 0;
+    uint32_t last_heartbeat_ms_ = 0; // feedCapture 心跳日志节流（相对 capture_start_ms_）
     int16_t *pcm_buf_ = nullptr;     // PSRAM
     size_t pcm_cap_samples_ = 0;
     size_t pcm_len_samples_ = 0;
