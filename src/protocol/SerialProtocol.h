@@ -68,8 +68,10 @@ namespace ekeys
         void sendErrorResponse(int original_cmd, int seq, const char *error);
 
         /*
-         * 阶段 06：TCP 通道复用（Serial / TCP 双通道任一在线即生效）。
-         *   - setLineSink：TcpChannel 注册后，所有协议帧同步发到 TCP；
+         * 阶段 06：TCP 通道复用。帧只发对端所在通道（2026-09-08）：
+         *   - setLineSink：TCP 连接成功后由 TcpChannel 注册，断开时传 nullptr
+         *     注销；sink 非空 = TCP 在线，帧走 TCP，串口不镜像（防心跳刷屏）；
+         *     sink 为空时帧走 Serial（串口连接的 App 依赖）。
          *   - handleTcpLine：TCP 收到的 JSON 行喂给同一解析分发。
          */
         using LineSink = void (*)(const char *line);

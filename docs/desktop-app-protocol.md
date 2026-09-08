@@ -121,7 +121,7 @@ TCP 收到的一行 JSON 直接交给 `SerialProtocol` 解析，发送协议帧�
 
 实现见 [TcpChannel.cpp](../src/network/TcpChannel.cpp#L27-L223)。
 
-当前 TCP 没有认证和加密层。如果局域网不可信，不能把 WiFi 密码、百度 API Key 等配置明文暴露给不可信客户端。
+当前 TCP 没有认证和加密层。如果局域网不可信，不能把 WiFi 密码、腾讯云 SecretKey 等配置明文暴露给不可信客户端。
 
 #### 重连和离线恢复
 
@@ -340,10 +340,9 @@ App 应始终按 `cmd`、`seq`、`status` 解析，不要依赖响应字段的�
     "voice_trigger_key": 11,
     "voice_max_record_ms": 30000,
     "voice_auto_enter": 0,
-    "voice_dev_pid": 1537,
     "voice_cuid": "EKeys",
-    "voice_baidu_api_key": "...",
-    "voice_baidu_secret_key": "...",
+    "voice_tencent_secret_id": "...",
+    "voice_tencent_secret_key": "...",
     "pc_status_mask": 0,
     "active_keymap_profile": 0,
     "active_profile_name": "Profile 1",
@@ -374,10 +373,9 @@ App 应始终按 `cmd`、`seq`、`status` 解析，不要依赖响应字段的�
 | `voice_trigger_key`              | int    | 语音触发键；当前代码范围为 `0~11`                   |
 | `voice_max_record_ms`            | int    | 最大录音时长，毫秒；当前代码范围 `1000~60000`       |
 | `voice_auto_enter`               | int    | 识别后是否自动进入相关行为                          |
-| `voice_dev_pid`                  | int    | 百度语音 PID                                        |
-| `voice_cuid`                     | string | 百度语音 CUID                                       |
-| `voice_baidu_api_key`            | string | 百度 API Key                                        |
-| `voice_baidu_secret_key`         | string | 百度 Secret Key                                     |
+| `voice_cuid`                     | string | 语音 cuid（腾讯云 TC3 协议不使用，保留占位）        |
+| `voice_tencent_secret_id`        | string | 腾讯云 SecretId                                     |
+| `voice_tencent_secret_key`       | string | 腾讯云 SecretKey                                    |
 | `pc_status_mask`                 | int    | PC 状态显示位掩码                                   |
 | `active_keymap_profile`          | int    | 当前 Profile，`0~7`                                 |
 | `active_profile_name`            | string | 当前 Profile 显示名，由固件生成                     |
@@ -443,8 +441,7 @@ App 应始终按 `cmd`、`seq`、`status` 解析，不要依赖响应字段的�
 | `voice_enable`、`voice_auto_enter` | 归一化为 `0/1`                                   |
 | `voice_trigger_key`                | 小于 0 取 0，大于 11 取 11                       |
 | `voice_max_record_ms`              | 钳制到 `1000~60000`                              |
-| `voice_dev_pid`                    | 钳制到 `0~65535`                                 |
-| 字符串字段                         | 超过容量时截断；WiFi 密码和百度 Key 最大 64 字节 |
+| 字符串字段                         | 超过容量时截断；WiFi 密码和腾讯云 Key 最大 64 字节 |
 | 未知字段                           | 忽略，不影响请求结果                             |
 
 配置修改在内存层通过一次 `mutateSettings()` 完成，持久化会逐项写入 `/config.ini`。因此协议层看起来是一次请求，但文件写入不是事务式的强一致提交。
@@ -1116,8 +1113,8 @@ App 始终使用 `\n` 分帧，不应假设每条消息固定长度。USB 和 TC
 `CMD_CONFIG_GET` 会返回以下敏感信息：
 
 - `wifi_password`
-- `voice_baidu_api_key`
-- `voice_baidu_secret_key`
+- `voice_tencent_secret_id`
+- `voice_tencent_secret_key`
 
 桌面 App 不应将完整快照写入普通日志，也不要通过不可信局域网长期暴露 TCP 30000。
 

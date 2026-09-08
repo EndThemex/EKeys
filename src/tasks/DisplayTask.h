@@ -89,6 +89,8 @@ namespace ekeys
 
         QueueHandle_t queue_;
         bool spectrum_active_ = false;
+        /* Mic::begin 失败后的退避时刻（ms），0 表示立即可重试 */
+        uint32_t spectrum_retry_after_ms_ = 0;
         /*
          * 上次用户活动时刻（FreeRTOS tick，单位 ms）。0 表示尚未开始计时，
          * 用于 run() 启动首帧 / navigateNow 到 MAIN 时禁用计时。

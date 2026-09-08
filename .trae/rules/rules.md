@@ -37,16 +37,19 @@
 | DOWN     | `LV_KEY_DOWN` (18)       | —      | key_id=11      | —              |
 | ENTER    | `LV_KEY_ENTER` (10)      | 单击   | —              | `ButtonEnter*` |
 | ESC      | `LV_KEY_ESC` (27)        | 双击   | —              | `ButtonExit*`  |
-| 焦点跳转 | `action = key_id` (1~11) | —      | KEYMAPPED 截胡 | —              |
+| 焦点跳转 | `action = 100 + key_id` (101~111) | —      | KEYMAPPED 截胡 | —              |
 
-矩阵键 `key_id`（1~11）与 `LV_KEY_*` 数值不重叠（`LV_KEY_ENTER=10` 例外，详见 [MainTask.cpp#L255-L267](file:///d:/search/esp/Keys/EKeys/src/tasks/MainTask.cpp#L255-L267) 注释）。
+矩阵键 `key_id`（1~11）以 `kMatrixKeyActionBase(100) + key_id` 编码进 `ActionInput.action`，与 `LV_KEY_*` 数值完全不重叠（2026-09-08 修复：原裸传 key_id 时 `LV_KEY_ENTER=10` 与矩阵键 10 冲突，主页按按键 10 会被当成旋钮单击进入键映射屏）。
 
 ### 3. DisplayTask 路由规则
 
-[`DisplayTask::applyMessage(ActionInput)`](file:///d:/search/esp/Keys/EKeys/src/tasks/DisplayTask.cpp#L243-L271) 是旋钮 / 矩阵键的唯一改写点：
+[`DisplayTask::applyMessage(ActionInput)`](file:///d:/search/esp/Keys/EKeys/src/tasks/DisplayTask.cpp#L281-L334) 是旋钮 / 矩阵键的唯一改写点：
 
-- **KEYMAPPED 屏**：截胡 key_id 1~11 → 跳 `KEYMAPPED_SECONDARY` 并把 `key_id` 作为焦点键传 UI（[DisplayTask.cpp#L252-L258](file:///d:/search/esp/Keys/EKeys/src/tasks/DisplayTask.cpp#L252-L258)）
-- **其它屏**：`lv_event_send(active_screen, LV_EVENT_KEY, action)` 透传
+- **矩阵键（101~111）**：
+  - **KEYMAPPED 屏**：截胡 → 跳 `KEYMAPPED_SECONDARY` 并把 `key_id` 作为焦点键传 UI
+  - **KEYMAPPED_SECONDARY / SETTING_SECONDARY 屏**：解码后的 `key_id` 裸传 `LV_EVENT_KEY`（焦点跳转 / 矩阵键 7、11 移焦点）
+  - **其它屏**：丢弃，不触发 UI 导航（矩阵键为 HID 专用）
+- **旋钮动作（`LV_KEY_*`）**：`lv_event_send(active_screen, LV_EVENT_KEY, action)` 透传；主页单击（ENTER）= 无操作
 - 禁止在 UI 屏幕内部再把 `LV_KEY_LEFT/RIGHT` 改写为 `LV_KEY_UP/DOWN`，所有改写集中在 DisplayTask
 
 ### 4. SettingScreenSecondary 行为契约

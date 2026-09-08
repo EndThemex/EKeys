@@ -516,6 +516,7 @@ namespace ekeys
                     IKeyboard *kb = AppContext::instance().keyboard();
                     if (kb != nullptr)
                     {
+                        unsigned injected = 0;
                         for (const char *p = text; *p != '\0'; ++p)
                         {
                             const char c = *p;
@@ -523,6 +524,7 @@ namespace ekeys
                             {
                                 kb->press(0x2C);
                                 kb->release(0x2C);
+                                ++injected;
                             }
                             else if (c >= 0x21 && c <= 0x7E)
                             {
@@ -532,6 +534,7 @@ namespace ekeys
                                 {
                                     kb->press(keycode);
                                     kb->release(keycode);
+                                    ++injected;
                                 }
                             }
                             delay(voice::kAsciiInjectDelayMs);
@@ -541,7 +544,19 @@ namespace ekeys
                             kb->press(0x28); // KEY_RETURN
                             kb->release(0x28);
                         }
+                        LOG_INFO("ASR", "hid injected %u chars%s",
+                                 injected, job.auto_enter ? " +enter" : "");
                     }
+                    else
+                    {
+                        LOG_WARNING("ASR", "hid keyboard unavailable, inject skipped");
+                    }
+                }
+                else
+                {
+                    /* TCP 在线时文本已走 0x0c 推送；离线且含非 ASCII 只能丢弃 */
+                    LOG_INFO("ASR", "hid inject skipped (%s)",
+                             tcp_online ? "app channel online" : "non-ascii & tcp offline");
                 }
 
                 free(job.pcm);

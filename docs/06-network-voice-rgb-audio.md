@@ -44,8 +44,8 @@
 
 ### 语音
 
-- [ ] **6.10 `src/voice/VoiceRecognizer.h/.cpp`**：百度短语音 ASR REST，`dev_pid=1537` 默认；token 缓存。
-- [ ] **6.11 `src/voice/VoiceConfig.h`** + **`AsrTokenCache.h/.cpp`**：凭证字段与 token 自动刷新。
+- [ ] **6.10 `src/voice/VoiceRecognizer.h/.cpp`**：腾讯云一句话识别 REST（TC3-HMAC-SHA256 签名，`16k_zh` + `pcm`，SourceType=1 base64 内嵌 JSON）；后台任务识别（栈 12KB）。
+- [ ] **6.11 `src/voice/VoiceConfig.h`** + **`TencentAsrSigner.h/.cpp`**：协议常量与 TC3 请求签名器（阶段 08 由百度 token 缓存方案迁移，见 [`08-tencent-asr-migration.md`](08-tencent-asr-migration.md)）。
 - [ ] **6.12 `src/keymap/KeyEventDispatcher`**：命中 `KEY_FUNCTION_ASR` 时调用 `VoiceRecognizer::startCapture()`；松开后 `finishCapture()`。
 - [ ] **6.13 协议命令 `0x0c CMD_VOICE_TEXT`**：识别完成后通过 `SerialProtocol::send()` 上报桌面 App。
 
@@ -98,6 +98,11 @@
   - **DisplayTask**：`run()` 启动快照 + `applySetting()`（SettingUpdate 路径）调用 `RGBLightControl::applySettings()`（LED 写入统一收口 DisplayTask 上下文）；主循环 `RGBLightControl::tick(delta)`（内部 30ms 帧节流）。AudioAnalyzer 频谱调度按计划留在阶段 07（6.9 约定只编译）。
   - **设置变更副作用**：`cmd_config`（wifi_changed → `scheduleConnect()`，any_changed → `Speaker::applyDeviceVolume()`）；`MainTask::applyUiSettingsSnapshot`（work_mode 变更 → `applyWorkMode` + `scheduleConnect()`，音量 → `applyDeviceVolume()`）。`scheduleConnect()` 内部以 `isEnabled()`（wifi_switch 且非 BLE）统一处理启停，两条路径无需重复判断。
   - **main.cpp**：注释与启动日志更新为 stage 06（服务初始化已由 `MainTask::begin()` 承担，main.cpp 结构不变）。
+- 2026-09-08：语音后端迁移至腾讯云一句话识别（详见 [`08-tencent-asr-migration.md`](08-tencent-asr-migration.md)）。
+  - **凭证字段**：`voice_baidu_api_key / voice_baidu_secret_key / voice_dev_pid` → `voice_tencent_secret_id / voice_tencent_secret_key`（配置加载 / SET 解析 / GET 快照 / 协议文档同步更新）。
+  - **删除**：`AsrTokenCache.h/.cpp`（百度 OAuth token 缓存）、百度端点常量。
+  - **新增**：`TencentAsrSigner.h/.cpp`（TC3-HMAC-SHA256 签名器，mbedtls HMAC 链）；识别循环改为 base64 内嵌 JSON POST + `Response.Error` 错误解析；`EKeysAsr` 任务栈 8KB → 12KB。
+  - **格式修正**：固件录音缓冲为无头 raw PCM，`VoiceFormat` 用 `pcm`（官方格式表中 `wav` 要求 RIFF 文件头），方案稿中的 `wav` 值不采用。
 
 ## 备注
 

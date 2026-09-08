@@ -66,6 +66,8 @@ void TcpChannel::stop()
         client->stop();
     }
     state_ = State::Idle;
+    /* sink 非空 == TCP 已连接；断开后协议帧恢复走串口 */
+    SerialProtocol::instance().setLineSink(nullptr);
     /* D6 修复：清空行缓冲，断线重连后无残留半行 */
     line_len_ = 0;
     line_overflow_ = false;
@@ -119,13 +121,14 @@ void TcpChannel::process()
         {
             impl_ = new WiFiClient();
             client = static_cast<WiFiClient *>(impl_);
-            SerialProtocol::instance().setLineSink(protocolLineSink);
         }
         if (client->connect(host_ip_, host_port_))
         {
             client->setNoDelay(true);
             state_ = State::Connected;
             connected_since_ms_ = millis();
+            /* 连接成功才注册发送 sink：保证 "sink 非空 == TCP 已连接" */
+            SerialProtocol::instance().setLineSink(protocolLineSink);
             LOG_INFO("TCP", "connected to %s:%u", host_ip_,
                      static_cast<unsigned>(host_port_));
         }
@@ -133,6 +136,8 @@ void TcpChannel::process()
         {
             LOG_WARNING("TCP", "connect timeout, rediscover");
             state_ = State::Idle;
+            /* 重连失败（上一轮连接可能注册过 sink）也要清掉 */
+            SerialProtocol::instance().setLineSink(nullptr);
             DiscoveryService::instance().stop();
         }
         break;

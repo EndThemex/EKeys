@@ -130,17 +130,26 @@ namespace ekeys
     void SerialProtocol::sendDocument(JsonDocument &doc)
     {
         /*
-         * 阶段 06：序列化一次，Serial + TCP 双通道输出（sink 已注册时）。
+         * 阶段 06：序列化一次输出；TCP 在线走 TCP，否则走 Serial。
          * keymap 全量约 12KB，String 分配在堆上可承受。
          */
         String out;
         serializeJson(doc, out);
         out += '\n';
 
-        Serial.print(out);
+        /*
+         * 帧只发对端所在通道：TCP 在线时走 TCP（串口不再镜像，
+         * 否则 App 心跳应答 ~1Hz 在串口持续刷屏）；TCP 离线时
+         * 串口是唯一通道，串口连接的 App 依赖这些 JSON 行。
+         * sink 生命周期由 TcpChannel 保证："非空 == TCP 已连接"。
+         */
         if (line_sink_ != nullptr)
         {
             line_sink_(out.c_str());
+        }
+        else
+        {
+            Serial.print(out);
         }
     }
 

@@ -28,7 +28,10 @@ void Speaker::begin()
     {
         return;
     }
-    auto *audio = new Audio();
+    /* I2S 端口必须用 I2S_NUM_1：Audio 库默认 I2S_NUM_0，与 Mic.cpp 的
+     * I2S0 冲突，会导致频谱 / ASR 的 i2s_driver_install 报
+     * "register I2S object to platform failed"（每 tick 重试刷屏）。 */
+    auto *audio = new Audio(false, 3, I2S_NUM_1);
     audio->setPinout(kPinI2sBclkSpeaker, kPinI2sLrclkSpeaker, kPinI2sDataSpeaker);
     audio->setVolume(12);  // 默认中等音量（0~21）
     impl_ = audio;

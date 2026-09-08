@@ -3,7 +3,8 @@
  *
  * MAX98357A I2S 功放封装（FEATURE_DOC §10.1，阶段 06 任务 6.7）。
  *
- *   - 引脚（PINOUT §2.7）：BCLK=IO10 / LRCLK=IO9 / DOUT=IO14
+ *   - 引脚（PINOUT §2.7，2026-09-06 原理图确认）：BCLK=IO10 / LRCLK=IO9 / DIN=IO11
+ *   - I2S 端口 I2S_NUM_1（Mic 占 I2S_NUM_0，勿共用外设）
  *   - 音量 SetVolume(0~21)，device_volume/5 由调用方换算
  *   - PlayRemoteAudio(url) / PlayLocalAudio(path) / Pause / Resume / Stop
  *   - loop() 由 MainTask 周期喂（解码驱动）

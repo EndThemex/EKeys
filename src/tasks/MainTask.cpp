@@ -312,15 +312,16 @@ namespace ekeys
                 }
                 /*
                  * A1 修复：应用键 1~11 在 KEYMAPPED 屏被解释为"进入二级页并聚焦该键"。
-                 * 编码复用 ActionInput.action=key_id（与 LV_KEY_* 数值不重叠，
-                 * LV_KEY_ENTER=10 / LV_KEY_LEFT=20 等，见 lv_group.h）。
-                 * DisplayTask 端命中 KEYMAPPED 屏时负责截胡并 navigateNow。
+                 * 编码 = kMatrixKeyActionBase + key_id（2026-09-08 修复：key_id=10
+                 * 原来与 LV_KEY_ENTER=10 数值冲突，裸传会被 UI 层当成旋钮单击触发
+                 * 导航；加基址偏移后与 LV_KEY_* 完全不重叠，由 DisplayTask 解码）。
                  */
                 if (pressed[i] >= 1 && pressed[i] <= kMatrixKeyCount)
                 {
                     DisplayMessage nav_msg{};
                     nav_msg.type = DisplayMessageType::ActionInput;
-                    nav_msg.action = pressed[i];
+                    nav_msg.action =
+                        static_cast<uint8_t>(kMatrixKeyActionBase + pressed[i]);
                     postMessage(nav_msg);
                 }
             }

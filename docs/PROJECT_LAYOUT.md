@@ -50,7 +50,7 @@ src/
 ├── ui/                         # SquareLine 生成的 LVGL 屏幕
 ├── upgrade/                    # OTA
 ├── utils/                      # 公共 POD 类型
-└── voice/                      # VoiceRecognizer / AsrTokenCache
+└── voice/                      # VoiceRecognizer / TencentAsrSigner
 ```
 
 > 各目录职责与功能对照表见 [`../ARCHITECTURE.md`](../ARCHITECTURE.md) 第 3 节。

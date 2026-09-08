@@ -110,6 +110,15 @@ namespace ekeys
         char keymap_labels[11][24]{};
     };
 
+    /*
+     * ActionInput.action 编码约定（见 rules.md 输入交互规则）：
+     *   - 旋钮动作：直接使用 LV_KEY_LEFT/RIGHT/ENTER/ESC（19/20/10/27）
+     *   - 矩阵键：kMatrixKeyActionBase + key_id（key_id 1~11）
+     * 矩阵键必须加基址偏移：key_id=10 与 LV_KEY_ENTER=10 数值冲突，
+     * 裸传会让矩阵键 10 在 UI 层被当成"旋钮单击"触发导航。
+     */
+    constexpr uint8_t kMatrixKeyActionBase = 100; /* 101~111，不与任何 LV_KEY_* 重叠 */
+
     struct DisplayMessage
     {
         DisplayMessageType type{DisplayMessageType::SettingUpdate};
@@ -117,7 +126,7 @@ namespace ekeys
         char time_text[16]{};       /* TimeUpdate："HH:MM:SS" + '\0' */
         char date_text[12]{};       /* TimeUpdate："YYYY-MM-DD" + '\0'；未同步为空串 */
         char week_text[4]{};        /* TimeUpdate："MON"/"TUE" + '\0'；未同步为空串 */
-        uint8_t action{0};          /* ActionInput：LV_KEY_LEFT/RIGHT/ENTER/ESC */
+        uint8_t action{0};          /* ActionInput：LV_KEY_* 或 kMatrixKeyActionBase + key_id */
         uint32_t key_value{0};      /* KeyInput：按键位掩码（RGB 高亮，阶段 06） */
         uint8_t navigate_target{0}; /* Navigate：ui_screen_tag_t */
         bool asr_recording{false};

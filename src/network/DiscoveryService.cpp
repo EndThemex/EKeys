@@ -43,9 +43,15 @@ namespace ekeys
         Configuration::instance().snapshot(snap);
         if (snap.connect_host == 0 || snap.work_mode == kWorkModeBluetooth)
         {
-            LOG_INFO("DISC", "connect_host=0 or BLE mode, discovery skipped");
+            /* 每 tick 都会进这里，日志只打一次；条件解除后重置允许再次提示 */
+            if (!skip_logged_)
+            {
+                LOG_INFO("DISC", "connect_host=0 or BLE mode, discovery skipped");
+                skip_logged_ = true;
+            }
             return;
         }
+        skip_logged_ = false;
         if (state_ == State::Probing)
         {
             return;

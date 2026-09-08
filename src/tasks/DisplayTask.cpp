@@ -25,6 +25,7 @@
 #include "audio/Mic.h"
 #include "display/Backlight.h"
 #include "display/LvglPort.h"
+#include "input/MatrixScanner.h"
 #include "logging/LogManager.h"
 #include "message_types.h"
 #include "rgb/ClickHighlight.h"
@@ -69,6 +70,8 @@ namespace ekeys
 
         /* 一级页无操作 5s 后自动返回主页 */
         constexpr TickType_t kAutoReturnToMainTicks = pdMS_TO_TICKS(5000);
+        /* 频谱 Mic::begin 失败重试退避：避免每 ms tick 重刷 install 报错 */
+        constexpr uint32_t kSpectrumRetryMs = 1000;
 
         /*
          * DeviceSettings.work_mode（0=USB 1=BLE 2=2.4G）与
@@ -284,17 +287,37 @@ namespace ekeys
              */
             bumpActivity();
             /*
-             * A1 修复：MainTask 在按下应用键 1~11 时也会投递 ActionInput，
-             * action 直接编码 key_id（1~11）。当前 active screen 为 KEYMAPPED 时
-             * 截胡并跳转 KEYMAPPED_SECONDARY，把 key_id 作为"焦点键"传给 UI。
-             * 其它屏 / 旋钮场景下走原 LV_EVENT_KEY 转发路径。
+             * 矩阵键动作编码 = kMatrixKeyActionBase + key_id（MainTask 侧编码，
+             * 与 LV_KEY_* 数值不重叠；原裸传 key_id 时 key_id=10 与
+             * LV_KEY_ENTER=10 冲突，导致按键 10 在主页被当成旋钮单击触发导航）。
+             * 路由：
+             *   - KEYMAPPED 屏：截胡 → 跳 KEYMAPPED_SECONDARY 并聚焦该键；
+             *   - KEYMAPPED_SECONDARY / SETTING_SECONDARY：key_id 裸传进 UI
+             *     （焦点跳转 / 矩阵键 7、11 移焦点）；
+             *   - 其它屏：矩阵键为 HID 专用，不触发 UI 导航。
              */
             const uint8_t action = msg.action;
-            if (action >= 1 && action <= 11 &&
-                ui_get_active_screen_tag() == UI_SCREEN_KEYMAPPED)
+            if (action > kMatrixKeyActionBase &&
+                action <= kMatrixKeyActionBase + kMatrixKeyCount)
             {
-                ui_KeyMappedSecondary_set_focus(action);
-                navigateNow(UI_SCREEN_KEYMAPPED_SECONDARY);
+                const uint8_t key_id =
+                    static_cast<uint8_t>(action - kMatrixKeyActionBase);
+                const ui_screen_tag_t tag = ui_get_active_screen_tag();
+                if (tag == UI_SCREEN_KEYMAPPED)
+                {
+                    ui_KeyMappedSecondary_set_focus(key_id);
+                    navigateNow(UI_SCREEN_KEYMAPPED_SECONDARY);
+                }
+                else if (tag == UI_SCREEN_KEYMAPPED_SECONDARY ||
+                         tag == UI_SCREEN_SETTING_SECONDARY)
+                {
+                    lv_obj_t *active_screen = lv_scr_act();
+                    if (active_screen != nullptr)
+                    {
+                        lv_event_send(active_screen, LV_EVENT_KEY,
+                                      (void *)(uintptr_t)key_id);
+                    }
+                }
                 break;
             }
             /*
@@ -630,14 +653,21 @@ namespace ekeys
             {
                 return;
             }
+            /* 失败退避窗口内不重试（毫秒回绕安全比较） */
+            if ((int32_t)(millis() - spectrum_retry_after_ms_) < 0)
+            {
+                return;
+            }
             /* 挂起语音识别（docs/06：音乐屏 suspend / 离开 resume） */
             VoiceRecognizer::instance().suspend();
             /* BCLK=IO10 与 Speaker 互斥（PINOUT §2.7）：频谱接管 Mic 前停掉 Speaker */
             VoiceRecognizer::prepareI2sForMicCapture();
             if (!Mic::instance().begin())
             {
-                return; // 下一轮重试
+                spectrum_retry_after_ms_ = millis() + kSpectrumRetryMs;
+                return; // 退避后重试
             }
+            spectrum_retry_after_ms_ = 0;
             AudioAnalyzer::instance().begin();
             spectrum_active_ = true;
             LOG_INFO("DISP", "spectrum started");

@@ -49,6 +49,8 @@ private:
     State state_ = State::Idle;
     uint32_t probe_started_ms_ = 0;
     uint32_t probe_count_ = 0;
+    /* start() 被 TcpChannel Idle 态每 tick 调用，skip 日志只打一次防刷屏 */
+    bool skip_logged_ = false;
     void (*on_discovered_)(const char *ip) = nullptr;
     char discovered_ip_[16]{0};
 };

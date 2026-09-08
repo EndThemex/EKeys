@@ -218,7 +218,7 @@
 - **RGB LED**：`rgb_mode`、`rgb_single_color`、`rgb_click_mode`、`rgb_brightness`
 - **屏幕**：`tft_theme`、`tft_brightness`（下限 5，避免 OLED 烧屏）
 - **音频**：`device_volume`（联动 `speaker_.SetVolume(volume/5)`）、`audio_enable`、`power_mode`
-- **语音**：`voice_enable`、`voice_trigger_key`、`voice_max_record_ms`、`voice_auto_enter`、`voice_dev_pid`、`voice_cuid`、`voice_baidu_api_key`、`voice_baidu_secret_key`
+- **语音**：`voice_enable`、`voice_trigger_key`、`voice_max_record_ms`、`voice_auto_enter`、`voice_cuid`、`voice_tencent_secret_id`、`voice_tencent_secret_key`
 - **PC 状态**：`pc_status_mask`
 - **Profile 切换**：`active_keymap_profile`（写入后刷新 UI + 上报完整状态）
 
