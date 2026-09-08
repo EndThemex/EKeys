@@ -95,6 +95,8 @@ namespace ekeys
         bool highlight_[11] = {false};
         uint32_t last_render_ms_ = 0;
         uint8_t fire_seed_[11] = {0};
+        /* NONE 模式下上帧渲染的高亮掩码（位 i = highlight_[i]），无变化帧跳过重发 */
+        uint8_t last_none_mask_ = 0xFF;
     };
 
 } // namespace ekeys

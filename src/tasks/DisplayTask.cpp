@@ -27,6 +27,7 @@
 #include "display/LvglPort.h"
 #include "logging/LogManager.h"
 #include "message_types.h"
+#include "rgb/ClickHighlight.h"
 #include "rgb/RGBLightControl.h"
 #include "ui/ui.h"
 #include "ui/ui_HaScreenSecondary.h"
@@ -178,6 +179,7 @@ namespace ekeys
             Configuration::instance().snapshot(snap);
             /* RGB 灯效初始化（RGBDriver::begin 在 DisplayTask 上下文统一驱动） */
             RGBLightControl::instance().applySettings(snap);
+            ClickHighlight::applySettings(snap);
             DisplayMessage msg;
             msg.type = DisplayMessageType::SettingUpdate;
             fillSettingPayload(snap, msg.setting);
@@ -351,6 +353,7 @@ namespace ekeys
             DeviceSettings snap;
             Configuration::instance().snapshot(snap);
             RGBLightControl::instance().applySettings(snap);
+            ClickHighlight::applySettings(snap);
         }
 
         /* 状态条：工作模式 + 音量 */

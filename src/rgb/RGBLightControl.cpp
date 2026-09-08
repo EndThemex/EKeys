@@ -78,6 +78,8 @@ namespace ekeys
         RGBDriver::instance().SetBrightness(brightness_);
         if (mode_changed && mode_ == RGB_NONE_MODE)
         {
+            /* 强制 NONE 分支首帧重绘，避免切回后高亮掩码恰好相同被跳过 */
+            last_none_mask_ = 0xFF;
             RGBDriver::instance().clearAll();
             RGBDriver::instance().show();
         }
@@ -104,15 +106,46 @@ namespace ekeys
     void RGBLightControl::renderFrame()
     {
         RGBDriver &led = RGBDriver::instance();
+        const RgbColor c = currentSingleColor();
+
+        /*
+         * 关灯模式下仍渲染点击高亮（FEATURE_DOC §9：RGB_CLICK_MODE 独立于
+         * rgb_mode）：高亮键点亮调色板色、其余键熄灭；掩码无变化时跳过重发。
+         */
+        if (mode_ == RGB_NONE_MODE)
+        {
+            uint8_t mask = 0;
+            for (uint8_t i = 0; i < RGBDriver::kLedCount; ++i)
+            {
+                if (highlight_[i])
+                {
+                    mask |= static_cast<uint8_t>(1u << i);
+                }
+            }
+            if (mask == last_none_mask_)
+            {
+                return;
+            }
+            last_none_mask_ = mask;
+            for (uint8_t i = 0; i < RGBDriver::kLedCount; ++i)
+            {
+                if (mask & (1u << i))
+                {
+                    led.setPixel(i, c.r, c.g, c.b);
+                }
+                else
+                {
+                    led.setPixel(i, 0, 0, 0);
+                }
+            }
+            led.show();
+            return;
+        }
 
         switch (mode_)
         {
-        case RGB_NONE_MODE:
-            return; // 关灯（applySettings 已 clear）
-
         case RGB_SINGLE_MODE:
         {
-            const RgbColor c = currentSingleColor();
             led.setAll(c.r, c.g, c.b);
             break;
         }
@@ -185,7 +218,6 @@ namespace ekeys
 
         case RGB_PULSE_MODE:
         {
-            const RgbColor c = currentSingleColor();
             const float breath = 0.5f - 0.5f * cosf(elapsed_ms_ * 0.006f); // ~1s 呼吸
             led.setAll(static_cast<uint8_t>(c.r * breath),
                        static_cast<uint8_t>(c.g * breath),
@@ -195,7 +227,6 @@ namespace ekeys
         }
 
         /* 点击高亮 override（FEATURE_DOC §9 RGB_CLICK_MODE） */
-        const RgbColor c = currentSingleColor();
         for (uint8_t i = 0; i < RGBDriver::kLedCount; ++i)
         {
             if (highlight_[i])
@@ -209,10 +240,7 @@ namespace ekeys
 
     void RGBLightControl::tick(uint32_t elapsed_ms)
     {
-        if (mode_ == RGB_NONE_MODE)
-        {
-            return;
-        }
+        /* NONE 模式不早退：点击高亮（RGB_CLICK_MODE）仍需按帧渲染 */
         elapsed_ms_ += elapsed_ms;
         if ((elapsed_ms_ - last_render_ms_) < kFrameIntervalMs)
         {
