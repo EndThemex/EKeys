@@ -67,6 +67,9 @@ namespace ekeys
         /* ≤ 期望帧周期 16ms：队列空闲时保证 LVGL tick 节奏（docs/10 §3.7） */
         constexpr TickType_t kDisplayMessageBlockTicks = pdMS_TO_TICKS(10);
 
+        /* 一级页无操作 5s 后自动返回主页 */
+        constexpr TickType_t kAutoReturnToMainTicks = pdMS_TO_TICKS(5000);
+
         /*
          * DeviceSettings.work_mode（0=USB 1=BLE 2=2.4G）与
          * ui_StatusBar 的 WORKMODE 枚举同序。
@@ -205,6 +208,9 @@ namespace ekeys
             {
                 applyMessage(msg);
             }
+
+            /* 一级页 5s 无操作 → 自动回主页（run() 主循环每帧检查） */
+            checkAutoReturn();
         }
     }
 
@@ -274,6 +280,10 @@ namespace ekeys
         case DisplayMessageType::ActionInput:
         {
             /*
+             * 旋钮 / 矩阵键都是用户主动操作，重置 5s 自动回主页计时。
+             */
+            bumpActivity();
+            /*
              * A1 修复：MainTask 在按下应用键 1~11 时也会投递 ActionInput，
              * action 直接编码 key_id（1~11）。当前 active screen 为 KEYMAPPED 时
              * 截胡并跳转 KEYMAPPED_SECONDARY，把 key_id 作为"焦点键"传给 UI。
@@ -303,7 +313,9 @@ namespace ekeys
         }
 
         case DisplayMessageType::Navigate:
+            /* 主动导航也是用户操作；navigateNow 内部会按目标屏决定是否禁用计时 */
             navigateNow(static_cast<ui_screen_tag_t>(msg.navigate_target));
+            bumpActivity();
             break;
 
         case DisplayMessageType::ModuleStatus:
@@ -415,6 +427,14 @@ namespace ekeys
         {
             ui_set_active_screen_tag(tag);
             lv_scr_load_anim(target, LV_SCR_LOAD_ANIM_NONE, 0, 0, false);
+            /*
+             * 进入 MAIN 或任何二级页：禁用 5s 自动回主页计时。
+             * 进入一级页（非 MAIN）：清零，由后续 bumpActivity() 触发开始计时。
+             * 无论切到哪都先清零：navigateNow 触发可能是由 ActionInput /
+             * Navigate（已经 bumpActivity）或 checkAutoReturn 自动回主页，
+             * 后者必须清零避免触发链式回主页。
+             */
+            last_activity_tick_ = 0;
         }
     }
 
@@ -636,6 +656,73 @@ namespace ekeys
             draw_bands[i] = bands[i] * 255.0f;
         }
         ui_MusicScreen_drawAudioBandsCool(draw_bands);
+    }
+
+    /*
+     * 是否处于二级页（详情页）。二级页不参与自动回主页：
+     *   - 详情页往往需要较长时间停留（看歌词 / 看 PC 状态）
+     *   - SETTING_SECONDARY 本身有 1s apply debounce（setting_secondary_apply_timer_cb）
+     *   - 离开二级页回到一级页时，navigateNow() 已把 last_activity_tick_ 清零，
+     *     下次 ActionInput/Navigate 进入一级页才会重新开始 5s 计时
+     */
+    bool DisplayTask::isSecondaryScreen(ui_screen_tag_t tag) const
+    {
+        switch (tag)
+        {
+        case UI_SCREEN_KEYMAPPED_SECONDARY:
+        case UI_SCREEN_MUSIC_SECONDARY:
+        case UI_SCREEN_PC_STATUS_SECONDARY:
+        case UI_SCREEN_HA_SECONDARY:
+        case UI_SCREEN_SETTING_SECONDARY:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    bool DisplayTask::isAutoReturnEnabled() const
+    {
+        const ui_screen_tag_t tag = ui_get_active_screen_tag();
+        /* 主页不需要自动回；二级页禁用；UNKNOWN 视为禁用（启动首帧） */
+        if (tag == UI_SCREEN_MAIN || tag == UI_SCREEN_UNKNOWN)
+        {
+            return false;
+        }
+        if (isSecondaryScreen(tag))
+        {
+            return false;
+        }
+        return true;
+    }
+
+    void DisplayTask::bumpActivity()
+    {
+        /* 0 表示尚未开始；用户操作 → 设当前 tick 作为基准 */
+        last_activity_tick_ = xTaskGetTickCount();
+    }
+
+    void DisplayTask::checkAutoReturn()
+    {
+        if (!isAutoReturnEnabled())
+        {
+            /* 进入主页 / 二级页 / 启动首帧 → 清零计时器，等待下次进入一级页 */
+            last_activity_tick_ = 0;
+            return;
+        }
+        if (last_activity_tick_ == 0)
+        {
+            /* 一级页但尚未开始计时（navigateNow 切到一级页后还没收到任何输入）
+             * → 不触发回主页 */
+            return;
+        }
+        const TickType_t now = xTaskGetTickCount();
+        if ((now - last_activity_tick_) >= kAutoReturnToMainTicks)
+        {
+            LOG_INFO("DISP", "auto return to MAIN after %lu ms idle",
+                     (unsigned long)pdTICKS_TO_MS(now - last_activity_tick_));
+            navigateNow(UI_SCREEN_MAIN);
+            /* navigateNow 内部会把 last_activity_tick_ 清零 */
+        }
     }
 
 } // namespace ekeys

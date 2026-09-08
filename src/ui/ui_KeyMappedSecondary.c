@@ -5,8 +5,8 @@
 #include <stdio.h>
 #include "lvgl.h"
 
-// 必须与 MatrixScanner.h 中 PHYSICAL_KEY_NUM 保持一致
-#define KEYMAP_SECONDARY_KEY_NUM 9
+// 必须与 MatrixScanner.h 中 PHYSICAL_KEY_NUM（11）保持一致
+#define KEYMAP_SECONDARY_KEY_NUM 11
 
 #define KEYMAP_SECONDARY_APP_CARD_WIDTH 60
 #define KEYMAP_SECONDARY_APP_CARD_HEIGHT 134
@@ -53,17 +53,23 @@ typedef struct
     lv_coord_t h;
 } key_cell_rect_t;
 
-// 9 键布局：3 列 × 3 行，KEYS_CARD_WIDTH=358, HEIGHT=134
+// 11 键布局：3 行 × 4 列，首行仅 3 键；KEYS_CARD 358×134
+// 列宽 82, 间距 ~6；行高 36, 间距 ~6
 static const key_cell_rect_t kKeyRects[KEYMAP_SECONDARY_KEY_NUM] = {
-    {4, 4, 82, 22},    // 应用键 1
-    {90, 4, 82, 22},   // 应用键 2
-    {176, 4, 82, 22},  // 应用键 3
-    {4, 30, 82, 22},   // 应用键 4
-    {90, 30, 82, 22},  // 应用键 5
-    {176, 30, 82, 22}, // 应用键 6
-    {4, 56, 82, 22},   // 应用键 7
-    {90, 56, 82, 22},  // 应用键 8
-    {176, 56, 82, 22}, // 应用键 9
+    // 第 0 行：键 1/2/3（左对齐）
+    {4, 4, 82, 36},   // 应用键 1
+    {92, 4, 82, 36},  // 应用键 2
+    {180, 4, 82, 36}, // 应用键 3
+    // 第 1 行：键 4/5/6/7（满 4 列）
+    {4, 46, 82, 36},   // 应用键 4
+    {92, 46, 82, 36},  // 应用键 5
+    {180, 46, 82, 36}, // 应用键 6
+    {268, 46, 82, 36}, // 应用键 7
+    // 第 2 行：键 8/9/10/11（满 4 列）
+    {4, 88, 82, 36},   // 应用键 8
+    {92, 88, 82, 36},  // 应用键 9
+    {180, 88, 82, 36}, // 应用键 10
+    {268, 88, 82, 36}, // 应用键 11
 };
 
 static unsigned int keymapped_secondary_extract_profile_index(const char *file_name)
@@ -365,19 +371,18 @@ static void keymapped_secondary_dispatch_key(uintptr_t key)
     if (key == (uintptr_t)LV_KEY_RIGHT)
     {
         const uint8_t cur = s_keymapped_secondary_focus_slot;
-        const uint8_t col = cur % 3;
-        if (col + 1 < 3)
+        const uint8_t col = cur % 4;
+        if (cur + 1 < KEYMAP_SECONDARY_KEY_NUM)
         {
-            s_keymapped_secondary_focus_slot = cur + 1;
+            s_keymapped_secondary_focus_slot = (uint8_t)(cur + 1);
         }
     }
     else if (key == (uintptr_t)LV_KEY_LEFT)
     {
         const uint8_t cur = s_keymapped_secondary_focus_slot;
-        const uint8_t col = cur % 3;
-        if (col > 0)
+        if (cur > 0)
         {
-            s_keymapped_secondary_focus_slot = cur - 1;
+            s_keymapped_secondary_focus_slot = (uint8_t)(cur - 1);
         }
     }
     else if (key == (uintptr_t)LV_KEY_ENTER)
@@ -582,32 +587,13 @@ void ui_KeyMappedSecondary_screen_init(void)
     lv_obj_set_style_text_font(ui_KeyMappedSecondaryProfileName, &ui_font_FontCKJGT16, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_align(ui_KeyMappedSecondaryProfileName, LV_ALIGN_BOTTOM_MID, 0, -12);
 
-    for (unsigned int i = 0; i < 12 && i < KEYMAP_SECONDARY_KEY_NUM; ++i)
+    for (unsigned int i = 0; i < KEYMAP_SECONDARY_KEY_NUM; ++i)
     {
         lv_obj_t *cell = lv_obj_create(ui_KeyMappedSecondaryKeysCard);
         lv_obj_set_size(cell, kKeyRects[i].w, kKeyRects[i].h);
         lv_obj_set_pos(cell, kKeyRects[i].x, kKeyRects[i].y);
         keymapped_secondary_style_key_cell(cell);
         ui_KeyMappedSecondaryKeyCells[i] = cell; /* A1：记录 cell 以做 focus 高亮 */
-
-        ui_KeyMappedSecondaryKeyLabels[i] = lv_label_create(cell);
-        lv_label_set_text(ui_KeyMappedSecondaryKeyLabels[i], "--");
-        lv_obj_set_width(ui_KeyMappedSecondaryKeyLabels[i], kKeyRects[i].w - 8);
-        lv_label_set_long_mode(ui_KeyMappedSecondaryKeyLabels[i], LV_LABEL_LONG_DOT);
-        lv_obj_set_style_text_font(ui_KeyMappedSecondaryKeyLabels[i], &ui_font_BebasNeueFont14, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_text_color(ui_KeyMappedSecondaryKeyLabels[i], lv_color_hex(0xF5F7FA), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_text_align(ui_KeyMappedSecondaryKeyLabels[i], LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_center(ui_KeyMappedSecondaryKeyLabels[i]);
-    }
-
-    for (unsigned int i = 12; i < KEYMAP_SECONDARY_KEY_NUM; ++i)
-    {
-        lv_obj_t *cell = lv_obj_create(ui_KeyMappedSecondaryKeysCard);
-        lv_obj_set_size(cell, kKeyRects[i].w, kKeyRects[i].h);
-        lv_obj_set_pos(cell, kKeyRects[i].x, kKeyRects[i].y);
-        keymapped_secondary_style_key_cell(cell);
-        lv_obj_set_style_bg_color(cell, lv_color_hex(0x151A22), LV_PART_MAIN | LV_STATE_DEFAULT);
-        lv_obj_set_style_border_color(cell, lv_color_hex(0x394555), LV_PART_MAIN | LV_STATE_DEFAULT);
 
         ui_KeyMappedSecondaryKeyLabels[i] = lv_label_create(cell);
         lv_label_set_text(ui_KeyMappedSecondaryKeyLabels[i], "--");

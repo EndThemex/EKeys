@@ -73,8 +73,27 @@ namespace ekeys
          */
         void updateSpectrum();
 
+        /*
+         * 一级页 5s 无操作自动回主页：
+         *   - isAutoReturnEnabled()  仅一级页（非 MAIN / 非 SECONDARY）启用
+         *   - bumpActivity()         任意用户输入 / 主动导航都重置计时
+         *   - checkAutoReturn()      run() 主循环每帧检查超时
+         *
+         * 二级页不启用：详情页往往需要较长时间查看，且 SETTING_SECONDARY 自身有
+         * 1s apply debounce，让二级页独占用户注意。
+         */
+        bool isAutoReturnEnabled() const;
+        bool isSecondaryScreen(ui_screen_tag_t tag) const;
+        void bumpActivity();
+        void checkAutoReturn();
+
         QueueHandle_t queue_;
         bool spectrum_active_ = false;
+        /*
+         * 上次用户活动时刻（FreeRTOS tick，单位 ms）。0 表示尚未开始计时，
+         * 用于 run() 启动首帧 / navigateNow 到 MAIN 时禁用计时。
+         */
+        TickType_t last_activity_tick_ = 0;
     };
 
 } // namespace ekeys
