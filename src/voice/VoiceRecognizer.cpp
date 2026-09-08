@@ -9,6 +9,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <mbedtls/base64.h>
@@ -436,8 +437,12 @@ namespace ekeys
                 /* POST JSON（Host 头由 HTTPClient 按 URL 自动携带，勿重复添加） */
                 char url[64];
                 snprintf(url, sizeof(url), "https://%s", voice::kTencentAsrHost);
+                /* 静态复用 TLS 客户端，避免每次请求反复分配 ~40KB TLS 缓冲；
+                 * setInsecure：不校验服务器证书（固件未内置 CA），仅加密传输 */
+                static WiFiClientSecure tlsClient;
+                tlsClient.setInsecure();
                 HTTPClient http;
-                http.begin(url);
+                http.begin(tlsClient, url);
                 http.addHeader("Content-Type", voice::kTencentAsrContentType);
                 http.addHeader("X-TC-Action", voice::kTencentAsrAction);
                 http.addHeader("X-TC-Timestamp", sig.timestamp);
