@@ -55,7 +55,6 @@
 #include "display/Arduino_NV3023.h"
 #include "display/Arduino_NV3041A.h"
 #include "display/Arduino_OTM8009A.h"
-#include "display/Arduino_R61529.h"
 #include "display/Arduino_RM67162.h"
 #include "display/Arduino_RM690B0.h"
 #include "display/Arduino_RGB_Display.h"
