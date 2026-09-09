@@ -175,7 +175,7 @@ namespace ekeys
         status_bar_set_recording_state(false);
         status_bar_set_volume(0);
         /* 电量由 MainTask 5s 节流后投递 BatteryStatus 更新，避免此处硬编码 100 */
-        status_bar_set_wifi_strength(0);
+        status_bar_set_wifi_status(false, false, -100);
         status_bar_set_module_status(UI_MODA, false);
         status_bar_set_module_status(UI_MODB, false);
 
@@ -532,10 +532,10 @@ namespace ekeys
         const HaStatusInfo &ha = msg.ha_status;
 
         ui_MainScreen_set_host_connection(ha.tcp_connected);
-        /* 主页右下角 WiFi 状态（与 HA 二级页共用 wifi_enabled/connected/rssi 字段） */
-        ui_MainScreen_set_wifi_status(ha.wifi_enabled,
-                                      ha.wifi_connected,
-                                      ha.wifi_rssi);
+        /* 状态栏 WiFi 图标：与 HA 二级页共用 wifi_enabled/connected/rssi 字段 */
+        status_bar_set_wifi_status(ha.wifi_enabled,
+                                   ha.wifi_connected,
+                                   ha.wifi_rssi);
         ui_HaScreenSecondary_set_wifi_status(ha.wifi_enabled,
                                              ha.wifi_connected,
                                              ha.wifi_rssi,

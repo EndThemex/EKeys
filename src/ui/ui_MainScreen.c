@@ -17,11 +17,6 @@ static lv_obj_t *s_ui_MainScreenProfileName = NULL;
 static lv_obj_t *s_ui_MainScreenHostConnectionIcon = NULL;
 static lv_obj_t *s_ui_MainScreenHostConnectionLabel = NULL;
 static bool s_ui_MainScreenHostConnected = false;
-static lv_obj_t *s_ui_MainScreenWifiIcon = NULL;
-static lv_obj_t *s_ui_MainScreenWifiLabel = NULL;
-static bool s_ui_MainScreenWifiEnabled = false;
-static bool s_ui_MainScreenWifiConnected = false;
-static int s_ui_MainScreenWifiRssi = -100;
 lv_obj_t *ui_LabelTime = NULL;
 lv_obj_t *ui_LabelData = NULL;
 lv_obj_t *ui_LabelSecond = NULL;
@@ -32,9 +27,7 @@ lv_obj_t *ui_LabelTFTLight = NULL;
 lv_obj_t *ui_line1 = NULL;
 lv_obj_t *ui_line2 = NULL;
 lv_obj_t *ui_line3 = NULL;
-lv_obj_t *ui_line4 = NULL;
 lv_obj_t *ui_line5 = NULL;
-lv_obj_t *ui_line6 = NULL;
 
 static void ui_MainScreen_refresh_host_connection(void)
 {
@@ -52,41 +45,6 @@ static void ui_MainScreen_refresh_host_connection(void)
                           s_ui_MainScreenHostConnected ? LV_SYMBOL_REFRESH : LV_SYMBOL_CLOSE);
         lv_obj_set_style_text_color(s_ui_MainScreenHostConnectionIcon,
                                     s_ui_MainScreenHostConnected ? lv_color_hex(0x22C55E) : lv_color_hex(0xF59E0B),
-                                    LV_PART_MAIN | LV_STATE_DEFAULT);
-    }
-}
-
-/*
- * 主页右下角 WiFi 状态显示：
- *   enabled=false → "WIFI OFF"（灰色，wifi_switch=0 或 BLE 模式）
- *   enabled=true & !connected → "WIFI ..."（琥珀色，正在连接）
- *   enabled=true & connected → "WIFI -65"（绿色，显示 RSSI 数值）
- */
-static void ui_MainScreen_refresh_wifi_status(void)
-{
-    if (s_ui_MainScreenWifiLabel == NULL)
-    {
-        return;
-    }
-    if (!s_ui_MainScreenWifiEnabled)
-    {
-        lv_label_set_text(s_ui_MainScreenWifiLabel, "WIFI OFF");
-        lv_obj_set_style_text_color(s_ui_MainScreenWifiLabel,
-                                    lv_color_hex(0x94A3B8),
-                                    LV_PART_MAIN | LV_STATE_DEFAULT);
-    }
-    else if (s_ui_MainScreenWifiConnected)
-    {
-        lv_label_set_text_fmt(s_ui_MainScreenWifiLabel, "WIFI %d", s_ui_MainScreenWifiRssi);
-        lv_obj_set_style_text_color(s_ui_MainScreenWifiLabel,
-                                    lv_color_hex(0x22C55E),
-                                    LV_PART_MAIN | LV_STATE_DEFAULT);
-    }
-    else
-    {
-        lv_label_set_text(s_ui_MainScreenWifiLabel, "WIFI ...");
-        lv_obj_set_style_text_color(s_ui_MainScreenWifiLabel,
-                                    lv_color_hex(0xF59E0B),
                                     LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 }
@@ -317,50 +275,11 @@ void ui_MainScreen_screen_init(void)
     lv_obj_set_style_text_opa(s_ui_MainScreenProfileName, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(s_ui_MainScreenProfileName, &ui_font_BebasNeueFont24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    ui_LabelRGBLight = lv_label_create(ui_MainScreen);
-    lv_obj_set_width(ui_LabelRGBLight, LV_SIZE_CONTENT);  /// 1
-    lv_obj_set_height(ui_LabelRGBLight, LV_SIZE_CONTENT); /// 1
-    lv_obj_set_x(ui_LabelRGBLight, 155);
-    lv_obj_set_y(ui_LabelRGBLight, -50);
-    lv_obj_set_align(ui_LabelRGBLight, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_LabelRGBLight, "RGB 75%");
-    lv_obj_set_style_text_color(ui_LabelRGBLight, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_LabelRGBLight, &ui_font_BebasNeueFont16, LV_PART_MAIN | LV_STATE_DEFAULT);
+    /* RGB / TFT 亮度文字与状态栏顶部图标区域重叠，已移除显示。亮度数值仍由
+     * ui_MainScreen_set_rgb_light / ui_MainScreen_set_tft_light 写入并用于
+     * Backlight::setDuty 与 RGBLightControl::applySettings。*/
 
-    ui_LabelTFTLight = lv_label_create(ui_MainScreen);
-    lv_obj_set_width(ui_LabelTFTLight, LV_SIZE_CONTENT);  /// 1
-    lv_obj_set_height(ui_LabelTFTLight, LV_SIZE_CONTENT); /// 1
-    lv_obj_set_x(ui_LabelTFTLight, 155);
-    lv_obj_set_y(ui_LabelTFTLight, -32);
-    lv_obj_set_align(ui_LabelTFTLight, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_LabelTFTLight, "TFT 75%");
-    lv_obj_set_style_text_color(ui_LabelTFTLight, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_LabelTFTLight, &ui_font_BebasNeueFont16, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    /* 主页右下角 WiFi 状态：与左侧 PC STOP 位置对称（左：x=-125 y=-4 label / y=35 icon，
-     * 右：x=155 y=-4 label / y=35 icon）。文字 + 图标组合，状态色由 refresh 函数控制。 */
-    s_ui_MainScreenWifiLabel = lv_label_create(ui_MainScreen);
-    lv_obj_set_width(s_ui_MainScreenWifiLabel, 108);
-    lv_obj_set_height(s_ui_MainScreenWifiLabel, LV_SIZE_CONTENT);
-    lv_obj_set_x(s_ui_MainScreenWifiLabel, 155);
-    lv_obj_set_y(s_ui_MainScreenWifiLabel, -4);
-    lv_obj_set_align(s_ui_MainScreenWifiLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(s_ui_MainScreenWifiLabel, "WIFI OFF");
-    lv_label_set_long_mode(s_ui_MainScreenWifiLabel, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_align(s_ui_MainScreenWifiLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(s_ui_MainScreenWifiLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(s_ui_MainScreenWifiLabel, &ui_font_BebasNeueFont24, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    s_ui_MainScreenWifiIcon = lv_label_create(ui_MainScreen);
-    lv_obj_set_width(s_ui_MainScreenWifiIcon, LV_SIZE_CONTENT);
-    lv_obj_set_height(s_ui_MainScreenWifiIcon, LV_SIZE_CONTENT);
-    lv_obj_set_x(s_ui_MainScreenWifiIcon, 155);
-    lv_obj_set_y(s_ui_MainScreenWifiIcon, 35);
-    lv_obj_set_align(s_ui_MainScreenWifiIcon, LV_ALIGN_CENTER);
-    lv_label_set_text(s_ui_MainScreenWifiIcon, LV_SYMBOL_WIFI);
-    lv_obj_set_style_text_opa(s_ui_MainScreenWifiIcon, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(s_ui_MainScreenWifiIcon, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
-    ui_MainScreen_refresh_wifi_status();
+    /* WiFi 状态仅在 ui_StatusBar 中显示，主页不再渲染 */
 
     ui_KeyMappedSecondary_bind_main_screen_summary(s_ui_MainScreenProfileIconLabel,
                                                    s_ui_MainScreenProfileIconImage,
@@ -389,22 +308,6 @@ void ui_MainScreen_screen_init(void)
     lv_obj_set_y(ui_line3, 13);
     lv_obj_set_align(ui_line3, LV_ALIGN_CENTER);
     lv_obj_clear_flag(ui_line3, LV_OBJ_FLAG_SCROLLABLE); /// Flags
-
-    ui_line4 = lv_obj_create(ui_MainScreen);
-    lv_obj_set_width(ui_line4, 92);
-    lv_obj_set_height(ui_line4, 1);
-    lv_obj_set_x(ui_line4, 155);
-    lv_obj_set_y(ui_line4, -25);
-    lv_obj_set_align(ui_line4, LV_ALIGN_CENTER);
-    lv_obj_clear_flag(ui_line4, LV_OBJ_FLAG_SCROLLABLE); /// Flags
-
-    ui_line6 = lv_obj_create(ui_MainScreen);
-    lv_obj_set_width(ui_line6, 1);
-    lv_obj_set_height(ui_line6, 60);
-    lv_obj_set_x(ui_line6, 156);
-    lv_obj_set_y(ui_line6, 18);
-    lv_obj_set_align(ui_line6, LV_ALIGN_CENTER);
-    lv_obj_clear_flag(ui_line6, LV_OBJ_FLAG_SCROLLABLE); /// Flags
 
     lv_obj_add_event_cb(ui_ButtonLeft1, ui_event_ButtonLeft1, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_ButtonRight1, ui_event_ButtonRight1, LV_EVENT_ALL, NULL);
@@ -438,14 +341,6 @@ void ui_MainScreen_set_host_connection(bool connected)
     ui_MainScreen_refresh_host_connection();
 }
 
-void ui_MainScreen_set_wifi_status(bool enabled, bool connected, int rssi)
-{
-    s_ui_MainScreenWifiEnabled = enabled;
-    s_ui_MainScreenWifiConnected = connected;
-    s_ui_MainScreenWifiRssi = rssi;
-    ui_MainScreen_refresh_wifi_status();
-}
-
 void ui_MainScreen_screen_destroy(void)
 {
     ui_KeyMappedSecondary_bind_main_screen_summary(NULL, NULL, NULL);
@@ -463,8 +358,6 @@ void ui_MainScreen_screen_destroy(void)
     s_ui_MainScreenProfileName = NULL;
     s_ui_MainScreenHostConnectionIcon = NULL;
     s_ui_MainScreenHostConnectionLabel = NULL;
-    s_ui_MainScreenWifiIcon = NULL;
-    s_ui_MainScreenWifiLabel = NULL;
     ui_LabelTime = NULL;
     ui_LabelData = NULL;
     ui_LabelSecond = NULL;
@@ -475,7 +368,5 @@ void ui_MainScreen_screen_destroy(void)
     ui_line1 = NULL;
     ui_line2 = NULL;
     ui_line3 = NULL;
-    ui_line4 = NULL;
     ui_line5 = NULL;
-    ui_line6 = NULL;
 }

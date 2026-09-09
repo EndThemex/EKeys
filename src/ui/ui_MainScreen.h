@@ -18,7 +18,6 @@ extern "C"
   extern void ui_MainScreen_set_rgb_light(uint8_t percent);
   extern void ui_MainScreen_set_tft_light(uint8_t percent);
   extern void ui_MainScreen_set_host_connection(bool connected);
-  extern void ui_MainScreen_set_wifi_status(bool enabled, bool connected, int rssi);
   extern void ui_event_MainScreen(lv_event_t *e);
   extern lv_obj_t *ui_MainScreen;
   extern void ui_event_ButtonLeft1(lv_event_t *e);
@@ -32,14 +31,10 @@ extern "C"
   extern lv_obj_t *ui_LabelSecond;
   extern lv_obj_t *ui_LabelWeek;
   extern lv_obj_t *ui_LabelWorkmode;
-  extern lv_obj_t *ui_LabelRGBLight;
-  extern lv_obj_t *ui_LabelTFTLight;
   extern lv_obj_t *ui_line1;
   extern lv_obj_t *ui_line2;
   extern lv_obj_t *ui_line3;
-  extern lv_obj_t *ui_line4;
   extern lv_obj_t *ui_line5;
-  extern lv_obj_t *ui_line6;
   // CUSTOM VARIABLES
 
 #ifdef __cplusplus
