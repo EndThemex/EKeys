@@ -27,6 +27,7 @@ typedef enum
     SETTING_ITEM_CONNECT_HOST,
     SETTING_ITEM_VOICE_ENABLE,
     SETTING_ITEM_PROFILE,
+    SETTING_ITEM_UI_LANG,
     SETTING_ITEM_COUNT
 } setting_item_id_t;
 
@@ -93,7 +94,8 @@ static ui_settings_snapshot_t s_setting_edit = {
     .connect_host = true,
     .voice_enable = true,
     .active_keymap_profile = 0,
-    .rgb_single_color = "0"};
+    .rgb_single_color = "0",
+    .ui_lang = 0};
 static bool s_setting_dirty = false;
 static bool s_setting_waiting_apply = false;
 static uint8_t s_setting_focus = 0;
@@ -253,6 +255,8 @@ static const char *setting_secondary_item_name(setting_item_id_t item)
         return "语音输入";
     case SETTING_ITEM_PROFILE:
         return "键位配置";
+    case SETTING_ITEM_UI_LANG:
+        return "语言";
     default:
         return "设置";
     }
@@ -395,6 +399,9 @@ static void setting_secondary_value_text(setting_item_id_t item, char *buffer, s
         break;
     case SETTING_ITEM_PROFILE:
         snprintf(buffer, buffer_size, "配置 %u", (unsigned)(s_setting_edit.active_keymap_profile + 1));
+        break;
+    case SETTING_ITEM_UI_LANG:
+        snprintf(buffer, buffer_size, "%s", s_setting_edit.ui_lang == 1 ? "English" : "中文");
         break;
     default:
         snprintf(buffer, buffer_size, "--");
@@ -620,6 +627,17 @@ static int setting_secondary_adjust_value(setting_item_id_t item, int step)
             return 0;
         }
         s_setting_edit.active_keymap_profile = (uint8_t)next;
+        return 1;
+    }
+    case SETTING_ITEM_UI_LANG:
+    {
+        /* 0=中文，1=英文；旋钮步进在两个值之间切换 */
+        const uint8_t next = s_setting_edit.ui_lang == 0 ? 1 : 0;
+        if (next == s_setting_edit.ui_lang)
+        {
+            return 0;
+        }
+        s_setting_edit.ui_lang = next;
         return 1;
     }
     default:

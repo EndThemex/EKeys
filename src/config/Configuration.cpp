@@ -58,7 +58,8 @@ namespace ekeys
             }
             if (strcmp(key, "config_version") == 0 ||
                 strcmp(key, "device_name") == 0 ||
-                strcmp(key, "serial_number") == 0)
+                strcmp(key, "serial_number") == 0 ||
+                strcmp(key, "ui_lang") == 0)
             {
                 return "system";
             }
@@ -200,13 +201,11 @@ namespace ekeys
         strncpy(settings_.voice_tencent_secret_id,
                 ini.GetValue("voice", "voice_tencent_secret_id", ""),
                 sizeof(settings_.voice_tencent_secret_id) - 1);
-        settings_.voice_tencent_secret_id[
-            sizeof(settings_.voice_tencent_secret_id) - 1] = '\0';
+        settings_.voice_tencent_secret_id[sizeof(settings_.voice_tencent_secret_id) - 1] = '\0';
         strncpy(settings_.voice_tencent_secret_key,
                 ini.GetValue("voice", "voice_tencent_secret_key", ""),
                 sizeof(settings_.voice_tencent_secret_key) - 1);
-        settings_.voice_tencent_secret_key[
-            sizeof(settings_.voice_tencent_secret_key) - 1] = '\0';
+        settings_.voice_tencent_secret_key[sizeof(settings_.voice_tencent_secret_key) - 1] = '\0';
 
         strncpy(settings_.device_name, ini.GetValue("system", "device_name", ""),
                 sizeof(settings_.device_name) - 1);
@@ -214,6 +213,14 @@ namespace ekeys
         strncpy(settings_.serial_number, ini.GetValue("system", "serial_number", ""),
                 sizeof(settings_.serial_number) - 1);
         settings_.serial_number[sizeof(settings_.serial_number) - 1] = '\0';
+
+        /* 主页日期/星期语言：0=中文（默认），1=英文 */
+        settings_.ui_lang =
+            static_cast<uint8_t>(ini.GetLongValue("system", "ui_lang", 0));
+        if (settings_.ui_lang > 1)
+        {
+            settings_.ui_lang = 0;
+        }
 
         LOG_INFO("CONFIG", "config.ini loaded (active profile=%u)",
                  static_cast<unsigned>(settings_.active_keymap_profile));

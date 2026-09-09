@@ -24,6 +24,8 @@ typedef struct {
     bool voice_enable;
     uint8_t active_keymap_profile;
     char rgb_single_color[16];
+    /* 主页日期/星期语言：0=中文（默认），1=英文 */
+    uint8_t ui_lang;
 } ui_settings_snapshot_t;
 
 #ifdef __cplusplus

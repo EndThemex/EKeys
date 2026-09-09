@@ -176,13 +176,13 @@ void ui_MainScreen_screen_init(void)
     ui_LabelData = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_LabelData, LV_SIZE_CONTENT);  /// 1
     lv_obj_set_height(ui_LabelData, LV_SIZE_CONTENT); /// 1
-    lv_obj_set_x(ui_LabelData, 58);
-    lv_obj_set_y(ui_LabelData, 36);
+    lv_obj_set_x(ui_LabelData, 52);
+    lv_obj_set_y(ui_LabelData, 44);
     lv_obj_set_align(ui_LabelData, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_LabelData, "SEP 05");
+    lv_label_set_text(ui_LabelData, "09月08日");
     lv_obj_set_style_text_color(ui_LabelData, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_LabelData, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_LabelData, &ui_font_BebasNeueFont36, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_LabelData, &ui_font_FontCKJGT24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_LabelSecond = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_LabelSecond, LV_SIZE_CONTENT);  /// 1
@@ -198,13 +198,13 @@ void ui_MainScreen_screen_init(void)
     ui_LabelWeek = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_LabelWeek, LV_SIZE_CONTENT);  /// 1
     lv_obj_set_height(ui_LabelWeek, LV_SIZE_CONTENT); /// 1
-    lv_obj_set_x(ui_LabelWeek, -40);
-    lv_obj_set_y(ui_LabelWeek, 36);
+    lv_obj_set_x(ui_LabelWeek, -58);
+    lv_obj_set_y(ui_LabelWeek, 44);
     lv_obj_set_align(ui_LabelWeek, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_LabelWeek, "Monday");
+    lv_label_set_text(ui_LabelWeek, "星期一");
     lv_obj_set_style_text_color(ui_LabelWeek, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_LabelWeek, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_LabelWeek, &ui_font_BebasNeueFont36, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_LabelWeek, &ui_font_FontCKJGT24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_LabelWorkmode = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_LabelWorkmode, LV_SIZE_CONTENT);  /// 1

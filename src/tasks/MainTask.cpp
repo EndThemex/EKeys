@@ -257,21 +257,43 @@ namespace ekeys
             }
             else
             {
-                /* 已同步：补齐日期 "YYYY-MM-DD" + 星期缩写 "MON"…"SUN" */
+                /* 已同步：按 ui_lang 生成最终显示文本（UI 端无需再解析） */
                 struct tm tm_now;
                 if (getLocalTime(&tm_now, 20))
                 {
-                    snprintf(msg.date_text, sizeof(msg.date_text),
-                             "%04d-%02d-%02d",
-                             tm_now.tm_year + 1900,
-                             tm_now.tm_mon + 1,
-                             tm_now.tm_mday);
-                    static const char *const kWeek[7] = {
-                        "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
-                    if (tm_now.tm_wday >= 0 && tm_now.tm_wday < 7)
+                    const uint8_t lang =
+                        ekeys::Configuration::instance().settings().ui_lang;
+                    if (lang == 1)
                     {
-                        snprintf(msg.week_text, sizeof(msg.week_text),
-                                 "%s", kWeek[tm_now.tm_wday]);
+                        /* 英文："SEP 08" / "MON" */
+                        static const char *const kMonthEn[12] = {
+                            "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+                            "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
+                        static const char *const kWeekEn[7] = {
+                            "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+                        const int mm = tm_now.tm_mon + 1;
+                        snprintf(msg.date_text, sizeof(msg.date_text),
+                                 "%s %02d", kMonthEn[mm - 1], tm_now.tm_mday);
+                        if (tm_now.tm_wday >= 0 && tm_now.tm_wday < 7)
+                        {
+                            snprintf(msg.week_text, sizeof(msg.week_text),
+                                     "%s", kWeekEn[tm_now.tm_wday]);
+                        }
+                    }
+                    else
+                    {
+                        /* 中文（默认）："09月08日" / "星期一" */
+                        static const char *const kWeekZh[7] = {
+                            "星期日", "星期一", "星期二", "星期三",
+                            "星期四", "星期五", "星期六"};
+                        snprintf(msg.date_text, sizeof(msg.date_text),
+                                 "%02d月%02d日",
+                                 tm_now.tm_mon + 1, tm_now.tm_mday);
+                        if (tm_now.tm_wday >= 0 && tm_now.tm_wday < 7)
+                        {
+                            snprintf(msg.week_text, sizeof(msg.week_text),
+                                     "%s", kWeekZh[tm_now.tm_wday]);
+                        }
                     }
                 }
             }
@@ -494,6 +516,11 @@ namespace ekeys
             {
                 d.active_keymap_profile = s.active_keymap_profile;
                 changed = true;
+            }
+            if (d.ui_lang != static_cast<uint8_t>(s.ui_lang))
+            {
+                d.ui_lang = static_cast<uint8_t>(s.ui_lang);
+                changed = true;
             } });
 
         if (!changed)
@@ -528,6 +555,7 @@ namespace ekeys
             config.saveSetting("connect_host", static_cast<int>(s.connect_host));
             config.saveSetting("voice_enable", static_cast<int>(s.voice_enable));
             config.saveSetting("active_keymap_profile", static_cast<int>(s.active_keymap_profile));
+            config.saveSetting("ui_lang", static_cast<int>(s.ui_lang));
         }
 
         /* C6 修复：副作用统一走 AppContext::applyUiSideEffects，与 cmd_config 共用 */

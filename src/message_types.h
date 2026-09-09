@@ -121,8 +121,8 @@ namespace ekeys
         DisplayMessageType type{DisplayMessageType::SettingUpdate};
 
         char time_text[16]{};       /* TimeUpdate："HH:MM:SS" + '\0' */
-        char date_text[12]{};       /* TimeUpdate："YYYY-MM-DD" + '\0'；未同步为空串 */
-        char week_text[4]{};        /* TimeUpdate："MON"/"TUE" + '\0'；未同步为空串 */
+        char date_text[16]{};       /* TimeUpdate：UI 直接显示文本（"09月08日"/"SEP 08"），未同步为空串 */
+        char week_text[12]{};       /* TimeUpdate：UI 直接显示文本（"星期一"/"MON"），未同步为空串 */
         uint8_t action{0};          /* ActionInput：LV_KEY_* 或 kMatrixKeyActionBase + key_id */
         uint32_t key_value{0};      /* KeyInput：按键位掩码（RGB 高亮，阶段 06） */
         uint8_t navigate_target{0}; /* Navigate：ui_screen_tag_t */
@@ -158,6 +158,7 @@ namespace ekeys
         out.active_keymap_profile = s.active_keymap_profile;
         snprintf(out.rgb_single_color, sizeof(out.rgb_single_color),
                  "%u", static_cast<unsigned>(s.rgb_single_color));
+        out.ui_lang = s.ui_lang;
     }
 
 } // namespace ekeys

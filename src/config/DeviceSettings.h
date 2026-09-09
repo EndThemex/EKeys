@@ -63,6 +63,12 @@ namespace ekeys
         uint32_t config_version;
         char device_name[33];
         char serial_number[33];
+
+        /*
+         * 主页日期/星期语言：0=中文（默认），1=英文。
+         * 持久化在 system 节，键名 "ui_lang"。
+         */
+        uint8_t ui_lang;
     };
 
 } // namespace ekeys
