@@ -376,11 +376,10 @@
 
 `CMD_PC_STATUS`（桌面 App 主动推送）解析后填充 [PcStatusInfo](file:///D:/search/gitcode/FunModularKeyboard/firmware/FunModularKeyboard/src/message_types.h#L8-L22)：
 
-- 锁键状态：`caps_lock / num_lock / scroll_lock`
 - 网络：`network_connected / network_up_kbps / network_down_kbps`
-- 电源：`on_ac_power / battery_percent`
 - 性能：`cpu_usage_percent / memory_usage_percent / cpu_temp_c / disk_io_percent`
 - 过滤：负值字段显示 `--`
+- 不支持：`caps_lock / num_lock / scroll_lock / on_ac_power / battery_percent`（电量走 `BatteryStatus`，其它字段本协议未实现）
 
 UI 展示在 `UI_SCREEN_PC_STATUS(_SECONDARY)`。
 

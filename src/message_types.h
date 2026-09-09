@@ -47,9 +47,6 @@ namespace ekeys
     /* PC 状态（CMD_PC_STATUS，阶段 06 起由协议层填充） */
     struct PcStatusInfo
     {
-        bool caps_lock{false};
-        bool num_lock{false};
-        bool scroll_lock{false};
         bool network_connected{false};
         float cpu_usage_percent{-1.0f};
         float memory_usage_percent{-1.0f};

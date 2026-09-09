@@ -432,17 +432,17 @@ App 应始终按 `cmd`、`seq`、`status` 解析，不要依赖响应字段的�
 
 ### 5.3 配置校验规则
 
-| 字段                               | 当前固件行为                                     |
-| ---------------------------------- | ------------------------------------------------ |
-| `tft_brightness`                   | 小于 5 钳制为 5，大于 100 钳制为 100             |
-| `work_mode`                        | 仅接受 `0~2`，越界忽略该字段                     |
-| `active_keymap_profile`            | 仅接受 `0~7`                                     |
-| `wifi_switch`、`connect_host`      | 归一化为 `0/1`                                   |
-| `voice_enable`、`voice_auto_enter` | 归一化为 `0/1`                                   |
-| `voice_trigger_key`                | 小于 0 取 0，大于 11 取 11                       |
-| `voice_max_record_ms`              | 钳制到 `1000~60000`                              |
+| 字段                               | 当前固件行为                                       |
+| ---------------------------------- | -------------------------------------------------- |
+| `tft_brightness`                   | 小于 5 钳制为 5，大于 100 钳制为 100               |
+| `work_mode`                        | 仅接受 `0~2`，越界忽略该字段                       |
+| `active_keymap_profile`            | 仅接受 `0~7`                                       |
+| `wifi_switch`、`connect_host`      | 归一化为 `0/1`                                     |
+| `voice_enable`、`voice_auto_enter` | 归一化为 `0/1`                                     |
+| `voice_trigger_key`                | 小于 0 取 0，大于 11 取 11                         |
+| `voice_max_record_ms`              | 钳制到 `1000~60000`                                |
 | 字符串字段                         | 超过容量时截断；WiFi 密码和腾讯云 Key 最大 64 字节 |
-| 未知字段                           | 忽略，不影响请求结果                             |
+| 未知字段                           | 忽略，不影响请求结果                               |
 
 配置修改在内存层通过一次 `mutateSettings()` 完成，持久化会逐项写入 `/config.ini`。因此协议层看起来是一次请求，但文件写入不是事务式的强一致提交。
 
@@ -805,9 +805,6 @@ App 定时发送：
   "seq": 1,
   "data": {
     "pc_status": {
-      "caps_lock": true,
-      "num_lock": false,
-      "scroll_lock": false,
       "network_connected": true,
       "cpu_usage_percent": 35.2,
       "memory_usage_percent": 61.8,
@@ -822,9 +819,6 @@ App 定时发送：
 
 支持字段：
 
-- `caps_lock`
-- `num_lock`
-- `scroll_lock`
 - `network_connected`
 - `cpu_usage_percent`
 - `memory_usage_percent`
@@ -832,6 +826,8 @@ App 定时发送：
 - `disk_io_percent`
 - `network_up_kbps`
 - `network_down_kbps`
+
+未实现（推送会被静默丢弃）：`caps_lock / num_lock / scroll_lock / on_ac_power / battery_percent`。电量走 `BatteryStatus` 命令。
 
 配置 PC 状态掩码：
 

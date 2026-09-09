@@ -3,11 +3,16 @@
  *
  * 报文（参考工程 onPcStatusCommand）：
  *   请求：{"cmd":0x0d,"seq":N,"data":{"pc_status":{
- *     type?("config"), mask?, caps_lock?, num_lock?, scroll_lock?,
- *     network_connected?, on_ac_power?, battery_percent?,
+ *     type?("config"), mask?, network_connected?,
  *     cpu_usage_percent?, memory_usage_percent?, cpu_temp_c?,
  *     disk_io_percent?, network_up_kbps?, network_down_kbps? }}}
  *   响应：{"cmd":0x8d,"seq":N,"status":0}
+ *
+ *   不支持的字段（推送会被静默丢弃）：
+ *     caps_lock / num_lock / scroll_lock —— 二级屏布局未单独渲染，
+ *       早期实现解析后未消费，2026-09 删除解析以保持实现与契约一致。
+ *     on_ac_power / battery_percent —— 电源信息本协议未实现；
+ *       电量走 CMD_BATTERY_STATUS。
  */
 
 #include "cmd_pc_status.h"
@@ -60,9 +65,6 @@ namespace ekeys::protocol::commands
             DisplayMessage msg;
             msg.type = DisplayMessageType::PcStatus;
             PcStatusInfo &p = msg.pc_status;
-            p.caps_lock = pc["caps_lock"] | false;
-            p.num_lock = pc["num_lock"] | false;
-            p.scroll_lock = pc["scroll_lock"] | false;
             p.network_connected = pc["network_connected"] | false;
             p.cpu_usage_percent = pc["cpu_usage_percent"] | -1.0f;
             p.memory_usage_percent = pc["memory_usage_percent"] | -1.0f;

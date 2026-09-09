@@ -7,36 +7,37 @@
 #define UI_PCSTATUSSCREEN_H
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-// SCREEN: ui_PcStatusScreen
-extern void ui_PcStatusScreen_screen_init(void);
-extern void ui_PcStatusScreen_screen_destroy(void);
-extern void ui_event_PcStatusScreen(lv_event_t * e);
-extern lv_obj_t * ui_PcStatusScreen;
-extern lv_obj_t * ui_Label2;
-extern lv_obj_t * ui_LabelPcHost;
-extern lv_obj_t * ui_LabelPcTime;
-extern lv_obj_t * ui_LabelPcLocks;
-extern lv_obj_t * ui_LabelPcNetwork;
-extern lv_obj_t * ui_LabelPcPower;
-extern void ui_event_ButtonLeft3(lv_event_t * e);
-extern lv_obj_t * ui_ButtonLeft3;
-extern void ui_event_ButtonRight3(lv_event_t * e);
-extern lv_obj_t * ui_ButtonRight3;
-extern void ui_event_ButtonEnter3(lv_event_t * e);
-extern lv_obj_t * ui_ButtonEnter3;
-extern lv_obj_t * ui_ButtonExit3;
-// CUSTOM VARIABLES
-extern void ui_PcStatusScreen_set_host_status(const char *text);
-extern void ui_PcStatusScreen_set_time_status(const char *text);
-extern void ui_PcStatusScreen_set_lock_status(const char *text);
-extern void ui_PcStatusScreen_set_network_status(const char *text);
-extern void ui_PcStatusScreen_set_power_status(const char *text);
-extern void ui_PcStatusScreen_set_cpu_temp_status(const char *text);
-extern void ui_PcStatusScreen_set_perf_status(const char *text);
-extern void ui_PcStatusScreen_set_temp_status(const char *text);
+  // SCREEN: ui_PcStatusScreen
+  extern void ui_PcStatusScreen_screen_init(void);
+  extern void ui_PcStatusScreen_screen_destroy(void);
+  extern void ui_event_PcStatusScreen(lv_event_t *e);
+  extern lv_obj_t *ui_PcStatusScreen;
+  extern lv_obj_t *ui_Label2;
+  extern lv_obj_t *ui_LabelPcHost;
+  extern lv_obj_t *ui_LabelPcTime;
+  extern lv_obj_t *ui_LabelPcLocks;
+  extern lv_obj_t *ui_LabelPcNetwork;
+  extern lv_obj_t *ui_LabelPcPower;
+  extern void ui_event_ButtonLeft3(lv_event_t *e);
+  extern lv_obj_t *ui_ButtonLeft3;
+  extern void ui_event_ButtonRight3(lv_event_t *e);
+  extern lv_obj_t *ui_ButtonRight3;
+  extern void ui_event_ButtonEnter3(lv_event_t *e);
+  extern lv_obj_t *ui_ButtonEnter3;
+  extern lv_obj_t *ui_ButtonExit3;
+  // CUSTOM VARIABLES
+/* 直接接原始字段，<0 表示"未知"，回退占位文本由 setter 内部决定 */
+extern void ui_PcStatusScreen_set_network(bool connected);
+extern void ui_PcStatusScreen_set_net_up_kbps(float kbps);
+extern void ui_PcStatusScreen_set_net_down_kbps(float kbps);
+extern void ui_PcStatusScreen_set_cpu_percent(float pct);
+extern void ui_PcStatusScreen_set_cpu_temp_c(float c);
+extern void ui_PcStatusScreen_set_mem_percent(float pct);
+extern void ui_PcStatusScreen_set_disk_io_percent(float pct);
 
 #ifdef __cplusplus
 } /*extern "C"*/

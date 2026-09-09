@@ -10,108 +10,83 @@
 #include <stdlib.h>
 #include <string.h>
 
-lv_obj_t * ui_PcStatusScreenSecondary = NULL;
-lv_obj_t * ui_Label2 = NULL;
-lv_obj_t * ui_LabelPcHost = NULL;
-lv_obj_t * ui_LabelPcTime = NULL;
-lv_obj_t * ui_LabelPcLocks = NULL;
-lv_obj_t * ui_LabelPcNetwork = NULL;
-lv_obj_t * ui_LabelPcPower = NULL;
-static lv_obj_t * s_LabelPcPerf = NULL;
-static lv_obj_t * s_LabelPcTemp = NULL;
+lv_obj_t *ui_PcStatusScreenSecondary = NULL;
+lv_obj_t *ui_Label2 = NULL;
+lv_obj_t *ui_LabelPcHost = NULL;
+lv_obj_t *ui_LabelPcTime = NULL;
+lv_obj_t *ui_LabelPcLocks = NULL;
+lv_obj_t *ui_LabelPcNetwork = NULL;
+lv_obj_t *ui_LabelPcPower = NULL;
+static lv_obj_t *s_LabelPcPerf = NULL;
+static lv_obj_t *s_LabelPcTemp = NULL;
 
-static lv_obj_t * s_PanelLeft = NULL;
-static lv_obj_t * s_PanelRight = NULL;
-static lv_obj_t * s_LabelTimeValue = NULL;
-static lv_obj_t * s_LabelNetValue = NULL;
-static lv_obj_t * s_LabelUpValue = NULL;
-static lv_obj_t * s_LabelDownValue = NULL;
-static lv_obj_t * s_LabelCpuValue = NULL;
-static lv_obj_t * s_LabelCpuTempValue = NULL;
-static lv_obj_t * s_LabelMemValue = NULL;
-static lv_obj_t * s_LabelDiskValue = NULL;
-static lv_obj_t * s_NetDot = NULL;
-static lv_obj_t * s_BarCpu = NULL;
-static lv_obj_t * s_BarCpuTemp = NULL;
-static lv_obj_t * s_BarMem = NULL;
-static lv_obj_t * s_BarDisk = NULL;
-static lv_obj_t * s_ButtonLeft = NULL;
-static lv_obj_t * s_ButtonRight = NULL;
-static lv_obj_t * s_ButtonEnter = NULL;
-static lv_obj_t * s_ButtonExit = NULL;
+static lv_obj_t *s_PanelLeft = NULL;
+static lv_obj_t *s_PanelRight = NULL;
+static lv_obj_t *s_LabelTimeValue = NULL;
+static lv_obj_t *s_LabelNetValue = NULL;
+static lv_obj_t *s_LabelUpValue = NULL;
+static lv_obj_t *s_LabelDownValue = NULL;
+static lv_obj_t *s_LabelCpuValue = NULL;
+static lv_obj_t *s_LabelCpuTempValue = NULL;
+static lv_obj_t *s_LabelMemValue = NULL;
+static lv_obj_t *s_LabelDiskValue = NULL;
+static lv_obj_t *s_NetDot = NULL;
+static lv_obj_t *s_BarCpu = NULL;
+static lv_obj_t *s_BarCpuTemp = NULL;
+static lv_obj_t *s_BarMem = NULL;
+static lv_obj_t *s_BarDisk = NULL;
+static lv_obj_t *s_ButtonLeft = NULL;
+static lv_obj_t *s_ButtonRight = NULL;
+static lv_obj_t *s_ButtonEnter = NULL;
+static lv_obj_t *s_ButtonExit = NULL;
 
-static char s_HostStatusText[64] = "";
-static char s_TimeStatusText[64] = "";
-static char s_LockStatusText[64] = "";
-static char s_NetworkStatusText[64] = "";
-static char s_PowerStatusText[64] = "";
-static char s_CpuTempStatusText[64] = "";
-static char s_PerfStatusText[64] = "";
-static char s_TempStatusText[64] = "";
-
-static void pc_status_cache_text(char *buffer, size_t buffer_size, const char *text)
+/*
+ * 字段缓存：<0 表示"未同步"，回退占位文本由 setter 内部决定。
+ * pc_status_apply_cached_values() 在二级屏 init 末尾回放，
+ * 避免从主屏 ENTER 进入二级屏时空白。
+ */
+static struct
 {
-    if (!buffer || buffer_size == 0) {
+    bool valid;
+    bool network_connected;
+    float net_up_kbps;
+    float net_down_kbps;
+    float cpu_percent;
+    float cpu_temp_c;
+    float mem_percent;
+    float disk_io_percent;
+} s_cached = {false, false,
+              -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+
+static void pc_status_set_bar_value(lv_obj_t *bar, float pct)
+{
+    if (!bar)
+    {
         return;
     }
-
-    snprintf(buffer, buffer_size, "%s", text ? text : "");
-}
-
-static void extract_value_part(const char *text, char *out, size_t outSize)
-{
-    if (!out || outSize == 0) return;
-    out[0] = '\0';
-    if (!text) return;
-
-    const char *sep = strchr(text, ':');
-    if (!sep) {
-        snprintf(out, outSize, "%s", text);
-        return;
-    }
-
-    const char *value = sep + 1;
-    while (*value == ' ') value++;
-    snprintf(out, outSize, "%s", value);
-}
-
-static int extract_percent_value(const char *text)
-{
-    if (!text) return -1;
-
-    const char *p = text;
-    while (*p && !((*p >= '0' && *p <= '9') || *p == '-')) p++;
-    if (!*p) return -1;
-
-    float v = strtof(p, NULL);
-    if (v < 0.0f) return -1;
-    if (v > 100.0f) v = 100.0f;
-    return (int)(v + 0.5f);
-}
-
-static void pc_status_set_bar_value(lv_obj_t *bar, int value)
-{
-    if (!bar) {
-        return;
-    }
-
-    if (value < 0) {
+    if (pct < 0.0f)
+    {
         lv_bar_set_value(bar, 0, LV_ANIM_OFF);
-    } else {
-        lv_bar_set_value(bar, value, LV_ANIM_ON);
+    }
+    else
+    {
+        if (pct > 100.0f)
+            pct = 100.0f;
+        lv_bar_set_value(bar, (int)(pct + 0.5f), LV_ANIM_ON);
     }
 }
 
 static void pc_status_apply_cached_values(void)
 {
-    ui_PcStatusScreen_set_host_status(s_HostStatusText[0] ? s_HostStatusText : NULL);
-    ui_PcStatusScreen_set_time_status(s_TimeStatusText[0] ? s_TimeStatusText : NULL);
-    ui_PcStatusScreen_set_lock_status(s_LockStatusText[0] ? s_LockStatusText : NULL);
-    ui_PcStatusScreen_set_network_status(s_NetworkStatusText[0] ? s_NetworkStatusText : NULL);
-    ui_PcStatusScreen_set_power_status(s_PowerStatusText[0] ? s_PowerStatusText : NULL);
-    ui_PcStatusScreen_set_cpu_temp_status(s_CpuTempStatusText[0] ? s_CpuTempStatusText : NULL);
-    ui_PcStatusScreen_set_perf_status(s_PerfStatusText[0] ? s_PerfStatusText : NULL);
-    ui_PcStatusScreen_set_temp_status(s_TempStatusText[0] ? s_TempStatusText : NULL);
+    if (!s_cached.valid)
+        return;
+    ui_PcStatusScreen_set_network(s_cached.network_connected);
+    ui_PcStatusScreen_set_net_up_kbps(s_cached.net_up_kbps);
+    ui_PcStatusScreen_set_net_down_kbps(s_cached.net_down_kbps);
+    ui_PcStatusScreen_set_cpu_percent(s_cached.cpu_percent);
+    ui_PcStatusScreen_set_cpu_temp_c(s_cached.cpu_temp_c);
+    ui_PcStatusScreen_set_mem_percent(s_cached.mem_percent);
+    ui_PcStatusScreen_set_disk_io_percent(s_cached.disk_io_percent);
 }
 
 static void pc_status_secondary_forward_key(uint32_t key)
@@ -119,115 +94,173 @@ static void pc_status_secondary_forward_key(uint32_t key)
     lv_obj_t *active_screen = lv_scr_act();
     lv_group_t *g = lv_group_get_default();
     lv_obj_t *target = g ? lv_group_get_focused(g) : active_screen;
-    if (target) {
+    if (target)
+    {
         lv_event_send(target, LV_EVENT_KEY, (void *)key);
     }
 }
 
-void ui_PcStatusScreen_set_host_status(const char *text)
+/*
+ * Locks setter（已删除）：
+ *   早期实现保留了 caps_lock / num_lock / scroll_lock 的协议解析与缓存，
+ *   但二级屏布局无对应控件。任务 #2 决定三处一致删除。
+ */
+
+void ui_PcStatusScreen_set_network(bool connected)
 {
-    char value[32] = {0};
-    pc_status_cache_text(s_HostStatusText, sizeof(s_HostStatusText), text);
-    if (!s_LabelTimeValue) return;
+    s_cached.valid = true;
+    s_cached.network_connected = connected;
+    if (!s_LabelNetValue || !s_NetDot)
+        return;
 
-    extract_value_part(text, value, sizeof(value));
-    lv_label_set_text(s_LabelTimeValue, value[0] ? value : "--:--:--");
-}
-
-void ui_PcStatusScreen_set_time_status(const char *text)
-{
-    char value[24] = {0};
-    pc_status_cache_text(s_TimeStatusText, sizeof(s_TimeStatusText), text);
-    if (!s_LabelNetValue || !s_NetDot) return;
-
-    extract_value_part(text, value, sizeof(value));
-    lv_label_set_text(s_LabelNetValue, value[0] ? value : "OFFLINE");
-
+    lv_label_set_text(s_LabelNetValue, connected ? "ONLINE" : "OFFLINE");
     lv_obj_set_style_bg_color(s_NetDot,
-                              strstr(value, "ONLINE") != NULL ? lv_color_hex(0x22C55E) : lv_color_hex(0xEF4444),
+                              connected ? lv_color_hex(0x22C55E)
+                                        : lv_color_hex(0xEF4444),
                               LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
-void ui_PcStatusScreen_set_lock_status(const char *text)
+void ui_PcStatusScreen_set_net_up_kbps(float kbps)
 {
-    char value[32] = {0};
-    pc_status_cache_text(s_LockStatusText, sizeof(s_LockStatusText), text);
-    if (!s_LabelUpValue) return;
+    char buf[24];
+    s_cached.valid = true;
+    s_cached.net_up_kbps = kbps;
+    if (!s_LabelUpValue)
+        return;
 
-    extract_value_part(text, value, sizeof(value));
-    lv_label_set_text(s_LabelUpValue, value[0] ? value : "-- Kbps");
+    if (kbps < 0.0f)
+    {
+        lv_label_set_text(s_LabelUpValue, "-- Kbps");
+    }
+    else
+    {
+        snprintf(buf, sizeof(buf), "%.1f Kbps", kbps);
+        lv_label_set_text(s_LabelUpValue, buf);
+    }
 }
 
-void ui_PcStatusScreen_set_network_status(const char *text)
+void ui_PcStatusScreen_set_net_down_kbps(float kbps)
 {
-    char value[32] = {0};
-    pc_status_cache_text(s_NetworkStatusText, sizeof(s_NetworkStatusText), text);
-    if (!s_LabelDownValue) return;
+    char buf[24];
+    s_cached.valid = true;
+    s_cached.net_down_kbps = kbps;
+    if (!s_LabelDownValue)
+        return;
 
-    extract_value_part(text, value, sizeof(value));
-    lv_label_set_text(s_LabelDownValue, value[0] ? value : "-- Kbps");
+    if (kbps < 0.0f)
+    {
+        lv_label_set_text(s_LabelDownValue, "-- Kbps");
+    }
+    else
+    {
+        snprintf(buf, sizeof(buf), "%.1f Kbps", kbps);
+        lv_label_set_text(s_LabelDownValue, buf);
+    }
 }
 
-void ui_PcStatusScreen_set_power_status(const char *text)
+void ui_PcStatusScreen_set_cpu_percent(float pct)
 {
-    char value[24] = {0};
-    pc_status_cache_text(s_PowerStatusText, sizeof(s_PowerStatusText), text);
-    if (!s_LabelCpuValue || !s_BarCpu) return;
+    char buf[16];
+    s_cached.valid = true;
+    s_cached.cpu_percent = pct;
+    if (!s_LabelCpuValue || !s_BarCpu)
+        return;
 
-    extract_value_part(text, value, sizeof(value));
-    lv_label_set_text(s_LabelCpuValue, value[0] ? value : "--");
-    pc_status_set_bar_value(s_BarCpu, extract_percent_value(value));
+    if (pct < 0.0f)
+    {
+        lv_label_set_text(s_LabelCpuValue, "--");
+    }
+    else
+    {
+        snprintf(buf, sizeof(buf), "%.1f%%", pct);
+        lv_label_set_text(s_LabelCpuValue, buf);
+    }
+    pc_status_set_bar_value(s_BarCpu, pct);
 }
 
-void ui_PcStatusScreen_set_cpu_temp_status(const char *text)
+void ui_PcStatusScreen_set_cpu_temp_c(float c)
 {
-    char value[24] = {0};
-    pc_status_cache_text(s_CpuTempStatusText, sizeof(s_CpuTempStatusText), text);
-    if (!s_LabelCpuTempValue) return;
+    char buf[16];
+    s_cached.valid = true;
+    s_cached.cpu_temp_c = c;
+    if (!s_LabelCpuTempValue || !s_BarCpuTemp)
+        return;
 
-    extract_value_part(text, value, sizeof(value));
-    lv_label_set_text(s_LabelCpuTempValue, value[0] ? value : "N/A");
-    pc_status_set_bar_value(s_BarCpuTemp, extract_percent_value(value));
+    if (c < 0.0f)
+    {
+        lv_label_set_text(s_LabelCpuTempValue, "N/A");
+    }
+    else
+    {
+        snprintf(buf, sizeof(buf), "%.1fC", c);
+        lv_label_set_text(s_LabelCpuTempValue, buf);
+    }
+    /*
+     * CPU 温度没有自然的 0~100 区间，沿用旧实现：把摄氏度钳到 0~100 当指示器长度。
+     * 视觉上 50℃ 大约一半，与"越热越长"语义基本一致。
+     */
+    pc_status_set_bar_value(s_BarCpuTemp, c);
 }
 
-void ui_PcStatusScreen_set_perf_status(const char *text)
+void ui_PcStatusScreen_set_mem_percent(float pct)
 {
-    char value[24] = {0};
-    pc_status_cache_text(s_PerfStatusText, sizeof(s_PerfStatusText), text);
-    if (!s_LabelMemValue || !s_BarMem) return;
+    char buf[16];
+    s_cached.valid = true;
+    s_cached.mem_percent = pct;
+    if (!s_LabelMemValue || !s_BarMem)
+        return;
 
-    extract_value_part(text, value, sizeof(value));
-    lv_label_set_text(s_LabelMemValue, value[0] ? value : "--");
-    pc_status_set_bar_value(s_BarMem, extract_percent_value(value));
+    if (pct < 0.0f)
+    {
+        lv_label_set_text(s_LabelMemValue, "--");
+    }
+    else
+    {
+        snprintf(buf, sizeof(buf), "%.1f%%", pct);
+        lv_label_set_text(s_LabelMemValue, buf);
+    }
+    pc_status_set_bar_value(s_BarMem, pct);
 }
 
-void ui_PcStatusScreen_set_temp_status(const char *text)
+void ui_PcStatusScreen_set_disk_io_percent(float pct)
 {
-    char value[24] = {0};
-    pc_status_cache_text(s_TempStatusText, sizeof(s_TempStatusText), text);
-    if (!s_LabelDiskValue || !s_BarDisk) return;
+    char buf[16];
+    s_cached.valid = true;
+    s_cached.disk_io_percent = pct;
+    if (!s_LabelDiskValue || !s_BarDisk)
+        return;
 
-    extract_value_part(text, value, sizeof(value));
-    lv_label_set_text(s_LabelDiskValue, value[0] ? value : "--");
-    pc_status_set_bar_value(s_BarDisk, extract_percent_value(value));
+    if (pct < 0.0f)
+    {
+        lv_label_set_text(s_LabelDiskValue, "--");
+    }
+    else
+    {
+        snprintf(buf, sizeof(buf), "%.1f%%", pct);
+        lv_label_set_text(s_LabelDiskValue, buf);
+    }
+    pc_status_set_bar_value(s_BarDisk, pct);
 }
 
-void ui_event_PcStatusScreenSecondary(lv_event_t * e)
+void ui_event_PcStatusScreenSecondary(lv_event_t *e)
 {
-    if (lv_event_get_code(e) != LV_EVENT_KEY) {
+    if (lv_event_get_code(e) != LV_EVENT_KEY)
+    {
         return;
     }
 
-    if ((uintptr_t)lv_event_get_param(e) == (uintptr_t)LV_KEY_ESC) {
+    if ((uintptr_t)lv_event_get_param(e) == (uintptr_t)LV_KEY_ESC)
+    {
         ui_set_active_screen_tag(UI_SCREEN_PC_STATUS);
         _ui_screen_change(&ui_PcStatusScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_PcStatusScreen_screen_init);
         lv_refr_now(NULL);
     }
 }
 
-void ui_event_ButtonExitPcStatusSecondary(lv_event_t * e)
+void ui_event_ButtonExitPcStatusSecondary(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         pc_status_secondary_forward_key(LV_KEY_ESC);
     }
 }
@@ -442,7 +475,8 @@ void ui_PcStatusScreenSecondary_screen_init(void)
 
 void ui_PcStatusScreenSecondary_screen_destroy(void)
 {
-    if (ui_PcStatusScreenSecondary) {
+    if (ui_PcStatusScreenSecondary)
+    {
         lv_obj_del(ui_PcStatusScreenSecondary);
     }
 

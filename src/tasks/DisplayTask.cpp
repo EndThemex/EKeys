@@ -518,81 +518,13 @@ namespace ekeys
     {
         const PcStatusInfo &pc = msg.pc_status;
 
-        char locks[48];
-        char network[48];
-        char up[48];
-        char down[48];
-        char cpu[48];
-        char cpuTemp[48];
-        char mem[48];
-        char diskIo[48];
-
-        snprintf(locks, sizeof(locks), "Locks: C%s N%s S%s",
-                 pc.caps_lock ? "ON" : "--",
-                 pc.num_lock ? "ON" : "--",
-                 pc.scroll_lock ? "ON" : "--");
-        snprintf(network, sizeof(network), "Network: %s",
-                 pc.network_connected ? "ONLINE" : "OFFLINE");
-        if (pc.network_up_kbps >= 0.0f)
-        {
-            snprintf(up, sizeof(up), "Net Up: %.1f Kbps", pc.network_up_kbps);
-        }
-        else
-        {
-            snprintf(up, sizeof(up), "Net Up: -- Kbps");
-        }
-        if (pc.network_down_kbps >= 0.0f)
-        {
-            snprintf(down, sizeof(down), "Net Down: %.1f Kbps",
-                     pc.network_down_kbps);
-        }
-        else
-        {
-            snprintf(down, sizeof(down), "Net Down: -- Kbps");
-        }
-        if (pc.cpu_usage_percent >= 0.0f)
-        {
-            snprintf(cpu, sizeof(cpu), "CPU: %.1f%%", pc.cpu_usage_percent);
-        }
-        else
-        {
-            snprintf(cpu, sizeof(cpu), "CPU: --");
-        }
-        if (pc.memory_usage_percent >= 0.0f)
-        {
-            snprintf(mem, sizeof(mem), "MEM: %.1f%%",
-                     pc.memory_usage_percent);
-        }
-        else
-        {
-            snprintf(mem, sizeof(mem), "MEM: --");
-        }
-        if (pc.cpu_temp_c >= 0.0f)
-        {
-            snprintf(cpuTemp, sizeof(cpuTemp), "CPU Temp: %.1fC", pc.cpu_temp_c);
-        }
-        else
-        {
-            snprintf(cpuTemp, sizeof(cpuTemp), "CPU Temp: N/A");
-        }
-        if (pc.disk_io_percent >= 0.0f)
-        {
-            snprintf(diskIo, sizeof(diskIo), "Disk IO: %.1f%%",
-                     pc.disk_io_percent);
-        }
-        else
-        {
-            snprintf(diskIo, sizeof(diskIo), "Disk IO: --");
-        }
-
-        ui_PcStatusScreen_set_host_status(locks);
-        ui_PcStatusScreen_set_time_status(network);
-        ui_PcStatusScreen_set_lock_status(up);
-        ui_PcStatusScreen_set_network_status(down);
-        ui_PcStatusScreen_set_power_status(cpu);
-        ui_PcStatusScreen_set_cpu_temp_status(cpuTemp);
-        ui_PcStatusScreen_set_perf_status(mem);
-        ui_PcStatusScreen_set_temp_status(diskIo);
+        ui_PcStatusScreen_set_network(pc.network_connected);
+        ui_PcStatusScreen_set_net_up_kbps(pc.network_up_kbps);
+        ui_PcStatusScreen_set_net_down_kbps(pc.network_down_kbps);
+        ui_PcStatusScreen_set_cpu_percent(pc.cpu_usage_percent);
+        ui_PcStatusScreen_set_cpu_temp_c(pc.cpu_temp_c);
+        ui_PcStatusScreen_set_mem_percent(pc.memory_usage_percent);
+        ui_PcStatusScreen_set_disk_io_percent(pc.disk_io_percent);
     }
 
     void DisplayTask::applyHaStatus(const DisplayMessage &msg)
@@ -602,8 +534,8 @@ namespace ekeys
         ui_MainScreen_set_host_connection(ha.tcp_connected);
         /* 主页右下角 WiFi 状态（与 HA 二级页共用 wifi_enabled/connected/rssi 字段） */
         ui_MainScreen_set_wifi_status(ha.wifi_enabled,
-                                       ha.wifi_connected,
-                                       ha.wifi_rssi);
+                                      ha.wifi_connected,
+                                      ha.wifi_rssi);
         ui_HaScreenSecondary_set_wifi_status(ha.wifi_enabled,
                                              ha.wifi_connected,
                                              ha.wifi_rssi,
