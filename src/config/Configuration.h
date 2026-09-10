@@ -15,6 +15,8 @@
 #include <freertos/semphr.h>
 
 #include <functional>
+#include <initializer_list>
+#include <utility>
 
 #include "config/DeviceSettings.h"
 #include "input/MatrixScanner.h" // kMatrixKeyCount
@@ -55,6 +57,15 @@ namespace ekeys
         bool saveSetting(const char *key, int value);
         /* F6 修复：pc_status_mask 持久化为无符号，与 %lu 一致 */
         bool saveSetting(const char *key, uint32_t value);
+
+        /*
+         * 批量持久化多个 int 设置项：单次 config.ini 读/写覆盖全部键
+         * （SPIFFS atomic 写开销大，逐键 saveSetting 会放大 N 倍）。
+         * 任一键非法返回 false 且不做任何写入；仅持久化，不改内存
+         * settings_（内存更新仍走 mutateSettings）。
+         */
+        bool saveSettings(
+            const std::initializer_list<std::pair<const char *, int>> &kvs);
 
         /*
          * 加载当前激活 Profile 的键映射；无文件返回 false。

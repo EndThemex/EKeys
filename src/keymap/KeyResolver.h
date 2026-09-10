@@ -59,6 +59,15 @@ namespace ekeys
         void releaseAllForKey(uint8_t keyId, IKeyboard &keyboard);
 
         /*
+         * 用内存中的映射表直接刷新运行时表（0x06 下发路径使用）：
+         * keyMask 置位（bit 1~kMatrixKeyCount）的键覆盖为 mappings[i]，
+         * 未置位键保持现值；不访问 SPIFFS。调用后重置运行时状态
+         * （同 reloadKeymap 语义）。
+         */
+        void apply(const std::array<KeyMapping, kMatrixKeyCount + 1> &mappings,
+                   uint16_t keyMask);
+
+        /*
          * 重置运行时状态（FUN held 标志、触发层记录）。
          * reloadKeymap / 配置变更时调用，避免状态卡住。
          */

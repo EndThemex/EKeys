@@ -52,6 +52,14 @@ namespace ekeys
         void reloadKeymap();
 
         /*
+         * 0x06 下发路径：用协议层解析好的内存映射直接刷新 KeyResolver
+         * （免 SPIFFS 重读），并投递键映射屏标签更新。持久化由协议层
+         * 在回 ACK 后自行完成；启动路径仍走 reloadKeymap()。
+         */
+        void applyKeymap(const std::array<KeyMapping, kMatrixKeyCount + 1> &map,
+                         uint16_t keyMask);
+
+        /*
          * 由 Arduino loop() 调用，约 5ms 一次。
          */
         void loop();

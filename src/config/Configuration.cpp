@@ -262,6 +262,38 @@ namespace ekeys
         return saveSetting(key, buf);
     }
 
+    bool Configuration::saveSettings(
+        const std::initializer_list<std::pair<const char *, int>> &kvs)
+    {
+        if (kvs.size() == 0)
+        {
+            return true;
+        }
+
+        /* 先校验全部键，避免写了一半才发现非法 */
+        for (const auto &kv : kvs)
+        {
+            if (sectionOfKey(kv.first) == nullptr)
+            {
+                LOG_WARNING("CONFIG", "unknown setting key: %s", kv.first);
+                return false;
+            }
+        }
+
+        lock();
+        CSimpleIniA ini(true, false, false);
+        ConfigStore::loadGlobal(kGlobalConfigPath, ini); // 不存在则从空文件开始
+        for (const auto &kv : kvs)
+        {
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%d", kv.second);
+            ini.SetValue(sectionOfKey(kv.first), kv.first, buf);
+        }
+        bool ok = ConfigStore::saveGlobal(kGlobalConfigPath, ini);
+        unlock();
+        return ok;
+    }
+
     void Configuration::snapshot(DeviceSettings &out)
     {
         lock();

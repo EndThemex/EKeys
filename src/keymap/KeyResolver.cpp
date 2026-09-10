@@ -51,6 +51,20 @@ namespace ekeys
         }
     }
 
+    void KeyResolver::apply(
+        const std::array<KeyMapping, kMatrixKeyCount + 1> &mappings,
+        uint16_t keyMask)
+    {
+        for (uint8_t i = 1; i <= kMatrixKeyCount; ++i)
+        {
+            if ((keyMask & (1u << i)) != 0)
+            {
+                map_[i] = mappings[i];
+            }
+        }
+        resetState();
+    }
+
     void KeyResolver::end()
     {
         for (uint8_t i = 0; i <= kMatrixKeyCount; ++i)

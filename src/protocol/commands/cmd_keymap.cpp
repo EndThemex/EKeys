@@ -17,14 +17,18 @@
  * 与单击通道互相独立（运行时按 FUN 键是否按住选择，FUN1 层优先于 FUN2）。
  *
  * 键映射写入当前激活 Profile 的 keymap{N}.ini，fun_key 持久化到
- * config.ini [system]；成功后 MainTask::reloadKeymap() 刷新 KeyResolver
- * 并推送键映射屏标签。
+ * config.ini [system]。处理顺序：先更新运行时（内存设置 +
+ * MainTask::applyKeymap 直刷 KeyResolver）并回 ACK，再落盘 SPIFFS
+ * （atomic 写耗时秒级，放 ACK 前会拖慢响应导致 App 超时误判）。
  */
 
 #include "cmd_keymap.h"
 
 #include <ArduinoJson.h>
 #include <string.h>
+
+#include <initializer_list>
+#include <utility>
 
 #include "../../app/AppContext.h"
 #include "../../config/Configuration.h"
@@ -141,7 +145,12 @@ namespace ekeys::protocol::commands
         {
             (void)cmd;
 
-            Configuration::KeymapArray map{};
+            /*
+             * KeymapArray 约 4.3KB（12 键 × KeyMapping，含 combo 通道），
+             * 命令在 loopTask（8KB 栈）里执行，栈上声明会溢出复位，
+             * 必须放静态存储；命令处理为 MainTask 单线程，无并发问题。
+             */
+            static Configuration::KeymapArray map{};
             if (!Configuration::instance().loadActiveProfileKeyMapping(map))
             {
                 /*
@@ -297,7 +306,8 @@ namespace ekeys::protocol::commands
              * 逐键 saveKey 会对 keymap{N}.ini 做 N 次完整读/写，
              * SPIFFS 写入开销大，批量后仅一次。
              */
-            Configuration::KeymapArray map{};
+            /* 同 handleKeymapGet：KeymapArray 过大，放静态存储避免栈溢出 */
+            static Configuration::KeymapArray map{};
             uint16_t mask = 0;
             int ok_count = 0;
             for (JsonObject key : arr)
@@ -315,19 +325,18 @@ namespace ekeys::protocol::commands
             }
 
             Configuration &config = Configuration::instance();
-            if (!config.saveKeyMappings(map, mask))
-            {
-                LOG_ERROR("KEYMAP", "save %d mappings failed", ok_count);
-                SerialProtocol::instance().sendErrorResponse(
-                    cmd, seq, "save keymap failed");
-                return -1;
-            }
 
             /*
-             * FUN 组合键更新内存（KeyResolver 每次按键实时读取）；
-             * 出现过字段才持久化，与「字段存在性=显式配置」语义一致。
-             * saveSetting 内部自行加锁，不能放进 mutator。
+             * 性能优化：先更新运行时（内存设置 + KeyResolver）并立即回 ACK，
+             * SPIFFS 持久化放在 ACK 之后执行。0x06 的 SPIFFS atomic 写
+             * （keymap{N}.ini + config.ini）实测合计约 4s，放在 ACK 前
+             * 会导致 App 端 3s 超时误判下发失败（响应迟到被当未配对帧丢弃）。
+             * ACK 后落盘失败仅记 ERROR 日志：运行时已是新映射，下次 0x05
+             * 回读以设备实际为准，掉电窗口内最多丢失本次写入（回退旧配置）。
              */
+
+            /* FUN 组合键更新内存（KeyResolver 每次按键实时读取）；
+             * 与「字段存在性=显式配置」语义一致 */
             const bool fk1_present = data["fun_key1"].is<int>();
             const bool fk2_present = data["fun_key2"].is<int>();
             if (fk1_present || fk2_present)
@@ -342,18 +351,10 @@ namespace ekeys::protocol::commands
                     {
                         d.fun_key2 = fk2;
                     } });
-                if (fk1_present)
-                {
-                    config.saveSetting("fun_key1", static_cast<int>(fk1));
-                }
-                if (fk2_present)
-                {
-                    config.saveSetting("fun_key2", static_cast<int>(fk2));
-                }
             }
 
-            LOG_INFO("KEYMAP", "saved %d mappings, reloading", ok_count);
-            AppContext::instance().mainTask().reloadKeymap();
+            /* 内存映射直刷 KeyResolver（免 SPIFFS 重读）+ 键映射屏标签更新 */
+            AppContext::instance().mainTask().applyKeymap(map, mask);
 
             JsonDocument resp;
             resp["cmd"] = cmd | 0x80;
@@ -361,6 +362,37 @@ namespace ekeys::protocol::commands
             resp["status"] = 0;
             (void)resp["data"].to<JsonObject>();
             SerialProtocol::instance().sendDocument(resp);
+
+            /* ---- ACK 已发出，以下为持久化（阻塞 MainTask 但不再拖慢响应） ---- */
+            if (!config.saveKeyMappings(map, mask))
+            {
+                LOG_ERROR("KEYMAP", "save %d mappings failed", ok_count);
+            }
+
+            if (fk1_present || fk2_present)
+            {
+                /* 单次 config.ini 读/写覆盖全部出现的 fun_key（批量接口）；
+                 * saveSetting 内部自行加锁，不能放进 mutator */
+                std::initializer_list<std::pair<const char *, int>> fk_kvs;
+                if (fk1_present && fk2_present)
+                {
+                    fk_kvs = {{"fun_key1", fk1}, {"fun_key2", fk2}};
+                }
+                else if (fk1_present)
+                {
+                    fk_kvs = {{"fun_key1", fk1}};
+                }
+                else
+                {
+                    fk_kvs = {{"fun_key2", fk2}};
+                }
+                if (!config.saveSettings(fk_kvs))
+                {
+                    LOG_ERROR("KEYMAP", "persist fun_key failed");
+                }
+            }
+
+            LOG_INFO("KEYMAP", "persisted %d mappings", ok_count);
             return 0;
         }
 

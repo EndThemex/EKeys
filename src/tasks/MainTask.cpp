@@ -193,6 +193,13 @@ namespace ekeys
         keymap_ui_pending_ = true;
     }
 
+    void MainTask::applyKeymap(
+        const std::array<KeyMapping, kMatrixKeyCount + 1> &map, uint16_t keyMask)
+    {
+        resolver_.apply(map, keyMask);
+        keymap_ui_pending_ = true;
+    }
+
     void MainTask::loop()
     {
         /* 协议层轮询（CDC JSON 行收发），不依赖 keyboard_ 注入 */
