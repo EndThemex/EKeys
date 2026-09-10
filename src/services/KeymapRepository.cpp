@@ -13,6 +13,10 @@
  * 组合键写在 normal_key（"Ctrl"+"c" 拆两槽，修饰键槽经 KeyNameTable
  * 解析为 0xE0~0xE7）；macros_key 仅存储/协议透传，KeyResolver 未实现
  * 宏播放。
+ *
+ * FUN 组合层（combo1_* / combo2_*）：fun_key1 / fun_key2（config.ini
+ * [system]）对应物理键按住时，其它键改为触发对应组合层（优先级同单击
+ * function > text > normal）；FUN 键本身不产生 HID 输出。
  */
 
 #include "KeymapRepository.h"
@@ -118,10 +122,28 @@ namespace ekeys
             m.text_key = (tx != nullptr) ? tx : "";
             splitPlus((nk != nullptr) ? nk : "", m.normal_key);
             splitPlus((mk != nullptr) ? mk : "", m.macros_key);
+            const char *c1f = ini.GetValue(section, "combo1_function_key", nullptr);
+            const char *c1t = ini.GetValue(section, "combo1_text", nullptr);
+            const char *c1n = ini.GetValue(section, "combo1_normal_key", nullptr);
+            const char *c2f = ini.GetValue(section, "combo2_function_key", nullptr);
+            const char *c2t = ini.GetValue(section, "combo2_text", nullptr);
+            const char *c2n = ini.GetValue(section, "combo2_normal_key", nullptr);
+            m.combo1_function_key = (c1f != nullptr) ? c1f : "";
+            m.combo1_text_key = (c1t != nullptr) ? c1t : "";
+            splitPlus((c1n != nullptr) ? c1n : "", m.combo1_normal_key);
+            m.combo2_function_key = (c2f != nullptr) ? c2f : "";
+            m.combo2_text_key = (c2t != nullptr) ? c2t : "";
+            splitPlus((c2n != nullptr) ? c2n : "", m.combo2_normal_key);
             m.valid = (m.function_key.length() > 0) ||
                       (m.text_key.length() > 0) ||
                       (m.normal_key[0].length() > 0) ||
-                      (m.macros_key[0].length() > 0);
+                      (m.macros_key[0].length() > 0) ||
+                      (m.combo1_function_key.length() > 0) ||
+                      (m.combo1_text_key.length() > 0) ||
+                      (m.combo1_normal_key[0].length() > 0) ||
+                      (m.combo2_function_key.length() > 0) ||
+                      (m.combo2_text_key.length() > 0) ||
+                      (m.combo2_normal_key[0].length() > 0);
             if (m.valid)
             {
                 ++valid_cnt;
@@ -197,6 +219,45 @@ namespace ekeys
                 mk += mapping.macros_key[n];
             }
             ini.SetValue(section, "macros_key", mk.c_str());
+
+            /* FUN 组合层（combo1/combo2）："+" 分隔，空串也写入保持显式清空语义 */
+            ini.SetValue(section, "combo1_function_key",
+                         mapping.combo1_function_key.c_str());
+            ini.SetValue(section, "combo1_text",
+                         mapping.combo1_text_key.c_str());
+            String c1n;
+            for (uint8_t n = 0; n < kKeyMappingNormalCount; ++n)
+            {
+                if (mapping.combo1_normal_key[n].length() == 0)
+                {
+                    break;
+                }
+                if (n > 0)
+                {
+                    c1n += '+';
+                }
+                c1n += mapping.combo1_normal_key[n];
+            }
+            ini.SetValue(section, "combo1_normal_key", c1n.c_str());
+
+            ini.SetValue(section, "combo2_function_key",
+                         mapping.combo2_function_key.c_str());
+            ini.SetValue(section, "combo2_text",
+                         mapping.combo2_text_key.c_str());
+            String c2n;
+            for (uint8_t n = 0; n < kKeyMappingNormalCount; ++n)
+            {
+                if (mapping.combo2_normal_key[n].length() == 0)
+                {
+                    break;
+                }
+                if (n > 0)
+                {
+                    c2n += '+';
+                }
+                c2n += mapping.combo2_normal_key[n];
+            }
+            ini.SetValue(section, "combo2_normal_key", c2n.c_str());
         }
 
         return ConfigStore::saveGlobal(path, ini);

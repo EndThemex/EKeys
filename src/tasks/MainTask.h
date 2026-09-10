@@ -66,8 +66,12 @@ namespace ekeys
         /* 旋钮动作 → ActionInput */
         void sendDisplayAction(uint8_t action);
 
-        /* 当前键映射 + Profile → KEYMAP_PROFILE_UPDATE（11 键标签） */
-        void sendKeymapProfileUi();
+        /*
+         * 当前键映射 + Profile → KEYMAP_PROFILE_UPDATE（11 键标签）。
+         * fun_layer：0=单击视图（含组合摘要后缀），1/2=FUN 按住时只显示
+         * 对应组合层摘要（键映射二级页 FUN 预览）。
+         */
+        void sendKeymapProfileUi(uint8_t fun_layer);
 
         /* 设置屏反向同步（FEATURE_DOC §8.4） */
         void applyUiSettingsSnapshot(const ui_settings_snapshot_t &requested,
@@ -83,6 +87,7 @@ namespace ekeys
         uint32_t last_ha_status_ms_{0};
         uint32_t last_battery_status_ms_{0};
         bool keymap_ui_pending_{false};
+        uint8_t fun_ui_layer_{0}; /* 上次推送给 UI 的 FUN 组合层（0/1/2） */
     };
 
 } // namespace ekeys

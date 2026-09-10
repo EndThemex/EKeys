@@ -34,7 +34,9 @@ namespace ekeys
         {
             if (strcmp(key, "active_keymap_profile") == 0 ||
                 strcmp(key, "work_mode") == 0 ||
-                strcmp(key, "pc_status_mask") == 0)
+                strcmp(key, "pc_status_mask") == 0 ||
+                strcmp(key, "fun_key1") == 0 ||
+                strcmp(key, "fun_key2") == 0)
             {
                 return "system";
             }

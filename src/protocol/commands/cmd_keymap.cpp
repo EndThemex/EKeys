@@ -2,15 +2,23 @@
  * cmd_keymap.cpp
  *
  * 报文（参考工程 sendCurrentKeymapSnapshot / parseKeymapSetCommand）：
- *   0x05 响应：{"cmd":0x85,"seq":N,"status":0,"keymap":[
- *     {"physical":1,"normal":"a+b","macro":"","text":"hi","function":""}, ...]}
- *   0x06 请求：data.keymap = [{physical(1~11), normal?, macro?, text?, function?}]
+ *   0x05 响应：{"cmd":0x85,"seq":N,"status":0,"fun_key1":1,"fun_key2":0,
+ *     "keymap":[{"physical":1,"normal":"a+b","macro":"","text":"hi","function":"",
+ *       "combo1_normal":"Ctrl+c","combo1_text":"","combo1_function":"",
+ *       "combo2_normal":"","combo2_text":"","combo2_function":""}, ...]}
+ *   0x06 请求：data.fun_key1 / data.fun_key2（可选，0~11，出现时持久化），
+ *     data.keymap = [{physical(1~11), normal?, macro?, text?, function?,
+ *       combo1_normal?, combo1_text?, combo1_function?,
+ *       combo2_normal?, combo2_text?, combo2_function?}]
  *   0x06 响应：通用成功（cmd|0x80）。
  *
- * 优先级：function > text（文本注入，ASCII，≤128 字符）> normal / macro。
+ * 优先级：单击 function > text（文本注入，ASCII，≤128 字符）> normal / macro；
+ * 组合层 combo1（FUN1 按住）/ combo2（FUN2 按住）内部优先级同上，
+ * 与单击通道互相独立（运行时按 FUN 键是否按住选择，FUN1 层优先于 FUN2）。
  *
- * 键映射写入当前激活 Profile 的 keymap{N}.ini，成功后
- * MainTask::reloadKeymap() 刷新 KeyResolver 并推送键映射屏标签。
+ * 键映射写入当前激活 Profile 的 keymap{N}.ini，fun_key 持久化到
+ * config.ini [system]；成功后 MainTask::reloadKeymap() 刷新 KeyResolver
+ * 并推送键映射屏标签。
  */
 
 #include "cmd_keymap.h"
@@ -85,6 +93,50 @@ namespace ekeys::protocol::commands
             }
         }
 
+        /* 解析一层组合通道（layerPrefix 为 "combo1"/"combo2"）并写入 m；
+         * 层内优先级 function > text > normal，高优先级非空时低优先级留空 */
+        void parseComboLayer(JsonObject key, const char *layerPrefix,
+                             KeyMapping &m)
+        {
+            String &fk = (layerPrefix[5] == '1') ? m.combo1_function_key
+                                                 : m.combo2_function_key;
+            String &tk = (layerPrefix[5] == '1') ? m.combo1_text_key
+                                                 : m.combo2_text_key;
+            std::array<String, kKeyMappingNormalCount> &nk =
+                (layerPrefix[5] == '1') ? m.combo1_normal_key
+                                        : m.combo2_normal_key;
+
+            char field[24];
+            snprintf(field, sizeof(field), "%s_function", layerPrefix);
+            if (key[field].is<const char *>())
+            {
+                fk = key[field].as<const char *>();
+            }
+            if (fk.isEmpty())
+            {
+                snprintf(field, sizeof(field), "%s_text", layerPrefix);
+                if (key[field].is<const char *>())
+                {
+                    tk = key[field].as<const char *>();
+                    if (tk.length() > kMaxTextLen)
+                    {
+                        tk = tk.substring(0, kMaxTextLen);
+                        LOG_WARNING("KEYMAP", "%s too long, truncated to %u",
+                                    field, static_cast<unsigned>(kMaxTextLen));
+                    }
+                }
+            }
+            if (fk.isEmpty() && tk.isEmpty())
+            {
+                snprintf(field, sizeof(field), "%s_normal", layerPrefix);
+                if (key[field].is<const char *>())
+                {
+                    splitPlus<kKeyMappingNormalCount>(
+                        key[field].as<const char *>(), nk);
+                }
+            }
+        }
+
         int handleKeymapGet(int cmd, int seq, JsonObject /*data*/)
         {
             (void)cmd;
@@ -105,6 +157,8 @@ namespace ekeys::protocol::commands
             doc["cmd"] = CMD_KEYMAP_GET | 0x80;
             doc["seq"] = seq;
             doc["status"] = 0;
+            doc["fun_key1"] = Configuration::instance().settings().fun_key1;
+            doc["fun_key2"] = Configuration::instance().settings().fun_key2;
             JsonArray arr = doc["keymap"].to<JsonArray>();
             for (uint8_t key_id = 1; key_id <= kMatrixKeyCount; ++key_id)
             {
@@ -115,6 +169,12 @@ namespace ekeys::protocol::commands
                 key["macro"] = joinPlus(m.macros_key);
                 key["text"] = m.text_key;
                 key["function"] = m.function_key;
+                key["combo1_normal"] = joinPlus(m.combo1_normal_key);
+                key["combo1_text"] = m.combo1_text_key;
+                key["combo1_function"] = m.combo1_function_key;
+                key["combo2_normal"] = joinPlus(m.combo2_normal_key);
+                key["combo2_text"] = m.combo2_text_key;
+                key["combo2_function"] = m.combo2_function_key;
             }
             SerialProtocol::instance().sendDocument(doc);
             return 0;
@@ -167,8 +227,48 @@ namespace ekeys::protocol::commands
                     key["macro"].as<const char *>(), m.macros_key);
             }
 
+            /* FUN 组合层：与单击通道互相独立（运行时按 FUN 键是否按住选择） */
+            parseComboLayer(key, "combo1", m);
+            parseComboLayer(key, "combo2", m);
+
             out[static_cast<uint8_t>(key_id)] = m;
             mask |= static_cast<uint16_t>(1u << key_id);
+            return 0;
+        }
+
+        /*
+         * 解析可选的 data.fun_key1 / data.fun_key2（FUN 组合键，0~11，0=未配置），
+         * 合法时更新内存设置（持久化由调用方在保存成功后执行）。
+         * 未出现的字段保持现值。成功返回 0，非法返回 -1。
+         */
+        int parseFunKeys(JsonObject data, uint8_t &out_fk1, uint8_t &out_fk2)
+        {
+            Configuration &config = Configuration::instance();
+            DeviceSettings snap;
+            config.snapshot(snap);
+            out_fk1 = snap.fun_key1;
+            out_fk2 = snap.fun_key2;
+
+            if (data["fun_key1"].is<int>())
+            {
+                const int v = data["fun_key1"].as<int>();
+                if (v < 0 || v > kMatrixKeyCount)
+                {
+                    LOG_WARNING("KEYMAP", "fun_key1 %d out of range", v);
+                    return -1;
+                }
+                out_fk1 = static_cast<uint8_t>(v);
+            }
+            if (data["fun_key2"].is<int>())
+            {
+                const int v = data["fun_key2"].as<int>();
+                if (v < 0 || v > kMatrixKeyCount)
+                {
+                    LOG_WARNING("KEYMAP", "fun_key2 %d out of range", v);
+                    return -1;
+                }
+                out_fk2 = static_cast<uint8_t>(v);
+            }
             return 0;
         }
 
@@ -179,6 +279,16 @@ namespace ekeys::protocol::commands
             {
                 SerialProtocol::instance().sendErrorResponse(
                     cmd, seq, "missing 'keymap' array");
+                return -1;
+            }
+
+            /* 可选 fun_key1 / fun_key2 先校验，非法直接拒绝本次写入 */
+            uint8_t fk1 = 0;
+            uint8_t fk2 = 0;
+            if (parseFunKeys(data, fk1, fk2) != 0)
+            {
+                SerialProtocol::instance().sendErrorResponse(
+                    cmd, seq, "fun_key out of range (0~11)");
                 return -1;
             }
 
@@ -204,12 +314,42 @@ namespace ekeys::protocol::commands
                 return -1;
             }
 
-            if (!Configuration::instance().saveKeyMappings(map, mask))
+            Configuration &config = Configuration::instance();
+            if (!config.saveKeyMappings(map, mask))
             {
                 LOG_ERROR("KEYMAP", "save %d mappings failed", ok_count);
                 SerialProtocol::instance().sendErrorResponse(
                     cmd, seq, "save keymap failed");
                 return -1;
+            }
+
+            /*
+             * FUN 组合键更新内存（KeyResolver 每次按键实时读取）；
+             * 出现过字段才持久化，与「字段存在性=显式配置」语义一致。
+             * saveSetting 内部自行加锁，不能放进 mutator。
+             */
+            const bool fk1_present = data["fun_key1"].is<int>();
+            const bool fk2_present = data["fun_key2"].is<int>();
+            if (fk1_present || fk2_present)
+            {
+                (void)config.mutateSettings([&](DeviceSettings &d)
+                                            {
+                    if (fk1_present)
+                    {
+                        d.fun_key1 = fk1;
+                    }
+                    if (fk2_present)
+                    {
+                        d.fun_key2 = fk2;
+                    } });
+                if (fk1_present)
+                {
+                    config.saveSetting("fun_key1", static_cast<int>(fk1));
+                }
+                if (fk2_present)
+                {
+                    config.saveSetting("fun_key2", static_cast<int>(fk2));
+                }
             }
 
             LOG_INFO("KEYMAP", "saved %d mappings, reloading", ok_count);

@@ -604,26 +604,58 @@ App 应始终按 `cmd`、`seq`、`status` 解析，不要依赖响应字段的�
   "cmd": 133,
   "seq": 1,
   "status": 0,
+  "fun_key1": 1,
+  "fun_key2": 0,
   "keymap": [
     {
       "physical": 1,
       "normal": "Ctrl+Shift+A",
       "macro": "",
       "text": "",
-      "function": ""
+      "function": "",
+      "combo1_normal": "",
+      "combo1_text": "",
+      "combo1_function": "",
+      "combo2_normal": "",
+      "combo2_text": "",
+      "combo2_function": ""
     },
     {
       "physical": 2,
       "normal": "b",
       "macro": "",
       "text": "",
-      "function": "MEDIA_PLAY"
+      "function": "MEDIA_PLAY",
+      "combo1_normal": "Ctrl+c",
+      "combo1_text": "",
+      "combo1_function": "",
+      "combo2_normal": "",
+      "combo2_text": "",
+      "combo2_function": ""
     }
   ]
 }
 ```
 
 每个 Profile 有 11 个物理键，`physical` 范围为 `1~11`。
+
+- 顶层 `fun_key1` / `fun_key2`：FUN 组合键配置，`0~11`，`0` = 未配置；
+- 每键 `combo1_*` / `combo2_*`：FUN 组合层输出（见下方触发语义）。
+
+#### FUN 组合触发语义
+
+FUN 键在设备端「设置二级页 → FUN键 1 / FUN键 2」或 `0x06` 的
+`fun_key1` / `fun_key2` 字段配置（`0` = 关闭；两个 FUN 键是两个独立的
+组合层）：
+
+- 任一 FUN 键**先按住**，其它键在 FUN 按住期间按下 → 触发该键的
+  `combo1_*`（FUN1 层）或 `combo2_*`（FUN2 层）组合输出；松开该键 →
+  释放组合输出。两个 FUN 键同时按住时 FUN1 层优先；
+- 其它键先按下（已触发单击输出）后再按 FUN → 不追加组合，保持单击状态；
+- FUN 键本身按下/松开不产生任何 HID 输出；
+- `fun_key1=0` 且 `fun_key2=0` 时组合功能关闭，所有键按单击行为；
+- 组合层内部优先级与单击相同：`function > text > normal`；组合层与
+  单击通道互相独立存储、互不影响。
 
 #### 写入键映射
 
@@ -634,27 +666,47 @@ App 应始终按 `cmd`、`seq`、`status` 解析，不要依赖响应字段的�
   "cmd": 6,
   "seq": 2,
   "data": {
+    "fun_key1": 1,
+    "fun_key2": 0,
     "keymap": [
       {
         "physical": 1,
         "normal": "a+b",
         "macro": "",
         "text": "",
-        "function": ""
+        "function": "",
+        "combo1_normal": "",
+        "combo1_text": "",
+        "combo1_function": "",
+        "combo2_normal": "",
+        "combo2_text": "",
+        "combo2_function": ""
       },
       {
         "physical": 2,
         "normal": "Ctrl+c",
         "macro": "",
         "text": "",
-        "function": ""
+        "function": "",
+        "combo1_normal": "Ctrl+Shift+c",
+        "combo1_text": "",
+        "combo1_function": "",
+        "combo2_normal": "",
+        "combo2_text": "",
+        "combo2_function": ""
       },
       {
         "physical": 3,
         "normal": "",
         "macro": "",
         "text": "hello@example.com",
-        "function": ""
+        "function": "",
+        "combo1_normal": "",
+        "combo1_text": "",
+        "combo1_function": "",
+        "combo2_normal": "",
+        "combo2_text": "",
+        "combo2_function": ""
       }
     ]
   }
@@ -670,14 +722,18 @@ App 应始终按 `cmd`、`seq`、`status` 解析，不要依赖响应字段的�
   字母建议小写（大写字母会按普通键规则自动附带 Shift）；
 - `text` 为文本注入串（如 `hello@example.com`）：按键触发整串输出一次，
   仅支持 ASCII（HID 键盘固有限制，不支持中文），上限 128 字符（超长截断）；
-- 优先级：`function` > `text` > `normal` > `macro`，高优先级字段非空时
-  其余字段忽略；
+- 单击通道优先级：`function` > `text` > `normal` > `macro`，高优先级字段
+  非空时其余字段忽略；
 - `macro` 为宏序列（依次按下并释放），**设备端暂未实现宏播放，请勿使用**；
 - `function` 非空时优先，`text` / `normal` / `macro` 留空；`function` 也可写
   单槽组合键（如 `Ctrl+c`，整串传入不拆槽）；
+- `combo1_*` / `combo2_*` 为 FUN 组合层通道，规则同单击通道（层内优先级
+  `function > text > normal`，`combo*_text` 同样 ≤128 字符截断），与单击
+  通道互相独立，可同时配置；
+- `fun_key1` / `fun_key2` 为**可选**字段：出现时校验 `0~11` 并持久化到
+  config.ini `[system]`，缺省保持现值，越界返回错误；
 - 至少要有一个合法物理键映射，否则返回错误；
-- 写入当前激活 Profile；
-- 成功后立即调用 `MainTask::reloadKeymap()`。
+- 键映射写入当前激活 Profile；成功后立即调用 `MainTask::reloadKeymap()`。
 
 实现见 [cmd_keymap.cpp](../src/protocol/commands/cmd_keymap.cpp#L83-L185)。
 

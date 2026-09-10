@@ -36,6 +36,11 @@ namespace ekeys
    *   宏键序列，最多 5 个，按顺序先压后弹；
    *   仅存储/协议透传，KeyResolver 尚未实现宏播放。
    *
+   * combo1_* / combo2_*:
+   *   FUN 组合层通道（FUN1 优先于 FUN2）。设置二级页 / 协议 0x06 配置的
+   *   fun_key1 / fun_key2 对应物理键按住时，其它键改为触发对应组合层
+   *   （优先级同单击：function > text > normal）；FUN 键本身不产生 HID 输出。
+   *
    * valid:
    *   仅供 KeyResolver 内部标注"已加载"状态。
    */
@@ -45,6 +50,12 @@ namespace ekeys
     String text_key;
     std::array<String, kKeyMappingNormalCount> normal_key;
     std::array<String, kKeyMappingMacrosCount> macros_key;
+    String combo1_function_key;
+    String combo1_text_key;
+    std::array<String, kKeyMappingNormalCount> combo1_normal_key;
+    String combo2_function_key;
+    String combo2_text_key;
+    std::array<String, kKeyMappingNormalCount> combo2_normal_key;
     bool valid;
   };
 

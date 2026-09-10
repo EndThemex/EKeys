@@ -59,6 +59,14 @@ namespace ekeys
         /* 当前激活键映射 Profile（0~7） */
         uint8_t active_keymap_profile;
 
+        /*
+         * FUN 组合键 1/2：0=未配置，1~11=对应物理键作为 FUN 键。
+         * FUN 键按住时其它键触发各自 combo1/combo2 组合层；
+         * FUN 键本身不产生 HID 输出。持久化在 system 节。
+         */
+        uint8_t fun_key1;
+        uint8_t fun_key2;
+
         /* 阶段 07：设备元数据（0x02/0x04 写入，system 节持久化） */
         uint32_t config_version;
         char device_name[33];

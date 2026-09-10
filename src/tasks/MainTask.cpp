@@ -225,7 +225,7 @@ namespace ekeys
         /* 队列就绪后补发键映射屏数据（AppContext 在 begin() 后注入队列） */
         if (keymap_ui_pending_ && display_queue_ != nullptr)
         {
-            sendKeymapProfileUi();
+            sendKeymapProfileUi(fun_ui_layer_);
             keymap_ui_pending_ = false;
         }
 
@@ -318,6 +318,27 @@ namespace ekeys
             scanner_.getPressedKeys(pressed, pc);
             scanner_.getReleasedKeys(released, rc);
 
+            const bool suppress_hid =
+                ui_get_active_screen_tag() == UI_SCREEN_SETTING_SECONDARY;
+            if (!suppress_hid)
+            {
+                /*
+                 * FUN 键同 tick 预扫描：FUN 与其它键同一 5ms tick 按下时，
+                 * 若 FUN 键扫描顺序靠后，先按下其它键会误触发单击层。
+                 * 这里先把 FUN 置位（press 幂等），再走正常循环。
+                 */
+                const uint8_t fk1 = resolver_.funKey1();
+                const uint8_t fk2 = resolver_.funKey2();
+                for (uint8_t i = 0; i < pc; ++i)
+                {
+                    if ((fk1 != 0 && pressed[i] == fk1) ||
+                        (fk2 != 0 && pressed[i] == fk2))
+                    {
+                        resolver_.press(pressed[i], *keyboard_);
+                    }
+                }
+            }
+
             for (uint8_t i = 0; i < pc; ++i)
             {
                 /*
@@ -325,8 +346,6 @@ namespace ekeys
                  * 切焦点等），不向主机发送 HID。离开该屏后 release 仍正常派发，
                  * 避免卡键。
                  */
-                const bool suppress_hid =
-                    ui_get_active_screen_tag() == UI_SCREEN_SETTING_SECONDARY;
                 if (!suppress_hid)
                 {
                     KeyEventDispatcher::onKeyEdge(pressed[i], true);
@@ -352,6 +371,17 @@ namespace ekeys
                 KeyEventDispatcher::onKeyEdge(released[i], false);
                 resolver_.release(released[i], *keyboard_);
             }
+
+            /*
+             * FUN 组合层切换 → 键映射二级页实时预览：
+             * FUN 键按住/松开时重推 11 键标签，格子切换显示组合层摘要。
+             */
+            const uint8_t fun_layer = resolver_.activeFunLayer();
+            if (fun_layer != fun_ui_layer_)
+            {
+                fun_ui_layer_ = fun_layer;
+                sendKeymapProfileUi(fun_layer);
+            }
         }
     }
 
@@ -372,7 +402,7 @@ namespace ekeys
         postMessage(msg);
     }
 
-    void MainTask::sendKeymapProfileUi()
+    void MainTask::sendKeymapProfileUi(uint8_t fun_layer)
     {
         Configuration &config = Configuration::instance();
 
@@ -392,29 +422,71 @@ namespace ekeys
         for (uint8_t i = 0; i < kMatrixKeyCount; ++i)
         {
             const KeyMapping &mapping = resolver_.get(static_cast<uint8_t>(i + 1));
+            auto layerSummary = [](const String &fk, const String &tk,
+                                   const std::array<String, kKeyMappingNormalCount> &nk)
+            {
+                String s;
+                if (!fk.isEmpty())
+                {
+                    s = fk;
+                }
+                else if (!tk.isEmpty())
+                {
+                    /* 文本注入键直接显示内容（超长由 snprintf 截断） */
+                    s = tk;
+                }
+                else
+                {
+                    for (uint8_t j = 0; j < kKeyMappingNormalCount; ++j)
+                    {
+                        if (nk[j].isEmpty())
+                        {
+                            continue;
+                        }
+                        if (!s.isEmpty())
+                        {
+                            s += "+";
+                        }
+                        s += nk[j];
+                    }
+                }
+                return s;
+            };
+
             String combo;
-            if (!mapping.function_key.isEmpty())
+            if (fun_layer == 1)
             {
-                combo = mapping.function_key;
+                /* FUN1 按住：只显示该键组合层摘要（未配置显示 --） */
+                combo = layerSummary(mapping.combo1_function_key,
+                                     mapping.combo1_text_key,
+                                     mapping.combo1_normal_key);
             }
-            else if (!mapping.text_key.isEmpty())
+            else if (fun_layer == 2)
             {
-                /* 文本注入键直接显示内容（超长由 snprintf 截断） */
-                combo = mapping.text_key;
+                combo = layerSummary(mapping.combo2_function_key,
+                                     mapping.combo2_text_key,
+                                     mapping.combo2_normal_key);
             }
             else
             {
-                for (uint8_t j = 0; j < kKeyMappingNormalCount; ++j)
+                combo = layerSummary(mapping.function_key, mapping.text_key,
+                                     mapping.normal_key);
+                /* 单击视图追加 FUN 组合层摘要（超长由 snprintf 截断） */
+                const String c1 = layerSummary(mapping.combo1_function_key,
+                                               mapping.combo1_text_key,
+                                               mapping.combo1_normal_key);
+                const String c2 = layerSummary(mapping.combo2_function_key,
+                                               mapping.combo2_text_key,
+                                               mapping.combo2_normal_key);
+                if (!c1.isEmpty())
                 {
-                    if (mapping.normal_key[j].isEmpty())
-                    {
-                        continue;
-                    }
-                    if (!combo.isEmpty())
-                    {
-                        combo += "+";
-                    }
-                    combo += mapping.normal_key[j];
+                    combo += "|1:";
+                    combo += c1;
+                }
+                if (!c2.isEmpty())
+                {
+                    combo += "|2:";
+                    combo += c2;
                 }
             }
             snprintf(p.keymap_labels[i], sizeof(p.keymap_labels[i]), "%u:%s",
