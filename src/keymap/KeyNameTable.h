@@ -58,6 +58,16 @@ namespace ekeys
     };
     ResolvedKey resolveKeyWithModifier(const String &name);
 
+    /*
+     * 存储的键名 → 可读显示名（仅供 UI 展示，不影响 HID 解析）。
+     *
+     *   "0x04" / "4" → "a"
+     *   "0xE0"       → "Ctrl"
+     *   "0xFF"       → "0xFF"（未知 usage 保留十六进制）
+     *   "a" / "Ctrl" → 原样返回（已是可读名）
+     */
+    String keyDisplayName(const String &name);
+
 } // namespace ekeys
 
 #endif // EKEYS_KEYMAP_KEY_NAME_TABLE_H

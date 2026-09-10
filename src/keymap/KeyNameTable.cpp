@@ -236,4 +236,71 @@ namespace ekeys
         return r;
     }
 
+    namespace
+    {
+
+        /*
+         * usage code → 可读键名（keyDisplayName 专用，覆盖
+         * resolveKeyName 内置的全部可读段；未知 usage 保留十六进制）。
+         */
+        String nameForUsage(uint8_t usage)
+        {
+            if (usage >= HID_KEY_A && usage <= HID_KEY_Z)
+            {
+                return String(static_cast<char>('a' + (usage - HID_KEY_A)));
+            }
+            if (usage >= HID_KEY_1 && usage < HID_KEY_0)
+            {
+                return String(static_cast<char>('1' + (usage - HID_KEY_1)));
+            }
+            if (usage == HID_KEY_0)
+            {
+                return "0";
+            }
+            if (usage == HID_KEY_ENTER)
+            {
+                return "Enter";
+            }
+            if (usage == HID_KEY_BACKSPACE)
+            {
+                return "Backspace";
+            }
+            if (usage == HID_KEY_SPACE)
+            {
+                return "Space";
+            }
+            if (usage == HID_KEY_LCTRL)
+            {
+                return "Ctrl";
+            }
+            if (usage == HID_KEY_LSHIFT)
+            {
+                return "Shift";
+            }
+            if (usage == HID_KEY_LALT)
+            {
+                return "Alt";
+            }
+            if (usage == HID_KEY_LGUI)
+            {
+                return "Win";
+            }
+            char buf[8];
+            snprintf(buf, sizeof(buf), "0x%02X", static_cast<unsigned>(usage));
+            return String(buf);
+        }
+
+    } // namespace
+
+    String keyDisplayName(const String &name)
+    {
+        uint8_t usage = 0;
+        if (parseLiteralNumber(name, usage))
+        {
+            return nameForUsage(usage);
+        }
+        /* 已是可读键名（"a" / "Ctrl" / "Enter" 等）原样返回 */
+        return name;
+    }
+
 } // namespace ekeys

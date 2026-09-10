@@ -28,6 +28,7 @@
 #include "config/Configuration.h"
 #include "hardware/BatteryMonitor.h"
 #include "keymap/KeyEventDispatcher.h"
+#include "keymap/KeyNameTable.h"
 #include "logging/LogManager.h"
 #include "message_types.h"
 #include <time.h>
@@ -380,15 +381,32 @@ namespace ekeys
             }
 
             /*
-             * FUN 组合层切换 → 键映射二级页实时预览：
+             * FUN 组合层切换 → 键映射屏实时预览：
              * FUN 键按住/松开时重推 11 键标签，格子切换显示组合层摘要。
+             * 仅在键映射屏推送（2026-09-10）：applyKeymapProfile 内含隐藏
+             * label 刷新 + SPIFFS.exists 图标检查，会拖慢 DisplayTask 的
+             * RGB 渲染帧，导致 FUN 键点击高亮比其它键晚一帧亮起。
              */
+            const ui_screen_tag_t screen = ui_get_active_screen_tag();
+            const bool on_keymap_screen =
+                (screen == UI_SCREEN_KEYMAPPED ||
+                 screen == UI_SCREEN_KEYMAPPED_SECONDARY);
+
             const uint8_t fun_layer = resolver_.activeFunLayer();
             if (fun_layer != fun_ui_layer_)
             {
                 fun_ui_layer_ = fun_layer;
+                if (on_keymap_screen)
+                {
+                    sendKeymapProfileUi(fun_layer);
+                }
+            }
+            else if (on_keymap_screen && screen != keymap_ui_screen_)
+            {
+                /* 进入键映射屏（含 FUN 按住时进入）→ 补推当前层视图 */
                 sendKeymapProfileUi(fun_layer);
             }
+            keymap_ui_screen_ = static_cast<uint8_t>(screen);
         }
     }
 
@@ -454,7 +472,8 @@ namespace ekeys
                         {
                             s += "+";
                         }
-                        s += nk[j];
+                        /* App 端可能存 "0x04" 这类 usage code 字面量，显示转可读名 */
+                        s += keyDisplayName(nk[j]);
                     }
                 }
                 return s;

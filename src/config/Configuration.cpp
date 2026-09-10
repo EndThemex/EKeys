@@ -155,6 +155,15 @@ namespace ekeys
         /* F6 修复：pc_status_mask 作为 uint32 加载，long 范围足够 */
         settings_.pc_status_mask =
             static_cast<uint32_t>(ini.GetLongValue("system", "pc_status_mask", 0));
+        /*
+         * FUN 组合键（0=未配置）：0x06 写入经 saveSettings 持久化到
+         * system 节，这里必须读回，否则重启后 fun_key 静默归 0，
+         * FUN 预扫描永不命中（组合键失效 + 键映射屏 FUN 预览不切换）。
+         */
+        settings_.fun_key1 =
+            static_cast<uint8_t>(ini.GetLongValue("system", "fun_key1", 0));
+        settings_.fun_key2 =
+            static_cast<uint8_t>(ini.GetLongValue("system", "fun_key2", 0));
 
         settings_.wifi_switch =
             static_cast<uint8_t>(ini.GetLongValue("wifi", "wifi_switch", 0));

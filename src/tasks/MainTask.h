@@ -96,6 +96,9 @@ namespace ekeys
         uint32_t last_battery_status_ms_{0};
         bool keymap_ui_pending_{false};
         uint8_t fun_ui_layer_{0}; /* 上次推送给 UI 的 FUN 组合层（0/1/2） */
+        /* ui_screen_tag_t 缓存（UI_SCREEN_UNKNOWN=0），仅 5ms tick 内读写，
+         * 用于检测"进入键映射屏"边沿以补推当前 FUN 层标签 */
+        uint8_t keymap_ui_screen_{0};
     };
 
 } // namespace ekeys
