@@ -13,6 +13,8 @@
  * CMD_PROFILE_NAME_SET（0x15，App→主控）：
  *   data{profile?, name} 设置 / 清除（name=""）profile 名称（UTF-8 中文），
  *   持久化到 config.ini [profile]，设备 UI 直接显示该名称。
+ *   处理顺序同 0x06：先内存更新并回 ACK，再落盘（SPIFFS 原子写 ~1s，
+ *   放 ACK 前会拖慢响应导致 App 超时误判）。
  */
 
 #ifndef EKEYS_PROTOCOL_COMMANDS_CMD_PROFILE_H

@@ -126,12 +126,16 @@ namespace ekeys
         /*
          * Profile 名称（APP 下发，UTF-8 中文，持久化到 config.ini
          * [profile] 节 profile_name_N）。idx 0~7。
-         * - setProfileName：name 为空串表示清除，回退内置符号名；
-         *   超长按 UTF-8 字符边界安全截断。
+         * - setProfileNameInMemory：name 为空串表示清除，回退内置符号名；
+         *   超长按 UTF-8 字符边界安全截断。仅更新内存，不落盘——
+         *   持久化由调用方在回 ACK 后执行（SPIFFS 原子写 ~1s，
+         *   放 ACK 前会导致 App 3s/1s 超时误判下发失败）。
+         * - saveProfileName：把 idx 的内存名称持久化到 config.ini。
          * - isProfileNameCustom：是否设置了 APP 端名称。
          */
         static constexpr uint8_t kProfileNameMaxLen = 32; /* 含 '\0' */
-        bool setProfileName(uint8_t idx, const char *name);
+        void setProfileNameInMemory(uint8_t idx, const char *name);
+        bool saveProfileName(uint8_t idx);
         bool isProfileNameCustom(uint8_t idx) const;
 
         /* 供后续阶段（ConfigStore 直连场景）共享互斥量 */

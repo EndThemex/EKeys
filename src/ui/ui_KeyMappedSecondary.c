@@ -495,10 +495,15 @@ void ui_KeyMappedSecondary_set_profile(const char *icon, const char *name, const
              sizeof(s_keymapped_secondary_profile_icon_symbol),
              "%s",
              (icon && icon[0]) ? icon : LV_SYMBOL_LIST);
+    /*
+     * 名称：空名保持空串（不注入"当前布局"兜底文案）——
+     * keymapped_secondary_apply_cached_profile 统一处理回退：
+     * 有 APP 下发名称（UTF-8 中文）显示名称，否则显示 "Conf%u"。
+     */
     snprintf(s_keymapped_secondary_profile_name,
              sizeof(s_keymapped_secondary_profile_name),
              "%s",
-             (name && name[0]) ? name : "当前布局");
+             (name && name[0]) ? name : "");
     snprintf(s_keymapped_secondary_profile_file_name,
              sizeof(s_keymapped_secondary_profile_file_name),
              "%s",

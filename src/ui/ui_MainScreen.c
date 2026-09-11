@@ -273,8 +273,9 @@ void ui_MainScreen_screen_init(void)
     lv_obj_set_style_text_align(s_ui_MainScreenProfileName, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(s_ui_MainScreenProfileName, lv_color_hex(0xF59E0B), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(s_ui_MainScreenProfileName, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    /* Profile 名称可能为 APP 下发的中文（UTF-8），用 CKJGT 中文字体渲染 */
-    lv_obj_set_style_text_font(s_ui_MainScreenProfileName, &ui_font_FontCKJGT24, LV_PART_MAIN | LV_STATE_DEFAULT);
+    /* Profile 名称可能为 APP 下发的中文（UTF-8），用 CKJGT 中文字体渲染；
+     * 中文全高字形偏大，降为 16 号与 PC 状态文字视觉协调 */
+    lv_obj_set_style_text_font(s_ui_MainScreenProfileName, &ui_font_FontCKJGT16, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     /* RGB / TFT 亮度文字与状态栏顶部图标区域重叠，已移除显示。亮度数值仍由
      * ui_MainScreen_set_rgb_light / ui_MainScreen_set_tft_light 写入并用于

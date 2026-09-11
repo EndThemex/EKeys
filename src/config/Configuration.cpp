@@ -466,17 +466,17 @@ namespace ekeys
         }
         /*
          * 读写均为 MainTask 单线程（协议命令处理与 UI 消息构造同任务），
-         * 32 字节数组读取无需持锁；写侧 setProfileName 亦在 MainTask。
+         * 32 字节数组读取无需持锁；写侧 setProfileNameInMemory 亦在 MainTask。
          */
         return profile_names_[idx][0] != '\0';
     }
 
-    bool Configuration::setProfileName(uint8_t idx, const char *name)
+    void Configuration::setProfileNameInMemory(uint8_t idx, const char *name)
     {
         if (idx >= CONFIG_PROFILE_COUNT)
         {
             LOG_WARNING("CONFIG", "profile name idx %u out of range", idx);
-            return false;
+            return;
         }
         if (name == nullptr)
         {
@@ -509,17 +509,26 @@ namespace ekeys
         strncpy(profile_names_[idx], trimmed, sizeof(profile_names_[idx]) - 1);
         profile_names_[idx][sizeof(profile_names_[idx]) - 1] = '\0';
         unlock();
+    }
+
+    bool Configuration::saveProfileName(uint8_t idx)
+    {
+        if (idx >= CONFIG_PROFILE_COUNT)
+        {
+            LOG_WARNING("CONFIG", "profile name idx %u out of range", idx);
+            return false;
+        }
 
         /* 持久化（空串=清除，回退内置符号名）；saveSetting 内部自行加锁 */
         char key[20];
         snprintf(key, sizeof(key), "profile_name_%u", static_cast<unsigned>(idx));
-        if (!saveSetting(key, trimmed))
+        if (!saveSetting(key, profile_names_[idx]))
         {
             LOG_ERROR("CONFIG", "persist %s failed", key);
             return false;
         }
         LOG_INFO("CONFIG", "profile_name_%u set to \"%s\"",
-                 static_cast<unsigned>(idx), trimmed);
+                 static_cast<unsigned>(idx), profile_names_[idx]);
         return true;
     }
 

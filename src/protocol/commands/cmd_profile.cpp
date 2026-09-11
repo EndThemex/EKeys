@@ -238,12 +238,14 @@ namespace ekeys::protocol::commands
         }
 
         Configuration &config = Configuration::instance();
-        if (!config.setProfileName(profile, data["name"].as<const char *>()))
-        {
-            SerialProtocol::instance().sendErrorResponse(cmd, seq,
-                                                         "set profile name failed");
-            return -1;
-        }
+        /*
+         * 先更新内存并回 ACK，再落盘（同 0x06 键映射模式）：
+         * config.ini SPIFFS 原子写实测 ~1s，放 ACK 前会导致 App
+         * 超时误判下发失败（响应迟到被当未配对帧丢弃）。
+         * ACK 后落盘失败仅记 ERROR 日志：内存已是新名称，下次 0x10
+         * 推送以设备实际为准，掉电窗口内最多丢失本次写入。
+         */
+        config.setProfileNameInMemory(profile, data["name"].as<const char *>());
 
         {
             JsonDocument resp;
@@ -256,6 +258,12 @@ namespace ekeys::protocol::commands
             out["profile_name"] = config.getProfileDisplayName(profile);
             out["is_custom_name"] = config.isProfileNameCustom(profile);
             SerialProtocol::instance().sendDocument(resp);
+        }
+
+        if (!config.saveProfileName(profile))
+        {
+            LOG_ERROR("PROFILE", "persist profile_name_%u failed",
+                      static_cast<unsigned>(profile));
         }
 
         /* 名称变化后推送全量列表（seq=0），App 端刷新方案选择页 */
