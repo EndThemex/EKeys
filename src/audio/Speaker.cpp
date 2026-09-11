@@ -120,7 +120,9 @@ void Speaker::SetVolume(uint8_t volume_0_21)
 
 void Speaker::applyDeviceVolume(uint8_t device_volume)
 {
-    SetVolume(device_volume / 5);
+    /* 0~100 四舍五入映射到库的 0~21（22 档）。
+     * 旧 /5 映射 100% 只到 20 档 = 58/64 ≈ -0.9dB，永远到不了满幅。 */
+    SetVolume((device_volume * 21 + 50) / 100);
 }
 
 bool Speaker::PlayRemoteAudio(const char *url)
