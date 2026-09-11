@@ -68,18 +68,33 @@ namespace ekeys
         /* 阶段 06 服务调度（WiFi/NTP/发现/TCP/扬声器/ASR + HA 状态节流） */
         void tick();
 
-        /* 向 DisplayTask 投递（display_queue_ 为空时忽略） */
-        void postMessage(const struct DisplayMessage &msg);
+        /* 向 DisplayTask 投递（display_queue_ 为空时忽略），返回入队结果 */
+        bool postMessage(const struct DisplayMessage &msg);
 
         /* 旋钮动作 → ActionInput */
         void sendDisplayAction(uint8_t action);
 
         /*
-         * 当前键映射 + Profile → KEYMAP_PROFILE_UPDATE（11 键标签）。
+         * 当前键映射 + Profile → KEYMAP_PROFILE_UPDATE（11 键标签，已应用语义）。
          * fun_layer：0=单击视图（只显示单击配置），1/2=FUN 按住时只显示
-         * 对应组合层摘要（键映射屏 FUN 预览）。
+         * 对应组合层摘要（键映射屏 FUN 预览）。尾部会把预览索引 resync
+         * 为当前激活 profile（外部切 profile 路径的兜底汇聚点）。
          */
-        void sendKeymapProfileUi(uint8_t fun_layer);
+        bool sendKeymapProfileUi(uint8_t fun_layer);
+
+        /*
+         * 预览 profile（g_preview_profile_index）→ is_preview=true 的
+         * KEYMAP_PROFILE_UPDATE 消息：从 SPIFFS 读目标 profile 键映射生成
+         * 标签，仅展示不应用不落盘（键映射二级页旋钮预览）。
+         */
+        bool sendKeymapProfilePreview(uint8_t fun_layer);
+
+        /*
+         * FUN 层变化 / 进入键映射屏时的推屏入口：按活动屏分流，
+         * 二级页推预览消息（避免 applied 消息冲掉预览态），一级屏推
+         * applied 消息。发送失败置对应 pending 下轮重试。
+         */
+        void pushCurrentKeymapView(uint8_t fun_layer);
 
         /* 设置屏反向同步（FEATURE_DOC §8.4） */
         void applyUiSettingsSnapshot(const ui_settings_snapshot_t &requested,
@@ -95,7 +110,9 @@ namespace ekeys
         uint32_t last_ha_status_ms_{0};
         uint32_t last_battery_status_ms_{0};
         bool keymap_ui_pending_{false};
-        uint8_t fun_ui_layer_{0}; /* 上次推送给 UI 的 FUN 组合层（0/1/2） */
+        bool keymap_preview_ui_pending_{false}; /* 二级页预览消息待发 */
+        uint32_t last_preview_load_ms_{0};      /* 预览 SPIFFS 读取节流 */
+        uint8_t fun_ui_layer_{0};               /* 上次推送给 UI 的 FUN 组合层（0/1/2） */
         /* ui_screen_tag_t 缓存（UI_SCREEN_UNKNOWN=0），仅 5ms tick 内读写，
          * 用于检测"进入键映射屏"边沿以补推当前 FUN 层标签 */
         uint8_t keymap_ui_screen_{0};

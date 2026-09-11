@@ -98,10 +98,16 @@ namespace ekeys
     /*
      * 键映射 Profile 屏数据：
      *   keymap_labels[i] 对应应用键 i+1，格式 "K{i}:映射"（docs/05 §5.4）。
+     *   profile_index：本消息描述的 profile（0~7）；
+     *     is_preview=false（已应用消息）时恒等于 active_profile。
+     *   is_preview：true=预览消息（仅展示，未应用）；默认 false=已应用
+     *     语义（发送方漏设字段时退化为现状行为，更安全）。
      */
     struct KeymapProfileInfo
     {
         uint8_t active_profile{0};
+        uint8_t profile_index{0};
+        bool is_preview{false};
         char profile_name[24]{0};
         char profile_icon[8]{0};
         char keymap_labels[11][24]{};

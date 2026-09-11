@@ -452,11 +452,47 @@ namespace ekeys
     {
         const KeymapProfileInfo &p = msg.keymap_profile;
 
+        /* 一律用 profile_index（applied 消息中它恒等于 active_profile） */
         char fileName[32] = {0};
         snprintf(fileName, sizeof(fileName), "config_profile_%u.ini",
-                 static_cast<unsigned>(p.active_profile));
+                 static_cast<unsigned>(p.profile_index));
+
+        if (p.is_preview)
+        {
+            /*
+             * 预览消息：只刷新二级页展示，不应用不落盘。
+             * - update_main_summary=false：预览不得污染主屏 summary（bind 缓存）
+             * - 跳过 SPIFFS.exists 图标检查与两个 set_profile_icon_image_data：
+             *   最贵的 SPIFFS 探测在预览高频路径上没必要（当前 icon 恒为
+             *   符号回退，无视觉差异），且避免一级屏图标被预览污染
+             */
+            ui_KeyMappedSecondary_set_profile(p.profile_icon, p.profile_name,
+                                              fileName,
+                                              /*update_main_summary=*/false);
+            {
+                DeviceSettings snap;
+                Configuration::instance().snapshot(snap);
+                ui_KeyMappedSecondary_set_fun_keys(snap.fun_key1, snap.fun_key2);
+            }
+            for (uint8_t i = 0; i < 11; ++i)
+            {
+                ui_KeyMappedSecondary_set_key_label(i, p.keymap_labels[i]);
+            }
+            if (ui_get_active_screen_tag() == UI_SCREEN_KEYMAPPED_SECONDARY)
+            {
+                lv_refr_now(NULL);
+            }
+            return;
+        }
+
+        /* 已应用消息：先收尾等待遮罩 + 更新已应用标记 */
+        ui_KeyMappedSecondary_hide_apply_waiting();
+        ui_KeyMappedSecondary_set_applied_index(
+            static_cast<unsigned>(p.profile_index) + 1u);
+
         ui_KeyMappedSecondary_set_profile(p.profile_icon, p.profile_name,
-                                          fileName);
+                                          fileName,
+                                          /*update_main_summary=*/true);
 
         /*
          * FUN 键整体配色标识：把 fun_key1 / fun_key2 同步给二级页，
@@ -481,7 +517,7 @@ namespace ekeys
          * 不链入 lodepng.c.o，链接失败；可考虑 LV_USE_PNG=1 或显式 src/util）。
          */
         const char *icon_path = Configuration::instance().getProfileIconPath(
-            p.active_profile);
+            p.profile_index);
         const bool has_icon = SPIFFS.exists(icon_path);
         if (!has_icon)
         {

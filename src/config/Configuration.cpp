@@ -332,6 +332,21 @@ namespace ekeys
         return repo_->loadProfile(getProfileConfigPath(activeProfile()), out);
     }
 
+    bool Configuration::loadProfileKeyMapping(uint8_t idx, KeymapArray &out)
+    {
+        if (repo_ == nullptr)
+        {
+            LOG_ERROR("CONFIG", "KeymapRepository not injected");
+            return false;
+        }
+        if (idx >= CONFIG_PROFILE_COUNT)
+        {
+            LOG_WARNING("CONFIG", "profile index %u out of range", idx);
+            return false;
+        }
+        return repo_->loadProfile(getProfileConfigPath(idx), out);
+    }
+
     bool Configuration::saveKeyMappings(const KeymapArray &mappings,
                                         uint16_t keyMask)
     {

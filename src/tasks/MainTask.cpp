@@ -40,6 +40,7 @@
 #include "output/IKeyboard.h"
 #include "protocol/SerialProtocol.h"
 #include "ui/ui_KeyMapped.h"
+#include "utils/keymap_types.h"
 #include "voice/VoiceRecognizer.h"
 
 namespace ekeys
@@ -75,6 +76,71 @@ namespace ekeys
         }
 
         /*
+         * 单键标签格式化（sendKeymapProfileUi 内 layerSummary 逻辑迁出，
+         * 供 applied / preview 两条发送路径复用）。按 fun_layer 选择映射
+         * 通道，生成可读摘要；空映射输出 "--"。
+         * 注意：KeyMapping 含多个 String，必须按 const 引用传参。
+         */
+        void formatKeymapLabel(const KeyMapping &mapping, uint8_t fun_layer,
+                               char *out, size_t cap)
+        {
+            auto layerSummary = [](const String &fk, const String &tk,
+                                   const std::array<String, kKeyMappingNormalCount> &nk)
+            {
+                String s;
+                if (!fk.isEmpty())
+                {
+                    /* 功能键同样可能存 usage code 字面量（如 "0x52"），转可读名 */
+                    s = keyDisplayName(fk);
+                }
+                else if (!tk.isEmpty())
+                {
+                    /* 文本注入键直接显示内容（超长由调用方 snprintf 截断） */
+                    s = tk;
+                }
+                else
+                {
+                    for (uint8_t j = 0; j < kKeyMappingNormalCount; ++j)
+                    {
+                        if (nk[j].isEmpty())
+                        {
+                            continue;
+                        }
+                        if (!s.isEmpty())
+                        {
+                            s += "+";
+                        }
+                        /* App 端可能存 "0x04" 这类 usage code 字面量，显示转可读名 */
+                        s += keyDisplayName(nk[j]);
+                    }
+                }
+                return s;
+            };
+
+            String combo;
+            if (fun_layer == 1)
+            {
+                /* FUN1 按住：只显示该键组合层摘要（未配置显示 --） */
+                combo = layerSummary(mapping.combo1_function_key,
+                                     mapping.combo1_text_key,
+                                     mapping.combo1_normal_key);
+            }
+            else if (fun_layer == 2)
+            {
+                combo = layerSummary(mapping.combo2_function_key,
+                                     mapping.combo2_text_key,
+                                     mapping.combo2_normal_key);
+            }
+            else
+            {
+                /* 单击视图：只显示单击配置；组合层在 FUN 键按住时整屏切换预览 */
+                combo = layerSummary(mapping.function_key, mapping.text_key,
+                                     mapping.normal_key);
+            }
+            snprintf(out, cap, "%s", combo.isEmpty() ? "--" : combo.c_str());
+        }
+
+        /*
          * 设置屏反向同步通道（FEATURE_DOC §8.4）：
          * LVGL 事件回调经 ui_settings_request_apply()/save() 写入，
          * MainTask::loop() 消费。临界区用 FreeRTOS spinlock。
@@ -90,19 +156,29 @@ namespace ekeys
         PendingUiSettingsRequest g_ui_settings_request{};
 
         /*
-         * 键映射二级页旋钮切 Profile 请求（与设置屏反向同步同款通道）：
-         * LVGL 事件回调经 ui_keymap_request_profile_switch() 写入，
-         * MainTask::loop() 消费。快速旋转时 step 累积，合并为一次
-         * 切换 + 一次 INI 落盘。
+         * 键映射二级页旋钮请求（与设置屏反向同步同款通道）：
+         * LVGL 事件回调经 ui_keymap_request_profile_switch() /
+         * ui_keymap_request_profile_apply() 写入，MainTask::loop() 消费。
+         * 旋转只累积"预览"步进（合并消费，一次 SPIFFS 读取）；
+         * 单击 apply 在请求瞬间捕获目标（g_preview_profile_index），
+         * 避免同 5ms 窗口内迟到的 step 干扰。
          */
         struct PendingProfileSwitchRequest
         {
             bool pending{false};
             int16_t step{0};
+            bool apply_pending{false};
+            uint8_t apply_target{0};
         };
 
         portMUX_TYPE g_profile_switch_lock = portMUX_INITIALIZER_UNLOCKED;
         PendingProfileSwitchRequest g_profile_switch_request{};
+
+        /* 当前预览的 profile（0~7）：预览/应用的唯一事实源 */
+        uint8_t g_preview_profile_index = 0;
+
+        /* 预览 SPIFFS 读取最小间隔：连转旋钮时限制 INI 解析频率 */
+        constexpr uint32_t kKeymapPreviewMinIntervalMs = 100;
 
         MainTask *g_main_task = nullptr;
 
@@ -144,7 +220,8 @@ namespace ekeys
 
     /*
      * 供 SquareLine 生成的 ui_KeyMappedSecondary.c 调用（C 链接）。
-     * 旋钮旋转切 Profile：step=+1 顺时针 / -1 逆时针，累积合并消费。
+     * 旋钮旋转预览 Profile：step=+1 顺时针 / -1 逆时针，累积合并消费；
+     * 只切预览视图，不应用不落盘（应用经 ui_keymap_request_profile_apply）。
      */
     extern "C" bool ui_keymap_request_profile_switch(int step)
     {
@@ -169,6 +246,26 @@ namespace ekeys
         return true;
     }
 
+    /*
+     * 供 ui_KeyMappedSecondary.c 调用（C 链接）。
+     * 单击确认应用当前预览的 Profile：目标在请求瞬间捕获，
+     * MainTask 消费后经 sendKeymapProfileUi 回发 applied 消息，
+     * UI 侧收尾等待遮罩。
+     */
+    extern "C" bool ui_keymap_request_profile_apply(void)
+    {
+        if (g_main_task == nullptr)
+        {
+            return false;
+        }
+
+        taskENTER_CRITICAL(&g_profile_switch_lock);
+        g_profile_switch_request.apply_target = g_preview_profile_index;
+        g_profile_switch_request.apply_pending = true;
+        taskEXIT_CRITICAL(&g_profile_switch_lock);
+        return true;
+    }
+
     MainTask::MainTask()
         : resolver_(Configuration::instance()),
           keyboard_(nullptr),
@@ -182,6 +279,7 @@ namespace ekeys
     {
         /* 加载 /config.ini（文件缺失时使用默认值），再加载键映射 */
         Configuration::instance().load();
+        g_preview_profile_index = Configuration::instance().activeProfile();
 
         scanner_.begin();
         resolver_.begin();
@@ -273,39 +371,77 @@ namespace ekeys
             applyUiSettingsSnapshot(pending, persist);
         }
 
-        /* 键映射二级页旋钮切 Profile 请求（合并消费，一次落盘 + 一次重载） */
-        int16_t profile_step = 0;
+        /*
+         * 键映射二级页旋钮请求消费：apply 优先（applied 消息先入队），
+         * 预览步进合并消费（只切预览视图，不应用不落盘）。
+         */
         {
+            bool apply_now = false;
+            uint8_t apply_target = 0;
+            int16_t profile_step = 0;
             taskENTER_CRITICAL(&g_profile_switch_lock);
-            if (g_profile_switch_request.pending)
+            if (g_profile_switch_request.apply_pending)
+            {
+                apply_now = true;
+                apply_target = g_profile_switch_request.apply_target;
+                g_profile_switch_request.apply_pending = false;
+                /* 消费 apply 时丢弃未处理的预览步进（目标已在请求时捕获） */
+                g_profile_switch_request.pending = false;
+                g_profile_switch_request.step = 0;
+            }
+            else if (g_profile_switch_request.pending)
             {
                 profile_step = g_profile_switch_request.step;
                 g_profile_switch_request.pending = false;
                 g_profile_switch_request.step = 0;
             }
             taskEXIT_CRITICAL(&g_profile_switch_lock);
-        }
-        if (profile_step != 0)
-        {
-            DeviceSettings snap;
-            Configuration::instance().snapshot(snap);
-            const uint8_t count = Configuration::CONFIG_PROFILE_COUNT;
-            int next = static_cast<int>(snap.active_keymap_profile) + profile_step;
-            next = ((next % count) + count) % count;
-            if (static_cast<uint8_t>(next) != snap.active_keymap_profile)
+
+            if (apply_now)
             {
-                Configuration::instance().switchActiveProfile(static_cast<uint8_t>(next));
-                reloadKeymap();
-                LOG_INFO("MAIN", "keymap secondary profile switch -> %u",
-                         static_cast<unsigned>(next));
+                const uint8_t active =
+                    Configuration::instance().activeProfile();
+                if (apply_target != active)
+                {
+                    Configuration::instance().switchActiveProfile(apply_target);
+                    reloadKeymap();
+                }
+                else
+                {
+                    /* 同 profile：跳过 SPIFFS 原子写，applied 消息照发供 UI 收尾遮罩 */
+                    keymap_ui_pending_ = true;
+                }
+                LOG_INFO("MAIN", "keymap secondary profile apply -> %u",
+                         static_cast<unsigned>(apply_target));
+            }
+            else if (profile_step != 0)
+            {
+                const uint8_t count = Configuration::CONFIG_PROFILE_COUNT;
+                int next = static_cast<int>(g_preview_profile_index) + profile_step;
+                next = ((next % count) + count) % count;
+                g_preview_profile_index = static_cast<uint8_t>(next);
+                keymap_preview_ui_pending_ = true;
             }
         }
 
-        /* 队列就绪后补发键映射屏数据（AppContext 在 begin() 后注入队列） */
+        /* 已应用视图：post 失败不清标志，下轮重试（防队列满丢消息后遮罩永挂） */
         if (keymap_ui_pending_ && display_queue_ != nullptr)
         {
-            sendKeymapProfileUi(fun_ui_layer_);
-            keymap_ui_pending_ = false;
+            if (sendKeymapProfileUi(fun_ui_layer_))
+            {
+                keymap_ui_pending_ = false;
+            }
+        }
+
+        /* 预览视图（节流：连转旋钮时限制 SPIFFS INI 解析频率） */
+        if (keymap_preview_ui_pending_ && display_queue_ != nullptr &&
+            (millis() - last_preview_load_ms_) >= kKeymapPreviewMinIntervalMs)
+        {
+            if (sendKeymapProfilePreview(fun_ui_layer_))
+            {
+                keymap_preview_ui_pending_ = false;
+                last_preview_load_ms_ = millis();
+            }
         }
 
         /* 阶段 06 服务调度（网络 / 扬声器 / ASR，不依赖 keyboard_ 注入） */
@@ -469,25 +605,25 @@ namespace ekeys
                 fun_ui_layer_ = fun_layer;
                 if (on_keymap_screen)
                 {
-                    sendKeymapProfileUi(fun_layer);
+                    pushCurrentKeymapView(fun_layer);
                 }
             }
             else if (on_keymap_screen && screen != keymap_ui_screen_)
             {
                 /* 进入键映射屏（含 FUN 按住时进入）→ 补推当前层视图 */
-                sendKeymapProfileUi(fun_layer);
+                pushCurrentKeymapView(fun_layer);
             }
             keymap_ui_screen_ = static_cast<uint8_t>(screen);
         }
     }
 
-    void MainTask::postMessage(const DisplayMessage &msg)
+    bool MainTask::postMessage(const DisplayMessage &msg)
     {
         if (display_queue_ == nullptr)
         {
-            return;
+            return false;
         }
-        xQueueSend(static_cast<QueueHandle_t>(display_queue_), &msg, 0);
+        return xQueueSend(static_cast<QueueHandle_t>(display_queue_), &msg, 0) == pdTRUE;
     }
 
     void MainTask::sendDisplayAction(uint8_t action)
@@ -498,7 +634,7 @@ namespace ekeys
         postMessage(msg);
     }
 
-    void MainTask::sendKeymapProfileUi(uint8_t fun_layer)
+    bool MainTask::sendKeymapProfileUi(uint8_t fun_layer)
     {
         Configuration &config = Configuration::instance();
 
@@ -509,74 +645,84 @@ namespace ekeys
         msg.type = DisplayMessageType::KeymapProfile;
         KeymapProfileInfo &p = msg.keymap_profile;
         p.active_profile = snap.active_keymap_profile;
+        /* applied 消息：描述的 profile 即激活 profile，is_preview 默认 false */
+        p.profile_index = snap.active_keymap_profile;
 
         snprintf(p.profile_name, sizeof(p.profile_name), "%s",
-                 config.getProfileDisplayName(p.active_profile));
+                 config.getProfileDisplayName(p.profile_index));
         snprintf(p.profile_icon, sizeof(p.profile_icon), "%s",
                  LV_SYMBOL_SETTINGS);
 
         for (uint8_t i = 0; i < kMatrixKeyCount; ++i)
         {
-            const KeyMapping &mapping = resolver_.get(static_cast<uint8_t>(i + 1));
-            auto layerSummary = [](const String &fk, const String &tk,
-                                   const std::array<String, kKeyMappingNormalCount> &nk)
-            {
-                String s;
-                if (!fk.isEmpty())
-                {
-                    /* 功能键同样可能存 usage code 字面量（如 "0x52"），转可读名 */
-                    s = keyDisplayName(fk);
-                }
-                else if (!tk.isEmpty())
-                {
-                    /* 文本注入键直接显示内容（超长由 snprintf 截断） */
-                    s = tk;
-                }
-                else
-                {
-                    for (uint8_t j = 0; j < kKeyMappingNormalCount; ++j)
-                    {
-                        if (nk[j].isEmpty())
-                        {
-                            continue;
-                        }
-                        if (!s.isEmpty())
-                        {
-                            s += "+";
-                        }
-                        /* App 端可能存 "0x04" 这类 usage code 字面量，显示转可读名 */
-                        s += keyDisplayName(nk[j]);
-                    }
-                }
-                return s;
-            };
-
-            String combo;
-            if (fun_layer == 1)
-            {
-                /* FUN1 按住：只显示该键组合层摘要（未配置显示 --） */
-                combo = layerSummary(mapping.combo1_function_key,
-                                     mapping.combo1_text_key,
-                                     mapping.combo1_normal_key);
-            }
-            else if (fun_layer == 2)
-            {
-                combo = layerSummary(mapping.combo2_function_key,
-                                     mapping.combo2_text_key,
-                                     mapping.combo2_normal_key);
-            }
-            else
-            {
-                /* 单击视图：只显示单击配置；组合层在 FUN 键按住时整屏切换预览 */
-                combo = layerSummary(mapping.function_key, mapping.text_key,
-                                     mapping.normal_key);
-            }
+            char label[20];
+            formatKeymapLabel(resolver_.get(static_cast<uint8_t>(i + 1)),
+                              fun_layer, label, sizeof(label));
             snprintf(p.keymap_labels[i], sizeof(p.keymap_labels[i]), "%u:%s",
-                     static_cast<unsigned>(i + 1),
-                     combo.isEmpty() ? "--" : combo.c_str());
+                     static_cast<unsigned>(i + 1), label);
         }
 
-        postMessage(msg);
+        /*
+         * 尾部 resync：外部切 profile 路径（cmd_config / 设置屏反向同步 /
+         * 0x06 applyKeymap）全部汇聚到 keymap_ui_pending_ → 本函数，
+         * 在此把预览索引对齐激活 profile，避免预览态与实际激活脱节。
+         */
+        g_preview_profile_index = p.profile_index;
+
+        return postMessage(msg);
+    }
+
+    bool MainTask::sendKeymapProfilePreview(uint8_t fun_layer)
+    {
+        Configuration &config = Configuration::instance();
+
+        /* 读目标 profile 键映射（仅内存展示，不应用不落盘） */
+        /* KeymapArray 约 4.3KB，放静态存储避免 loopTask 栈溢出（同 cmd_keymap.cpp） */
+        static Configuration::KeymapArray map{};
+        if (!config.loadProfileKeyMapping(g_preview_profile_index, map))
+        {
+            /* 文件缺失：与 KeyResolver::begin() 相同的默认映射回退 */
+            keymapFillDefaults(map);
+        }
+
+        DisplayMessage msg;
+        msg.type = DisplayMessageType::KeymapProfile;
+        KeymapProfileInfo &p = msg.keymap_profile;
+        p.active_profile = config.activeProfile(); /* 真实激活值，≠ profile_index */
+        p.profile_index = g_preview_profile_index;
+        p.is_preview = true;
+
+        snprintf(p.profile_name, sizeof(p.profile_name), "%s",
+                 config.getProfileDisplayName(p.profile_index));
+        snprintf(p.profile_icon, sizeof(p.profile_icon), "%s",
+                 LV_SYMBOL_SETTINGS);
+
+        for (uint8_t i = 0; i < kMatrixKeyCount; ++i)
+        {
+            char label[20];
+            formatKeymapLabel(map[static_cast<uint8_t>(i + 1)], fun_layer,
+                              label, sizeof(label));
+            snprintf(p.keymap_labels[i], sizeof(p.keymap_labels[i]), "%u:%s",
+                     static_cast<unsigned>(i + 1), label);
+        }
+
+        return postMessage(msg);
+    }
+
+    void MainTask::pushCurrentKeymapView(uint8_t fun_layer)
+    {
+        if (ui_get_active_screen_tag() == UI_SCREEN_KEYMAPPED_SECONDARY)
+        {
+            /* 二级页推预览消息：applied 消息会把 UI 预览态冲掉 */
+            if (!sendKeymapProfilePreview(fun_layer))
+            {
+                keymap_preview_ui_pending_ = true;
+            }
+        }
+        else if (!sendKeymapProfileUi(fun_layer))
+        {
+            keymap_ui_pending_ = true;
+        }
     }
 
     void MainTask::applyUiSettingsSnapshot(const ui_settings_snapshot_t &requested,

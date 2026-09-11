@@ -45,8 +45,18 @@ static uint8_t s_keymapped_secondary_fun_key2 = 0;
 static lv_obj_t *ui_KeyMappedSecondaryLastGroup = NULL;
 static uint8_t s_keymapped_secondary_focus_slot = 0xFFu; /* A1：当前高亮槽位，0xFF = 无 */
 
+/* 已应用的 profile（1~8，0=未知）；屏幕重建不清零，标记持续有效 */
+static unsigned int s_applied_profile_index = 0;
+
+/* "应用中..." 等待遮罩（screen_init 创建，默认隐藏） */
+static lv_obj_t *s_apply_waiting_mask = NULL;
+static lv_obj_t *s_apply_waiting_label = NULL;
+static lv_timer_t *s_apply_waiting_timer = NULL; /* 3s 兜底：applied 消息丢失时强制收尾 */
+static bool s_apply_in_progress = false;         /* 防重入：等待期间忽略再次单击 */
+
 /* 前向声明：dispatch_key 在 apply_focus 之前定义，需先声明 */
 static void keymapped_secondary_apply_focus(void);
+static void keymapped_secondary_apply_applied_marker(void);
 static lv_obj_t *s_keymapped_secondary_main_screen_icon = NULL;
 static lv_obj_t *s_keymapped_secondary_main_screen_icon_image = NULL;
 static lv_obj_t *s_keymapped_secondary_main_screen_profile_name = NULL;
@@ -128,7 +138,12 @@ static void keymapped_secondary_style_key_cell(lv_obj_t *obj)
     lv_obj_set_style_shadow_width(obj, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
-static void keymapped_secondary_apply_cached_profile(void)
+/*
+ * 刷新 profile 摘要缓存到二级页控件。
+ * sync_main=false（预览消息）时跳过主屏 summary（bind 缓存）刷新，
+ * 避免预览态污染一级屏显示。
+ */
+static void keymapped_secondary_apply_cached_profile(bool sync_main)
 {
     char profile_hint[20] = {0};
     const unsigned int profile_number = keymapped_secondary_extract_profile_index(s_keymapped_secondary_profile_file_name);
@@ -147,7 +162,7 @@ static void keymapped_secondary_apply_cached_profile(void)
     {
         lv_label_set_text(ui_KeyMappedSecondaryIcon, profile_symbol);
     }
-    if (s_keymapped_secondary_main_screen_icon)
+    if (sync_main && s_keymapped_secondary_main_screen_icon)
     {
         lv_label_set_text(s_keymapped_secondary_main_screen_icon, profile_symbol);
     }
@@ -155,7 +170,7 @@ static void keymapped_secondary_apply_cached_profile(void)
     {
         lv_label_set_text(ui_KeyMappedSecondaryProfileName, profile_text);
     }
-    if (s_keymapped_secondary_main_screen_profile_name)
+    if (sync_main && s_keymapped_secondary_main_screen_profile_name)
     {
         lv_label_set_text(s_keymapped_secondary_main_screen_profile_name, profile_text);
     }
@@ -176,6 +191,9 @@ static void keymapped_secondary_apply_cached_profile(void)
                  (unsigned)UI_KEYMAPPED_PROFILE_COUNT);
         lv_label_set_text(s_keymapped_secondary_profile_index_label, index_text);
     }
+
+    /* 展示序号变化后重刷"已应用"标记（红 = 展示的即已应用 profile） */
+    keymapped_secondary_apply_applied_marker();
 }
 
 static void keymapped_secondary_apply_cached_key_labels(void)
@@ -233,7 +251,7 @@ void ui_KeyMappedSecondary_bind_main_screen_summary(lv_obj_t *icon_label,
     s_keymapped_secondary_main_screen_icon_image = icon_image;
     s_keymapped_secondary_main_screen_profile_name = profile_name;
 
-    keymapped_secondary_apply_cached_profile();
+    keymapped_secondary_apply_cached_profile(true);
     if (s_keymapped_secondary_icon_image_data != NULL && s_keymapped_secondary_icon_image_size > 0)
     {
         keymapped_secondary_apply_cached_image();
@@ -367,9 +385,12 @@ static void keymapped_secondary_forward_key(uint32_t key)
  *   - DisplayTask 经 ActionInput 转 LV_EVENT_KEY（旋钮 / 应用键 1~11）
  *   - SquareLine ButtonLeft/Right/Enter/Exit 转发 LV_KEY_LEFT/RIGHT/ENTER/ESC
  * 行为：
- *   LV_KEY_LEFT/RIGHT → 旋钮旋转切 Profile（-1/+1，MainTask 落盘并重载键映射）
- *   LV_KEY_ENTER       → 无操作（占位：未来接"编辑该键"流程）
- *   LV_KEY_ESC         → 回 KEYMAPPED
+ *   LV_KEY_LEFT/RIGHT → 旋钮旋转"预览"Profile（-1/+1，MainTask 只读目标
+ *                       profile 键映射回发预览消息，不应用不落盘）
+ *   LV_KEY_ENTER       → 应用当前预览的 Profile（先显示"应用中..."遮罩，
+ *                        applied 消息到达后收尾；请求失败则回滚遮罩）
+ *   LV_KEY_ESC         → 回 KEYMAPPED（不拦截：apply 在 MainTask 后台
+ *                        必然完成，遮罩由 applied 消息 / 3s 兜底关闭）
  *   101 ~ 111          → 矩阵键（BASE+key_id）跳焦点到对应槽位
  */
 static void keymapped_secondary_dispatch_key(uintptr_t key)
@@ -400,7 +421,16 @@ static void keymapped_secondary_dispatch_key(uintptr_t key)
     }
     else if (key == (uintptr_t)LV_KEY_ENTER)
     {
-        /* 占位：未来 KEYMAPPED 二级页要支持"重新映射该键"时再接 editing 流程 */
+        /* 应用当前预览的 Profile：防重入 + 等待遮罩，失败回滚 */
+        if (!s_apply_in_progress)
+        {
+            s_apply_in_progress = true;
+            ui_KeyMappedSecondary_show_apply_waiting();
+            if (!ui_keymap_request_profile_apply())
+            {
+                ui_KeyMappedSecondary_hide_apply_waiting();
+            }
+        }
     }
 }
 
@@ -448,7 +478,8 @@ void ui_event_ButtonExitKeyMappedSecondary(lv_event_t *e)
     }
 }
 
-void ui_KeyMappedSecondary_set_profile(const char *icon, const char *name, const char *file_name)
+void ui_KeyMappedSecondary_set_profile(const char *icon, const char *name, const char *file_name,
+                                       bool update_main_summary)
 {
     snprintf(s_keymapped_secondary_profile_icon_symbol,
              sizeof(s_keymapped_secondary_profile_icon_symbol),
@@ -463,7 +494,91 @@ void ui_KeyMappedSecondary_set_profile(const char *icon, const char *name, const
              "%s",
              (file_name && file_name[0]) ? file_name : "config_profile_0.ini");
 
-    keymapped_secondary_apply_cached_profile();
+    keymapped_secondary_apply_cached_profile(update_main_summary);
+}
+
+/*
+ * "已应用"标记：展示的 profile == 已应用 profile 时，
+ * 序号格子红框加粗 + 序号 / 名称文字红色；否则回默认灰。
+ */
+static void keymapped_secondary_apply_applied_marker(void)
+{
+    const bool applied_shown =
+        (s_applied_profile_index != 0 &&
+         s_applied_profile_index == s_keymapped_secondary_profile_index);
+    const lv_color_t marker_color = lv_color_hex(0xD33A31);
+    const lv_color_t idle_color = lv_color_hex(0x8FA0B5);
+
+    if (ui_KeyMappedSecondaryProfileIndex)
+    {
+        lv_obj_set_style_border_color(ui_KeyMappedSecondaryProfileIndex,
+                                      applied_shown ? marker_color
+                                                    : lv_color_hex(0x2B3442),
+                                      LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_border_width(ui_KeyMappedSecondaryProfileIndex,
+                                      applied_shown ? 2 : 1,
+                                      LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+    if (s_keymapped_secondary_profile_index_label)
+    {
+        lv_obj_set_style_text_color(s_keymapped_secondary_profile_index_label,
+                                    applied_shown ? marker_color : idle_color,
+                                    LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+    if (ui_KeyMappedSecondaryProfileName)
+    {
+        lv_obj_set_style_text_color(ui_KeyMappedSecondaryProfileName,
+                                    applied_shown ? marker_color : idle_color,
+                                    LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+}
+
+void ui_KeyMappedSecondary_set_applied_index(unsigned int index)
+{
+    s_applied_profile_index = (index >= 1 && index <= UI_KEYMAPPED_PROFILE_COUNT)
+                                  ? index
+                                  : 0;
+    keymapped_secondary_apply_applied_marker();
+}
+
+/* 兜底 timer 回调：applied 消息丢失（如队列满丢弃）时强制收尾遮罩 */
+static void keymapped_secondary_apply_waiting_timer_cb(lv_timer_t *timer)
+{
+    (void)timer;
+    s_apply_waiting_timer = NULL;
+    ui_KeyMappedSecondary_hide_apply_waiting();
+}
+
+void ui_KeyMappedSecondary_show_apply_waiting(void)
+{
+    if (s_apply_waiting_mask == NULL)
+    {
+        return;
+    }
+    lv_obj_clear_flag(s_apply_waiting_mask, LV_OBJ_FLAG_HIDDEN);
+    if (s_apply_waiting_timer == NULL)
+    {
+        s_apply_waiting_timer = lv_timer_create(
+            keymapped_secondary_apply_waiting_timer_cb, 3000, NULL);
+        if (s_apply_waiting_timer)
+        {
+            lv_timer_set_repeat_count(s_apply_waiting_timer, 1);
+        }
+    }
+}
+
+void ui_KeyMappedSecondary_hide_apply_waiting(void)
+{
+    if (s_apply_waiting_timer != NULL)
+    {
+        lv_timer_del(s_apply_waiting_timer);
+        s_apply_waiting_timer = NULL;
+    }
+    if (s_apply_waiting_mask != NULL)
+    {
+        lv_obj_add_flag(s_apply_waiting_mask, LV_OBJ_FLAG_HIDDEN);
+    }
+    s_apply_in_progress = false;
 }
 
 void ui_KeyMappedSecondary_set_key_label(unsigned int key_index, const char *text)
@@ -633,7 +748,8 @@ void ui_KeyMappedSecondary_screen_init(void)
     lv_obj_set_width(ui_KeyMappedSecondaryProfileName, KEYMAP_SECONDARY_APP_CARD_WIDTH - 10);
     lv_label_set_long_mode(ui_KeyMappedSecondaryProfileName, LV_LABEL_LONG_CLIP);
     lv_obj_set_style_text_align(ui_KeyMappedSecondaryProfileName, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(ui_KeyMappedSecondaryProfileName, lv_color_hex(0xD33A31), LV_PART_MAIN | LV_STATE_DEFAULT);
+    /* 默认灰：红色只由"已应用"标记动态设置（预览态为灰） */
+    lv_obj_set_style_text_color(ui_KeyMappedSecondaryProfileName, lv_color_hex(0x8FA0B5), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_KeyMappedSecondaryProfileName, &ui_font_FontCKJGT16, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_align(ui_KeyMappedSecondaryProfileName, LV_ALIGN_BOTTOM_MID, 0, -12);
 
@@ -708,7 +824,7 @@ void ui_KeyMappedSecondary_screen_init(void)
     lv_obj_add_event_cb(ui_KeyMappedSecondaryButtonExit, ui_event_ButtonExitKeyMappedSecondary, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_KeyMappedSecondary, ui_event_KeyMappedSecondaryScreen, LV_EVENT_ALL, NULL);
 
-    keymapped_secondary_apply_cached_profile();
+    keymapped_secondary_apply_cached_profile(true);
     if (s_keymapped_secondary_icon_image_data != NULL && s_keymapped_secondary_icon_image_size > 0)
     {
         keymapped_secondary_apply_cached_image();
@@ -721,10 +837,36 @@ void ui_KeyMappedSecondary_screen_init(void)
     keymapped_secondary_apply_cached_key_labels();
     /* FUN 键整体配色 + focus 高亮（screen 重建后重刷一次） */
     keymapped_secondary_apply_focus();
+
+    /*
+     * "应用中..." 等待遮罩：最后创建保证在最顶层，默认隐藏。
+     * applied 消息（hide_apply_waiting）或 3s 兜底 timer 收尾。
+     */
+    s_apply_waiting_mask = lv_obj_create(ui_KeyMappedSecondary);
+    lv_obj_set_size(s_apply_waiting_mask, 428, 142);
+    lv_obj_align(s_apply_waiting_mask, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_clear_flag(s_apply_waiting_mask, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_bg_color(s_apply_waiting_mask, lv_color_hex(0x070A0F), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(s_apply_waiting_mask, LV_OPA_70, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_width(s_apply_waiting_mask, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_radius(s_apply_waiting_mask, 14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_all(s_apply_waiting_mask, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_add_flag(s_apply_waiting_mask, LV_OBJ_FLAG_HIDDEN);
+
+    s_apply_waiting_label = lv_label_create(s_apply_waiting_mask);
+    lv_label_set_text(s_apply_waiting_label, "应用中...");
+    lv_obj_set_style_text_font(s_apply_waiting_label, &ui_font_FontCKJGT16, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(s_apply_waiting_label, lv_color_hex(0xF5F7FA), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_center(s_apply_waiting_label);
 }
 
 void ui_KeyMappedSecondary_screen_destroy(void)
 {
+    /* 兜底 timer 生命周期独立于对象，必须先删 */
+    ui_KeyMappedSecondary_hide_apply_waiting();
+    s_apply_waiting_mask = NULL;
+    s_apply_waiting_label = NULL;
+
     if (ui_KeyMappedSecondary)
     {
         lv_obj_del(ui_KeyMappedSecondary);

@@ -73,6 +73,14 @@ namespace ekeys
         bool loadActiveProfileKeyMapping(KeymapArray &out);
 
         /*
+         * 加载任意 profile（idx 0~7）的键映射到 out（仅读文件，不应用），
+         * 供键映射二级页预览使用。返回 false 时 out 内容未定义，
+         * 调用方须以 keymapFillDefaults(out) 兜底（与 KeyResolver::begin()
+         * 的回退语义一致）。
+         */
+        bool loadProfileKeyMapping(uint8_t idx, KeymapArray &out);
+
+        /*
          * 批量保存当前 Profile 键映射到 keymap{N}.ini（单次文件读/写）。
          * keyMask 为位掩码，bit i（1~kMatrixKeyCount）置位表示保存 mappings[i]。
          */
