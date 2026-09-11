@@ -536,7 +536,7 @@ namespace ekeys
 
             const bool suppress_hid =
                 ui_get_active_screen_tag() == UI_SCREEN_SETTING_SECONDARY ||
-                ui_get_active_screen_tag() == UI_SCREEN_AUDIO;
+                ui_get_active_screen_tag() == UI_SCREEN_AUDIO_SECONDARY;
             if (!suppress_hid)
             {
                 /*
@@ -900,6 +900,9 @@ namespace ekeys
         NtpSync::instance().process();
         DiscoveryService::instance().process();
         TcpChannel::instance().process();
+        /* 音效板：消费 DisplayTask（Core 0）的播放/停止请求。必须先于
+         * Speaker::loop——启停与喂流同任务串行访问 Audio 实例（INT WDT 修复） */
+        AudioPad::instance().service();
         Speaker::instance().loop();
         /* 音效板：检测键位播放结束 → 清键位高亮 */
         AudioPad::instance().loop();

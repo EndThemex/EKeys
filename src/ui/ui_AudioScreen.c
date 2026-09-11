@@ -1,198 +1,166 @@
 /*
  * ui_AudioScreen.c
  *
- * 音效页（Sound Pad）。手写 SquareLine 风格（参照 ui_MusicScreen.c）：
- * 4 列 × 3 行共 12 格 = 11 个音效格 + 1 状态格。屏 428×142。
- *
- * 仅 label/边框样式更新，无大缓冲（LVGL 内存约束，见 sound-pad 计划）。
+ * 音效页一级屏（Sound Pad entry）。与 KeyMapped / MusicScreen 一致风格：
+ * 大图标 + 标题，旋钮 ENTER 进入二级屏（AudioScreenSecondary）。
  */
 
 #include "ui_AudioScreen.h"
 
-#include <stdbool.h>
-
 #include "ui.h"
 
 lv_obj_t *ui_AudioScreen = NULL;
+lv_obj_t *ui_AudioScreenButtonLeft = NULL;
+lv_obj_t *ui_AudioScreenButtonRight = NULL;
+lv_obj_t *ui_AudioScreenButtonEnter = NULL;
+lv_obj_t *ui_AudioScreenButtonExit = NULL;
+static lv_obj_t *s_AudioScreenIcon = NULL;
+static lv_style_t s_audio_screen_icon_style;
+static bool s_audio_screen_icon_style_ready = false;
+static lv_style_t s_audio_screen_title_style;
+static bool s_audio_screen_title_style_ready = false;
 
-/* 音效格对象与文本标签（格 12 = 状态格） */
-static lv_obj_t *s_pad_cells[11] = {NULL};
-static lv_obj_t *s_pad_key_labels[11] = {NULL};
-static lv_obj_t *s_pad_file_labels[11] = {NULL};
-static lv_obj_t *s_status_cell = NULL;
-
-/* 布局：左右边距 8、上边距 6，格 100×41、间距 4/3 */
-#define PAD_COLS 4
-#define PAD_ROWS 3
-#define PAD_CELL_W 100
-#define PAD_CELL_H 41
-#define PAD_GAP_X 4
-#define PAD_GAP_Y 3
-#define PAD_LEFT 8
-#define PAD_TOP 6
-
-/* 播放高亮色（与 App 品牌蓝一致的观感） */
-#define PAD_HL_COLOR 0x4F8CFF
-#define PAD_BORDER_COLOR 0x2A3542
-#define PAD_BG_COLOR 0x141A22
-
-static void pad_cell_layout(uint8_t idx, lv_obj_t *cell, bool is_status)
+static void audio_screen_forward_key(uint32_t key)
 {
-    const uint8_t row = idx / PAD_COLS;
-    const uint8_t col = idx % PAD_COLS;
-    lv_obj_set_size(cell, PAD_CELL_W, PAD_CELL_H);
-    lv_obj_set_x(cell, PAD_LEFT + col * (PAD_CELL_W + PAD_GAP_X));
-    lv_obj_set_y(cell, PAD_TOP + row * (PAD_CELL_H + PAD_GAP_Y));
-
-    lv_obj_clear_flag(cell, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_radius(cell, 6, 0);
-    lv_obj_set_style_bg_color(cell, lv_color_hex(PAD_BG_COLOR), 0);
-    lv_obj_set_style_bg_opa(cell, 200, 0);
-    lv_obj_set_style_border_width(cell, 1, 0);
-    lv_obj_set_style_border_color(cell, lv_color_hex(PAD_BORDER_COLOR), 0);
-    lv_obj_set_style_pad_all(cell, 3, 0);
-    (void)is_status;
+    lv_obj_t *active_screen = lv_scr_act();
+    lv_group_t *g = lv_group_get_default();
+    lv_obj_t *target = g ? lv_group_get_focused(g) : active_screen;
+    if (target) {
+        lv_event_send(target, LV_EVENT_KEY, (void *)key);
+    }
 }
 
-/* 事件函数 */
 void ui_event_AudioScreen(lv_event_t *e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
-    uintptr_t key = (uintptr_t)lv_event_get_param(e);
+    if (event_code != LV_EVENT_KEY) {
+        return;
+    }
 
-    if (event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_RIGHT) {
+    uintptr_t key = (uintptr_t)lv_event_get_param(e);
+    if (key == (uintptr_t)LV_KEY_RIGHT) {
         ui_set_active_screen_tag(UI_SCREEN_PC_STATUS);
         _ui_screen_change(&ui_PcStatusScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_PcStatusScreen_screen_init);
         lv_refr_now(NULL);
-    }
-    else if (event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_LEFT) {
+    } else if (key == (uintptr_t)LV_KEY_LEFT) {
         ui_set_active_screen_tag(UI_SCREEN_MUSIC);
         _ui_screen_change(&ui_MusicScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_MusicScreen_screen_init);
         lv_refr_now(NULL);
-    }
-    else if (event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_ENTER) {
-        /* 旋钮单击：停止当前播放 */
-        ui_audio_pad_stop();
-    }
-    else if (event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_ESC) {
-        /* 旋钮双击：回主屏 */
+    } else if (key == (uintptr_t)LV_KEY_ENTER) {
+        ui_set_active_screen_tag(UI_SCREEN_AUDIO_SECONDARY);
+        _ui_screen_change(&ui_AudioScreenSecondary, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_AudioScreenSecondary_screen_init);
+        lv_refr_now(NULL);
+    } else if (key == (uintptr_t)LV_KEY_ESC) {
         ui_set_active_screen_tag(UI_SCREEN_MAIN);
         _ui_screen_change(&ui_MainScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_MainScreen_screen_init);
         lv_refr_now(NULL);
     }
 }
 
-/* build functions */
+void ui_event_AudioScreenButtonLeft(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        audio_screen_forward_key(LV_KEY_LEFT);
+    }
+}
+
+void ui_event_AudioScreenButtonRight(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        audio_screen_forward_key(LV_KEY_RIGHT);
+    }
+}
+
+void ui_event_AudioScreenButtonEnter(lv_event_t *e)
+{
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+        audio_screen_forward_key(LV_KEY_ENTER);
+    }
+}
+
 void ui_AudioScreen_screen_init(void)
 {
     ui_AudioScreen = lv_obj_create(NULL);
     lv_obj_clear_flag(ui_AudioScreen, LV_OBJ_FLAG_SCROLLABLE);
     ui_set_active_screen_tag(UI_SCREEN_AUDIO);
 
-    static lv_style_t key_style;
-    static bool key_style_ready = false;
-    if (!key_style_ready) {
-        lv_style_init(&key_style);
-        lv_style_set_text_font(&key_style, &ui_font_BebasNeueFont24);
-        lv_style_set_text_color(&key_style, lv_color_hex(0xF5F8FF));
-        key_style_ready = true;
-    }
-    static lv_style_t file_style;
-    static bool file_style_ready = false;
-    if (!file_style_ready) {
-        lv_style_init(&file_style);
-        lv_style_set_text_font(&file_style, &ui_font_FontCKJGT16);
-        lv_style_set_text_color(&file_style, lv_color_hex(0x9AA7B6));
-        file_style_ready = true;
-    }
-    static lv_style_t status_style;
-    static bool status_style_ready = false;
-    if (!status_style_ready) {
-        lv_style_init(&status_style);
-        lv_style_set_text_font(&status_style, &ui_font_FontCKJGT16);
-        lv_style_set_text_color(&status_style, lv_color_hex(0xF5F8FF));
-        status_style_ready = true;
+    if (!s_audio_screen_icon_style_ready) {
+        lv_style_init(&s_audio_screen_icon_style);
+        lv_style_set_text_font(&s_audio_screen_icon_style, &lv_font_montserrat_48);
+        s_audio_screen_icon_style_ready = true;
     }
 
-    char buf[16];
-    for (uint8_t i = 0; i < 11; ++i) {
-        s_pad_cells[i] = lv_obj_create(ui_AudioScreen);
-        pad_cell_layout(i, s_pad_cells[i], false);
-
-        s_pad_key_labels[i] = lv_label_create(s_pad_cells[i]);
-        lv_obj_add_style(s_pad_key_labels[i], &key_style, 0);
-        snprintf(buf, sizeof(buf), "%u", (unsigned)(i + 1));
-        lv_label_set_text(s_pad_key_labels[i], buf);
-        lv_obj_align(s_pad_key_labels[i], LV_ALIGN_TOP_LEFT, 2, 0);
-
-        s_pad_file_labels[i] = lv_label_create(s_pad_cells[i]);
-        lv_obj_add_style(s_pad_file_labels[i], &file_style, 0);
-        lv_label_set_text(s_pad_file_labels[i], "--");
-        lv_label_set_long_mode(s_pad_file_labels[i], LV_LABEL_LONG_DOT);
-        lv_obj_set_width(s_pad_file_labels[i], PAD_CELL_W - 10);
-        lv_obj_align(s_pad_file_labels[i], LV_ALIGN_BOTTOM_LEFT, 2, 0);
+    if (!s_audio_screen_title_style_ready) {
+        lv_style_init(&s_audio_screen_title_style);
+        lv_style_set_text_font(&s_audio_screen_title_style, &ui_font_FontCKJGT28);
+        lv_style_set_text_letter_space(&s_audio_screen_title_style, 1);
+        lv_style_set_text_color(&s_audio_screen_title_style, lv_color_hex(0xF5F8FF));
+        lv_style_set_text_opa(&s_audio_screen_title_style, LV_OPA_COVER);
+        s_audio_screen_title_style_ready = true;
     }
 
-    /* 格 12（第 4 行第 3 列）：状态格 */
-    s_status_cell = lv_obj_create(ui_AudioScreen);
-    pad_cell_layout(11, s_status_cell, true);
-    lv_obj_t *title = lv_label_create(s_status_cell);
-    lv_obj_add_style(title, &status_style, 0);
-    lv_label_set_text(title, "SOUND PAD");
-    lv_obj_align(title, LV_ALIGN_TOP_LEFT, 2, 0);
-    lv_obj_t *hint = lv_label_create(s_status_cell);
-    lv_obj_add_style(hint, &file_style, 0);
-    lv_label_set_text(hint, "ENTER:STOP");
-    lv_obj_align(hint, LV_ALIGN_BOTTOM_LEFT, 2, 0);
+    ui_AudioScreenButtonLeft = lv_btn_create(ui_AudioScreen);
+    lv_obj_set_size(ui_AudioScreenButtonLeft, 41, 28);
+    lv_obj_set_align(ui_AudioScreenButtonLeft, LV_ALIGN_CENTER);
+    lv_obj_set_pos(ui_AudioScreenButtonLeft, -178, -9);
+    lv_obj_set_style_bg_opa(ui_AudioScreenButtonLeft, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_clear_flag(ui_AudioScreenButtonLeft, LV_OBJ_FLAG_SCROLLABLE);
 
+    ui_AudioScreenButtonRight = lv_btn_create(ui_AudioScreen);
+    lv_obj_set_size(ui_AudioScreenButtonRight, 41, 28);
+    lv_obj_set_align(ui_AudioScreenButtonRight, LV_ALIGN_CENTER);
+    lv_obj_set_pos(ui_AudioScreenButtonRight, 181, -10);
+    lv_obj_set_style_bg_opa(ui_AudioScreenButtonRight, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_clear_flag(ui_AudioScreenButtonRight, LV_OBJ_FLAG_SCROLLABLE);
+
+    ui_AudioScreenButtonEnter = lv_btn_create(ui_AudioScreen);
+    lv_obj_set_size(ui_AudioScreenButtonEnter, 41, 28);
+    lv_obj_set_align(ui_AudioScreenButtonEnter, LV_ALIGN_CENTER);
+    lv_obj_set_pos(ui_AudioScreenButtonEnter, 2, 38);
+    lv_obj_set_style_bg_opa(ui_AudioScreenButtonEnter, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_clear_flag(ui_AudioScreenButtonEnter, LV_OBJ_FLAG_SCROLLABLE);
+
+    ui_AudioScreenButtonExit = lv_btn_create(ui_AudioScreen);
+    lv_obj_set_size(ui_AudioScreenButtonExit, 40, 20);
+    lv_obj_set_align(ui_AudioScreenButtonExit, LV_ALIGN_CENTER);
+    lv_obj_set_pos(ui_AudioScreenButtonExit, -181, -54);
+    lv_obj_set_style_bg_opa(ui_AudioScreenButtonExit, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_clear_flag(ui_AudioScreenButtonExit, LV_OBJ_FLAG_SCROLLABLE);
+
+    s_AudioScreenIcon = lv_img_create(ui_AudioScreen);
+    lv_img_set_src(s_AudioScreenIcon, LV_SYMBOL_AUDIO);
+    lv_obj_add_style(s_AudioScreenIcon, &s_audio_screen_icon_style, 0);
+    lv_obj_set_size(s_AudioScreenIcon, 80, 80);
+    lv_obj_set_x(s_AudioScreenIcon, 20);
+    lv_obj_set_y(s_AudioScreenIcon, -2);
+    lv_obj_set_align(s_AudioScreenIcon, LV_ALIGN_CENTER);
+    lv_obj_add_flag(s_AudioScreenIcon, LV_OBJ_FLAG_ADV_HITTEST);
+    lv_obj_clear_flag(s_AudioScreenIcon, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *audio_screen_title = lv_label_create(ui_AudioScreen);
+    lv_label_set_recolor(audio_screen_title, true);
+    lv_label_set_text(audio_screen_title, "SOUND PAD");
+    lv_obj_set_width(audio_screen_title, 300);
+    lv_label_set_long_mode(audio_screen_title, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_align(audio_screen_title, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_add_style(audio_screen_title, &s_audio_screen_title_style, 0);
+    lv_obj_align_to(audio_screen_title, s_AudioScreenIcon, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
+
+    lv_obj_add_event_cb(ui_AudioScreenButtonLeft, ui_event_AudioScreenButtonLeft, LV_EVENT_ALL, NULL);
+    lv_obj_add_event_cb(ui_AudioScreenButtonRight, ui_event_AudioScreenButtonRight, LV_EVENT_ALL, NULL);
+    lv_obj_add_event_cb(ui_AudioScreenButtonEnter, ui_event_AudioScreenButtonEnter, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_AudioScreen, ui_event_AudioScreen, LV_EVENT_ALL, NULL);
 }
 
 void ui_AudioScreen_screen_destroy(void)
 {
-    if (ui_AudioScreen) lv_obj_del(ui_AudioScreen);
-
+    if (ui_AudioScreen) {
+        lv_obj_del(ui_AudioScreen);
+    }
     ui_AudioScreen = NULL;
-    for (uint8_t i = 0; i < 11; ++i) {
-        s_pad_cells[i] = NULL;
-        s_pad_key_labels[i] = NULL;
-        s_pad_file_labels[i] = NULL;
-    }
-    s_status_cell = NULL;
-}
-
-void ui_AudioScreen_set_pads(const char files[11][25])
-{
-    if (ui_AudioScreen == NULL) {
-        return;
-    }
-    for (uint8_t i = 0; i < 11; ++i) {
-        if (s_pad_file_labels[i] == NULL) {
-            continue;
-        }
-        /* 未绑定显示 "--"，已绑定显示文件名（超长省略号截断） */
-        lv_label_set_text(s_pad_file_labels[i],
-                          files[i][0] == '\0' ? "--" : files[i]);
-    }
-}
-
-void ui_AudioScreen_set_playing(uint8_t key)
-{
-    if (ui_AudioScreen == NULL) {
-        return;
-    }
-    for (uint8_t i = 0; i < 11; ++i) {
-        if (s_pad_cells[i] == NULL) {
-            continue;
-        }
-        if (key == i + 1) {
-            lv_obj_set_style_border_width(s_pad_cells[i], 2, 0);
-            lv_obj_set_style_border_color(s_pad_cells[i],
-                                          lv_color_hex(PAD_HL_COLOR), 0);
-        } else {
-            lv_obj_set_style_border_width(s_pad_cells[i], 1, 0);
-            lv_obj_set_style_border_color(s_pad_cells[i],
-                                          lv_color_hex(PAD_BORDER_COLOR), 0);
-        }
-    }
+    ui_AudioScreenButtonLeft = NULL;
+    ui_AudioScreenButtonRight = NULL;
+    ui_AudioScreenButtonEnter = NULL;
+    ui_AudioScreenButtonExit = NULL;
+    s_AudioScreenIcon = NULL;
 }

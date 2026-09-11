@@ -43,6 +43,7 @@ void ui_init(void)
     ui_MusicScreen_screen_init();
     ui_MusicScreenSecondary_screen_init();
     ui_AudioScreen_screen_init();
+    ui_AudioScreenSecondary_screen_init();
     ui_PcStatusScreen_screen_init();
     ui_PcStatusScreenSecondary_screen_init();
     ui_HaScreen_screen_init();
@@ -63,6 +64,7 @@ void ui_destroy(void)
     ui_MusicScreen_screen_destroy();
     ui_MusicScreenSecondary_screen_destroy();
     ui_AudioScreen_screen_destroy();
+    ui_AudioScreenSecondary_screen_destroy();
     ui_PcStatusScreen_screen_destroy();
     ui_PcStatusScreenSecondary_screen_destroy();
     ui_HaScreen_screen_destroy();

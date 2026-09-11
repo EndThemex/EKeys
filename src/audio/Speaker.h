@@ -58,8 +58,27 @@ public:
 private:
     Speaker() = default;
 
+    /*
+     * 播放启动音量淡入（抑制 MP3 开头轻微电流音）：
+     * I2S 时钟开机即常开、DMA 已清零，开头噪声来自首帧解码伪影 /
+     * 采样率切换瞬态（约几十 ms），播放启动后 0 → target_volume_
+     * 线性爬升 kRampDurationMs 压掉瞬态。setVolume 逐样本查表生效，
+     * 中途改音量无爆音。
+     */
+    void startVolumeRamp();
+    void tickVolumeRamp();  /* 由 loop() 驱动 */
+
     void *impl_ = nullptr;  // Audio*（避免头文件引 ESP32-audioI2S）
     bool inited_ = false;
+
+    /*
+     * 淡入状态：ramp 启动（DisplayTask 侧 AudioPad 路径）与 tick
+     * （MainTask 侧 loop）跨任务读写，bool/uint8/uint32 对齐读写
+     * 在 Xtensa 上天然原子，与 ui_get_active_screen_tag 同理，无需加锁。
+     */
+    uint8_t target_volume_ = 12;
+    bool ramping_ = false;
+    uint32_t ramp_start_ms_ = 0;
 };
 
 }  // namespace ekeys

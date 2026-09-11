@@ -16,6 +16,12 @@
 
 namespace ekeys {
 
+namespace {
+/* 淡入时长：覆盖 MP3 首帧解码伪影 / 采样率切换瞬态（几十 ms 量级），
+ * 又短到人耳不会察觉是"渐入"。 */
+constexpr uint32_t kRampDurationMs = 150;
+}  // namespace
+
 Speaker &Speaker::instance()
 {
     static Speaker inst;
@@ -34,6 +40,8 @@ void Speaker::begin()
     auto *audio = new Audio(false, 3, I2S_NUM_1);
     audio->setPinout(kPinI2sBclkSpeaker, kPinI2sLrclkSpeaker, kPinI2sDataSpeaker);
     audio->setVolume(12);  // 默认中等音量（0~21）
+    target_volume_ = 12;
+    ramping_ = false;  // end() 重建后不残留旧淡入状态
     impl_ = audio;
     inited_ = true;
     LOG_INFO("SPK", "MAX98357 ready (bclk=%u lrc=%u dout=%u)",
@@ -44,7 +52,35 @@ void Speaker::loop()
 {
     if (inited_)
     {
+        tickVolumeRamp();
         static_cast<Audio *>(impl_)->loop();
+    }
+}
+
+void Speaker::startVolumeRamp()
+{
+    Audio *audio = static_cast<Audio *>(impl_);
+    audio->setVolume(0);
+    ramp_start_ms_ = millis();
+    ramping_ = true;
+}
+
+void Speaker::tickVolumeRamp()
+{
+    if (!ramping_)
+    {
+        return;
+    }
+    uint32_t elapsed = millis() - ramp_start_ms_;
+    if (elapsed >= kRampDurationMs)
+    {
+        ramping_ = false;
+        static_cast<Audio *>(impl_)->setVolume(target_volume_);
+    }
+    else
+    {
+        static_cast<Audio *>(impl_)->setVolume(
+            static_cast<uint8_t>(target_volume_ * elapsed / kRampDurationMs));
     }
 }
 
@@ -71,6 +107,14 @@ void Speaker::SetVolume(uint8_t volume_0_21)
     {
         volume_0_21 = 21;
     }
+    if (ramping_)
+    {
+        /* 淡入进行中：只更新目标值，淡入结束自动落到新目标，
+         * 直接打断爬升会产生音量跳变。 */
+        target_volume_ = volume_0_21;
+        return;
+    }
+    target_volume_ = volume_0_21;
     static_cast<Audio *>(impl_)->setVolume(volume_0_21);
 }
 
@@ -96,7 +140,12 @@ bool Speaker::PlayRemoteAudio(const char *url)
         begin();
     }
     LOG_INFO("SPK", "remote: %s", url);
-    return static_cast<Audio *>(impl_)->connecttohost(url);
+    bool ok = static_cast<Audio *>(impl_)->connecttohost(url);
+    if (ok)
+    {
+        startVolumeRamp();  /* 压掉流启动瞬态（本地/网络同样适用） */
+    }
+    return ok;
 }
 
 bool Speaker::PlayLocalAudio(const char *path)
@@ -121,7 +170,12 @@ bool Speaker::PlayLocalAudio(const char *path)
         return false;
     }
     LOG_INFO("SPK", "local: %s", path);
-    return static_cast<Audio *>(impl_)->connecttoFS(SPIFFS, path);
+    bool ok = static_cast<Audio *>(impl_)->connecttoFS(SPIFFS, path);
+    if (ok)
+    {
+        startVolumeRamp();  /* 抑制 MP3 开头轻微电流音（首帧解码伪影/瞬态） */
+    }
+    return ok;
 }
 
 void Speaker::Pause()
@@ -144,6 +198,7 @@ void Speaker::Stop()
 {
     if (inited_)
     {
+        ramping_ = false;  /* 停止即取消淡入，否则 SetVolume 会被悬空延迟 */
         static_cast<Audio *>(impl_)->stopSong();
     }
 }
@@ -166,3 +221,16 @@ void Speaker::end()
 }
 
 }  // namespace ekeys
+
+/*
+ * ESP32-audioI2S 弱符号 audio_info（全局命名空间，见 Audio.h L72）的强定义：
+ * 启用库内诊断输出——WAV 头解析 FormatCode/BitsPerSample/Audio-Length、
+ * RIFF/WAVE 校验失败原因、"stream ready"/"End of file" 时机等。
+ * 不定义时这些信息全部被吞，WAV/MP3 播放问题无从排查。
+ * 调用上下文：MainTask（Speaker::loop）或 DisplayTask（AudioPad::trigger
+ * → PlayLocalAudio → connecttoFS），与项目内其它跨任务 LOG 用法一致。
+ */
+void audio_info(const char *msg)
+{
+    LOG_INFO("SPK", "%s", msg);
+}

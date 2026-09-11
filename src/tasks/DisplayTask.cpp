@@ -319,11 +319,14 @@ namespace ekeys
                                   (void *)(uintptr_t)action);
                 }
             }
-            else if (tag == UI_SCREEN_AUDIO)
+            else if (tag == UI_SCREEN_AUDIO_SECONDARY)
             {
-                if (AudioPad::instance().trigger(key_id))
+                /* 只置播放请求（MainTask service 消费执行，Audio 实例跨核
+                 * 串行保护），绑定存在即亮键位高亮；播放被拒时 service
+                 * 重投 AudioPad 消息纠正 */
+                if (AudioPad::instance().requestTrigger(key_id))
                 {
-                    ui_AudioScreen_set_playing(key_id);
+                    ui_AudioScreenSecondary_set_playing(key_id);
                 }
             }
             break;
@@ -390,8 +393,8 @@ namespace ekeys
     void DisplayTask::applyAudioPad(const DisplayMessage &msg)
     {
         /* 绑定变更 / 播完清高亮统一走这里（AudioPad 模块投递） */
-        ui_AudioScreen_set_pads(msg.audio_pad.files);
-        ui_AudioScreen_set_playing(msg.audio_pad.playing_key);
+        ui_AudioScreenSecondary_set_pads(msg.audio_pad.files);
+        ui_AudioScreenSecondary_set_playing(msg.audio_pad.playing_key);
     }
 
     void DisplayTask::applySetting(const DisplayMessage &msg)
@@ -445,6 +448,9 @@ namespace ekeys
             break;
         case UI_SCREEN_AUDIO:
             target = ui_AudioScreen;
+            break;
+        case UI_SCREEN_AUDIO_SECONDARY:
+            target = ui_AudioScreenSecondary;
             break;
         case UI_SCREEN_PC_STATUS:
             target = ui_PcStatusScreen;
@@ -705,6 +711,7 @@ namespace ekeys
         {
         case UI_SCREEN_KEYMAPPED_SECONDARY:
         case UI_SCREEN_MUSIC_SECONDARY:
+        case UI_SCREEN_AUDIO_SECONDARY:
         case UI_SCREEN_PC_STATUS_SECONDARY:
         case UI_SCREEN_HA_SECONDARY:
         case UI_SCREEN_SETTING_SECONDARY:

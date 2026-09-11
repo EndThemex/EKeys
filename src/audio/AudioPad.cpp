@@ -70,31 +70,33 @@ namespace ekeys
         }
 
         uint8_t loaded = 0;
+        /* 校验（含 SPIFFS.exists 闪存操作）在临界区外完成，最后一次性写入。
+         * 禁止在 taskENTER_CRITICAL 内做 SPIFFS/闪存调用（2026-09-11 修复）。 */
+        char valid[kPadCount][kNameLenMax + 1]{};
+        for (uint8_t k = 1; k <= kPadCount; ++k)
         {
-            taskENTER_CRITICAL(&lock_);
-            for (uint8_t k = 1; k <= kPadCount; ++k)
+            char key[8];
+            snprintf(key, sizeof(key), "pad%u", static_cast<unsigned>(k));
+            const char *val = ini.GetValue("pads", key, "");
+            if (val[0] == '\0')
             {
-                char key[8];
-                snprintf(key, sizeof(key), "pad%u", static_cast<unsigned>(k));
-                const char *val = ini.GetValue("pads", key, "");
-                if (val[0] == '\0')
-                {
-                    continue;
-                }
-                char path[kNameLenMax + 2];
-                snprintf(path, sizeof(path), "/%s", val);
-                /* 失效条目（文件被重烧 SPIFFS 清掉 / 名字非法）丢弃 */
-                if (!validPadName(val) || !SPIFFS.exists(path))
-                {
-                    LOG_WARNING("PAD", "pad%u: drop invalid binding '%s'",
-                                static_cast<unsigned>(k), val);
-                    bindings_[k - 1][0] = '\0';
-                    continue;
-                }
-                snprintf(bindings_[k - 1], sizeof(bindings_[k - 1]), "%s", val);
-                ++loaded;
+                continue;
             }
+            char path[kNameLenMax + 2];
+            snprintf(path, sizeof(path), "/%s", val);
+            /* 失效条目（文件被重烧 SPIFFS 清掉 / 名字非法）丢弃 */
+            if (!validPadName(val) || !SPIFFS.exists(path))
+            {
+                LOG_WARNING("PAD", "pad%u: drop invalid binding '%s'",
+                            static_cast<unsigned>(k), val);
+                continue;
+            }
+            snprintf(valid[k - 1], sizeof(valid[k - 1]), "%s", val);
+            ++loaded;
         }
+        taskENTER_CRITICAL(&lock_);
+        memcpy(bindings_, valid, sizeof(bindings_));
+        taskEXIT_CRITICAL(&lock_);
         LOG_INFO("PAD", "loaded %u bindings from %s",
                  static_cast<unsigned>(loaded), kPersistPath);
     }
@@ -227,12 +229,86 @@ namespace ekeys
         was_playing = playing_key_;
         playing_key_ = 0;
         playing_name_[0] = '\0';
+        play_req_pending_ = false; /* 连带取消未消费的播放请求 */
         taskEXIT_CRITICAL(&lock_);
         Speaker::instance().Stop();
         if (was_playing != 0)
         {
             postPadMessage(); /* 清键位高亮 */
         }
+    }
+
+    bool AudioPad::requestTrigger(uint8_t key)
+    {
+        if (key < 1 || key > kPadCount)
+        {
+            return false;
+        }
+        char name[kNameLenMax + 1];
+        copyBinding(key, name, sizeof(name));
+        if (name[0] == '\0')
+        {
+            LOG_DEBUG("PAD", "key%u unbound", static_cast<unsigned>(key));
+            return false;
+        }
+        taskENTER_CRITICAL(&lock_);
+        play_req_key_ = key;
+        play_req_pending_ = true;
+        taskEXIT_CRITICAL(&lock_);
+        return true;
+    }
+
+    void AudioPad::requestStop()
+    {
+        uint8_t was_playing;
+        taskENTER_CRITICAL(&lock_);
+        was_playing = playing_key_;
+        playing_key_ = 0;
+        playing_name_[0] = '\0';
+        stop_req_pending_ = true;
+        taskEXIT_CRITICAL(&lock_);
+        if (was_playing != 0)
+        {
+            postPadMessage(); /* 清键位高亮 */
+        }
+    }
+
+    void AudioPad::service()
+    {
+        /*
+         * 消费 DisplayTask（Core 0）的播放/停止请求。本方法在 MainTask
+         * （与 Speaker::loop 同任务）执行，Audio 实例启停与喂流天然串行；
+         * 先处理 stop 再处理 play（换播 = 先停旧流再启新流）。
+         */
+        bool do_stop;
+        bool do_play;
+        uint8_t key;
+        taskENTER_CRITICAL(&lock_);
+        do_stop = stop_req_pending_;
+        stop_req_pending_ = false;
+        do_play = play_req_pending_;
+        play_req_pending_ = false;
+        key = play_req_key_;
+        taskEXIT_CRITICAL(&lock_);
+
+        if (do_stop)
+        {
+            Speaker::instance().Stop();
+        }
+        if (!do_play)
+        {
+            return;
+        }
+        char name[kNameLenMax + 1];
+        copyBinding(key, name, sizeof(name));
+        if (name[0] == '\0')
+        {
+            return; /* 请求后绑定被清除（cmd_audio stop/改绑） */
+        }
+        startPlayback(name, key);
+        /* 重投消息同步高亮：播放被拒（录音互斥等）时纠正 requestTrigger
+         * 的乐观高亮（postPadMessage 携带当前真实 playing_key_） */
+        postPadMessage();
     }
 
     void AudioPad::loop()
@@ -326,5 +402,7 @@ namespace ekeys
 
 extern "C" void ui_audio_pad_stop(void)
 {
-    ekeys::AudioPad::instance().stop();
+    /* DisplayTask（Core 0）上下文：只置请求，Speaker::Stop 由
+     * MainTask::loop 的 service() 执行（Audio 实例跨核串行保护） */
+    ekeys::AudioPad::instance().requestStop();
 }
