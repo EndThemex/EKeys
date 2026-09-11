@@ -41,10 +41,16 @@
    MEMORY SETTINGS
  *====================*/
 
-/* 使用 LVGL 自带内存池，heap 由 lv_init() 后 48 KB 起步即可 */
+/* 使用 LVGL 自带内存池（TLSF）。池本体经 LV_MEM_POOL_ALLOC 整体放 PSRAM，
+ * 避免静态数组占内部 RAM（ASR TLS 握手需要 ~35KB 内部堆，见 LvglPort 双缓冲教训）。
+ * 2026-09-11：UI 增至 11 屏（新增 AudioScreen）后 48KB 池耗尽，启动时
+ * lv_obj_create 收到 NULL 直接解引用崩溃（EXCVADDR 0x22），扩到 64KB。
+ * 池分配源实现见 src/display/LvglMemPool.c。 */
 #define LV_MEM_CUSTOM      0
-#define LV_MEM_SIZE        (48U * 1024U)
+#define LV_MEM_SIZE        (64U * 1024U)
 #define LV_MEM_BUF_MAX_NUM 16
+#define LV_MEM_POOL_ALLOC(size) lvgl_pool_alloc(size)
+#include "LvglMemPool.h"
 
 /*===========================
    HAL / TICK 设置

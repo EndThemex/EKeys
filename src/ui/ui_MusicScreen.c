@@ -48,8 +48,8 @@ void ui_event_MusicScreen(lv_event_t * e)
     uintptr_t key = (uintptr_t)lv_event_get_param(e);
 
     if(event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_RIGHT) {
-        ui_set_active_screen_tag(UI_SCREEN_PC_STATUS);
-        _ui_screen_change(&ui_PcStatusScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_PcStatusScreen_screen_init);
+        ui_set_active_screen_tag(UI_SCREEN_AUDIO);
+        _ui_screen_change(&ui_AudioScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_AudioScreen_screen_init);
         lv_refr_now(NULL);
     }
     else if(event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_LEFT) {

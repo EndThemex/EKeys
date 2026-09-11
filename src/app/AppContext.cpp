@@ -10,6 +10,7 @@
 
 #include "AppContext.h"
 
+#include "audio/AudioPad.h"
 #include "config/Configuration.h"
 #include "logging/LogManager.h"
 #include "network/WiFiManager.h"
@@ -35,6 +36,9 @@ namespace ekeys
         keymap_repo_ = std::make_unique<KeymapRepository>();
         configuration_ = &Configuration::instance();
         configuration_->setRepository(keymap_repo_.get());
+
+        /* 音效板：先于 MainTask 加载 /audio_pad.ini 绑定表（SPIFFS 已挂载） */
+        AudioPad::instance().load();
 
         main_task_.begin(); // 内部 Configuration::load()
 

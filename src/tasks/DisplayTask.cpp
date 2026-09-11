@@ -22,6 +22,7 @@
 
 #include "config/Configuration.h"
 #include "audio/AudioAnalyzer.h"
+#include "audio/AudioPad.h"
 #include "audio/Mic.h"
 #include "display/Backlight.h"
 #include "display/LvglPort.h"
@@ -31,6 +32,7 @@
 #include "rgb/ClickHighlight.h"
 #include "rgb/RGBLightControl.h"
 #include "ui/ui.h"
+#include "ui/ui_AudioScreen.h"
 #include "ui/ui_HaScreenSecondary.h"
 #include "ui/ui_KeyMapped.h"
 #include "ui/ui_KeyMappedSecondary.h"
@@ -166,6 +168,16 @@ namespace ekeys
         /* SquareLine UI：一次性创建 11 屏 */
         ui_init();
 
+        /* 池水位快照（一次性）：11 屏全建完后 LVGL 池的用量与碎片率，
+         * 用于发现"加屏耗尽 LV_MEM_SIZE"类问题（2026-09-11 启动崩溃根因） */
+        {
+            lv_mem_monitor_t mon;
+            lv_mem_monitor(&mon);
+            LOG_INFO("DISP", "LVGL pool: used %u/%u, frag %u%%",
+                     (unsigned)(mon.total_size - mon.free_size),
+                     (unsigned)mon.total_size, (unsigned)mon.frag_pct);
+        }
+
         /*
          * C7 修复：移除 status_bar_set_working_mode(WIRED_KEYBOARD_MODE) 硬编码。
          * 紧随其后的"启动快照"块会从 Configuration 读出真实 work_mode
@@ -281,32 +293,41 @@ namespace ekeys
              *   - KEYMAPPED_SECONDARY / SETTING_SECONDARY：编码后的 action
              *     （BASE + key_id = 101~111）透传进 UI，与 LV_KEY_* 不重叠
              *     （2026-09-11 修复：原裸传 key_id 时矩阵键 10 与旋钮单击冲突）；
+             *   - AUDIO 屏：截胡 → 触发音效板播放并直接同线程亮键位高亮
+             *     （不另发消息；播完由 AudioPad::loop 经 AudioPad 消息清除）；
              *   - 其它屏：矩阵键为 HID 专用，不触发 UI 导航。
              */
-            const uint8_t action = msg.action;
-            if (action > kMatrixKeyActionBase &&
-                action <= kMatrixKeyActionBase + kMatrixKeyCount)
+        const uint8_t action = msg.action;
+        if (action > kMatrixKeyActionBase &&
+            action <= kMatrixKeyActionBase + kMatrixKeyCount)
+        {
+            const uint8_t key_id =
+                static_cast<uint8_t>(action - kMatrixKeyActionBase);
+            const ui_screen_tag_t tag = ui_get_active_screen_tag();
+            if (tag == UI_SCREEN_KEYMAPPED)
             {
-                const uint8_t key_id =
-                    static_cast<uint8_t>(action - kMatrixKeyActionBase);
-                const ui_screen_tag_t tag = ui_get_active_screen_tag();
-                if (tag == UI_SCREEN_KEYMAPPED)
-                {
-                    ui_KeyMappedSecondary_set_focus(key_id);
-                    navigateNow(UI_SCREEN_KEYMAPPED_SECONDARY);
-                }
-                else if (tag == UI_SCREEN_KEYMAPPED_SECONDARY ||
-                         tag == UI_SCREEN_SETTING_SECONDARY)
-                {
-                    lv_obj_t *active_screen = lv_scr_act();
-                    if (active_screen != nullptr)
-                    {
-                        lv_event_send(active_screen, LV_EVENT_KEY,
-                                      (void *)(uintptr_t)action);
-                    }
-                }
-                break;
+                ui_KeyMappedSecondary_set_focus(key_id);
+                navigateNow(UI_SCREEN_KEYMAPPED_SECONDARY);
             }
+            else if (tag == UI_SCREEN_KEYMAPPED_SECONDARY ||
+                     tag == UI_SCREEN_SETTING_SECONDARY)
+            {
+                lv_obj_t *active_screen = lv_scr_act();
+                if (active_screen != nullptr)
+                {
+                    lv_event_send(active_screen, LV_EVENT_KEY,
+                                  (void *)(uintptr_t)action);
+                }
+            }
+            else if (tag == UI_SCREEN_AUDIO)
+            {
+                if (AudioPad::instance().trigger(key_id))
+                {
+                    ui_AudioScreen_set_playing(key_id);
+                }
+            }
+            break;
+        }
             /*
              * SettingScreenSecondary 旋钮行为：旋转直接发出 LV_KEY_LEFT/RIGHT
              * 进 UI，由 setting_secondary_handle_key 走调值分支
@@ -357,9 +378,20 @@ namespace ekeys
             status_bar_set_battery_level(msg.battery_percent);
             break;
 
+        case DisplayMessageType::AudioPad:
+            applyAudioPad(msg);
+            break;
+
         default:
             break;
         }
+    }
+
+    void DisplayTask::applyAudioPad(const DisplayMessage &msg)
+    {
+        /* 绑定变更 / 播完清高亮统一走这里（AudioPad 模块投递） */
+        ui_AudioScreen_set_pads(msg.audio_pad.files);
+        ui_AudioScreen_set_playing(msg.audio_pad.playing_key);
     }
 
     void DisplayTask::applySetting(const DisplayMessage &msg)
@@ -410,6 +442,9 @@ namespace ekeys
             break;
         case UI_SCREEN_MUSIC_SECONDARY:
             target = ui_MusicScreenSecondary;
+            break;
+        case UI_SCREEN_AUDIO:
+            target = ui_AudioScreen;
             break;
         case UI_SCREEN_PC_STATUS:
             target = ui_PcStatusScreen;

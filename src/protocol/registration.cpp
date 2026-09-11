@@ -9,6 +9,7 @@
 
 #include "../logging/LogManager.h"
 #include "CommandRegistry.h"
+#include "commands/cmd_audio.h"
 #include "commands/cmd_config.h"
 #include "commands/cmd_device_info.h"
 #include "commands/cmd_firmware.h"
@@ -31,6 +32,7 @@ namespace ekeys::protocol::registration
         commands::registerMusicHandlers();
         commands::registerProfileHandlers();
         commands::registerTimeHandlers();
+        commands::registerAudioHandlers();
         LOG_INFO("REG", "all command handlers registered (%u)",
                  static_cast<unsigned>(CommandRegistry::instance().handlerCount()));
     }

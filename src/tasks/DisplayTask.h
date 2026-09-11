@@ -64,6 +64,7 @@ namespace ekeys
         void applyPcStatus(const DisplayMessage &msg);
         void applyHaStatus(const DisplayMessage &msg);
         void applyMusicPlayer(const DisplayMessage &msg);
+        void applyAudioPad(const DisplayMessage &msg);
         void navigateNow(ui_screen_tag_t tag);
 
         /*

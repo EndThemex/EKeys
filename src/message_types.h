@@ -42,6 +42,7 @@ namespace ekeys
         KeymapProfile = 9,
         Navigate = 10,      /* 屏幕路由（docs/05 §5.2），载荷 navigate_target */
         BatteryStatus = 11, /* 电池电量（5s 节流，载荷 battery_percent） */
+        AudioPad = 12,      /* 音效板绑定/播放状态（载荷 audio_pad） */
     };
 
     /* PC 状态（CMD_PC_STATUS，阶段 06 起由协议层填充） */
@@ -96,6 +97,18 @@ namespace ekeys
     };
 
     /*
+     * 音效板状态（AudioPad 模块 → 音效页）：
+     *   files[k-1] = 键 k 绑定的文件名（无 '/' 前缀，空串 = 未绑定），
+     *   与 AudioPad::snapshotBindings 输出同构。
+     *   playing_key：1~11 = 正在播放的键位（UI 高亮），0 = 无高亮。
+     */
+    struct AudioPadInfo
+    {
+        uint8_t playing_key{0};
+        char files[11][25]{};
+    };
+
+    /*
      * 键映射 Profile 屏数据：
      *   keymap_labels[i] 对应应用键 i+1，格式 "K{i}:映射"（docs/05 §5.4）。
      *   profile_index：本消息描述的 profile（0~7）；
@@ -143,6 +156,7 @@ namespace ekeys
         MusicPlayerInfo music_player{};
         ModuleStatusInfo module{};
         KeymapProfileInfo keymap_profile{};
+        AudioPadInfo audio_pad{};
     };
 
     /*

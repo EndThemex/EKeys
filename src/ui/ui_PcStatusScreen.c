@@ -42,8 +42,8 @@ void ui_event_PcStatusScreen(lv_event_t * e)
         lv_refr_now(NULL);
     }
     else if (key == (uintptr_t)LV_KEY_LEFT) {
-        ui_set_active_screen_tag(UI_SCREEN_MUSIC);
-        _ui_screen_change(&ui_MusicScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_MusicScreen_screen_init);
+        ui_set_active_screen_tag(UI_SCREEN_AUDIO);
+        _ui_screen_change(&ui_AudioScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_AudioScreen_screen_init);
         lv_refr_now(NULL);
     }
     else if (key == (uintptr_t)LV_KEY_ENTER) {

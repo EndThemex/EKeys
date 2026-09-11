@@ -44,6 +44,8 @@ namespace ekeys
         CMD_TIME_SET = 0x13,          /* App→主控：写入系统时间（epoch + tz） */
         CMD_FIRMWARE_DOWNLOAD = 0x14, /* App→主控：复位进 USB 下载模式（烧录） */
         CMD_PROFILE_NAME_SET = 0x15,  /* App→主控：设置 profile 名称（UTF-8 中文） */
+        CMD_AUDIO_FILE = 0x16,        /* App→主控：音效文件管理（op 分发） */
+        CMD_AUDIO_PAD = 0x17,         /* App→主控：音效板绑定与播放（op 分发） */
     };
 
     class SerialProtocol

@@ -24,6 +24,7 @@
 #include <time.h>
 
 #include "app/AppContext.h"
+#include "audio/AudioPad.h"
 #include "audio/Speaker.h"
 #include "config/Configuration.h"
 #include "hardware/BatteryMonitor.h"
@@ -534,7 +535,8 @@ namespace ekeys
             scanner_.getReleasedKeys(released, rc);
 
             const bool suppress_hid =
-                ui_get_active_screen_tag() == UI_SCREEN_SETTING_SECONDARY;
+                ui_get_active_screen_tag() == UI_SCREEN_SETTING_SECONDARY ||
+                ui_get_active_screen_tag() == UI_SCREEN_AUDIO;
             if (!suppress_hid)
             {
                 /*
@@ -899,6 +901,8 @@ namespace ekeys
         DiscoveryService::instance().process();
         TcpChannel::instance().process();
         Speaker::instance().loop();
+        /* 音效板：检测键位播放结束 → 清键位高亮 */
+        AudioPad::instance().loop();
         VoiceRecognizer::instance().feedCapture();
 
         /* HA 状态聚合 → HA 屏 / 状态条（2.5s 节流，与参考工程一致） */
