@@ -38,7 +38,12 @@ namespace ekeys
             uint8_t keycode;
             uint8_t modifier;
         };
-        constexpr uint8_t kMaxPressed = 8;
+        /*
+         * F11 修复：矩阵键共 11 个，原容量 8 在 9 键以上同时带 modifier
+         * 按压时会静默溢出（modifier 计数只增不减，滞留到 releaseAll）。
+         * 容量提到 12 并在满表时告警。
+         */
+        constexpr uint8_t kMaxPressed = 12;
         PressedEntry g_pressed[kMaxPressed];
 
         // modifier 位掩码(0x01=LCtrl..0x80=RWin) → 0xE0~0xE7 的 usage code 逐位处理
@@ -81,6 +86,16 @@ namespace ekeys
     {
     }
 
+    /*
+     * 模式切换销毁实例时，把已按下的键全部释放，
+     * 避免切到 BLE/其它后端后 USB 主机侧按键状态滞留（卡键）。
+     * 与 BLEKeyboardImpl 析构行为对称。
+     */
+    USBKeyboardImpl::~USBKeyboardImpl()
+    {
+        releaseAll();
+    }
+
     bool USBKeyboardImpl::begin()
     {
         g_usb_keyboard.begin();
@@ -105,14 +120,22 @@ namespace ekeys
             applyModifier(modifier, true);
         }
         g_usb_keyboard.pressRaw(keycode);
+        bool recorded = false;
         for (auto &entry : g_pressed)
         {
             if (entry.keycode == 0)
             {
                 entry.keycode = keycode;
                 entry.modifier = modifier;
+                recorded = true;
                 break;
             }
+        }
+        if (!recorded)
+        {
+            LOG_WARNING("USB_HID",
+                        "pressed table full (0x%x), modifier may linger until releaseAll",
+                        static_cast<unsigned>(keycode));
         }
     }
 

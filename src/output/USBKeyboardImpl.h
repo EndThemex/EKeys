@@ -25,6 +25,7 @@ namespace ekeys
     {
     public:
         USBKeyboardImpl();
+        ~USBKeyboardImpl() override;
 
         bool begin() override;
         void press(uint8_t keycode, uint8_t modifier = 0) override;

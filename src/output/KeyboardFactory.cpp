@@ -49,8 +49,10 @@ namespace ekeys
     void KeyboardFactory::release()
     {
         /*
-         * USB 栈由 Arduino / TinyUSB 自动管理；
-         * BLE 资源随实例销毁（BleKeyboard 为静态存储，仅断开广播）。
+         * USB 栈由 Arduino / TinyUSB 自动管理。
+         * BLE 控制器每次上电只初始化一次（BLEKeyboardImpl::begin 幂等）：
+         * 切到 USB 时 BLE 栈随静态对象保留，切回 BLE 直接复用，
+         * 实例析构时仅 releaseAll 清空主机侧按键状态。
          */
     }
 

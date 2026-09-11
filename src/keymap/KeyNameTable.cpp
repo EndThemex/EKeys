@@ -25,9 +25,10 @@ namespace ekeys
 
         /*
          * 修饰键 usage code（0xE0~0xE7）。
-         * USB/BLE 输出层（pressRaw / t-vk press）对 0xE0~0xE7 有特判，
-         * 直接当 keycode 按下即置位 HID 报告的 modifier byte，不占普通键槽。
-         * 因此 normal_key 通道拆槽后的 "Ctrl"+"c" 两槽依次 press 即为标准组合键。
+         * USB 输出层 pressRaw 直接使用 usage code。
+         * BLE 输出层（t-vk 库）键值域不同（ASCII / 0x80+bit / usage+136），
+         * 由 BLEKeyboardImpl::usageToLibKeycode 统一转换，勿在此处适配。
+         * normal_key 通道拆槽后的 "Ctrl"+"c" 两槽依次 press 即为标准组合键。
          */
         constexpr uint8_t HID_KEY_LCTRL = 0xE0;
         constexpr uint8_t HID_KEY_LSHIFT = 0xE1;

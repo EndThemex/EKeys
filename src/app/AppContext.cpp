@@ -96,6 +96,17 @@ namespace ekeys
             wm = WorkMode::Wireless24G;
         }
 
+        /*
+         * 切到 BLE 前先关停 WiFi：此时 Configuration 中 work_mode 已是新值，
+         * scheduleConnect 内部因 isEnabled()==false（BLE 模式）走 stopReconnect
+         * （WiFi.mode OFF），避免 WiFi 栈占堆导致 BLE init 失败回退 USB。
+         * 开机路径不经本函数（init() 直接 create），无影响。
+         */
+        if (wm == WorkMode::Bluetooth)
+        {
+            WiFiManager::instance().scheduleConnect();
+        }
+
         LOG_INFO("APP", "work_mode -> %u, recreating keyboard", mode);
         keyboard_.reset(); // 释放旧实例（回收 HID / BLE 资源）
         setKeyboard(KeyboardFactory::create(wm));

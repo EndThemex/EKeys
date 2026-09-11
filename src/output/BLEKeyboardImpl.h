@@ -19,7 +19,7 @@ namespace ekeys
     {
     public:
         BLEKeyboardImpl() = default;
-        ~BLEKeyboardImpl() override = default;
+        ~BLEKeyboardImpl() override;
 
         bool begin() override;
         void press(uint8_t keycode, uint8_t modifier = 0) override;
