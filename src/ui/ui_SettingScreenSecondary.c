@@ -675,16 +675,18 @@ static void setting_secondary_handle_key(int32_t key)
     /*
      * 矩阵键 7 / 11 在 SettingScreenSecondary 上映射为 UP / DOWN，
      * 用于在无触屏硬件上切换焦点项。MainTask 在 SettingScreenSecondary
-     * 不截胡 1~11，key_id 直接进到这里。
+     * 不截胡矩阵键，DisplayTask 以 UI_MATRIX_KEY_ACTION_BASE + key_id
+     * （101~111）透传进这里，与 LV_KEY_* 数值不重叠
+     * （2026-09-11 修复：原裸传 key_id 时矩阵键 10 与 LV_KEY_ENTER=10 冲突）。
      */
-    if (key == 7)
+    if (key == (int32_t)(UI_MATRIX_KEY_ACTION_BASE + 7))
     {
         s_setting_focus = (uint8_t)((s_setting_focus == 0) ? (SETTING_ITEM_COUNT - 1) : (s_setting_focus - 1));
         setting_secondary_refresh();
         return;
     }
 
-    if (key == 11)
+    if (key == (int32_t)(UI_MATRIX_KEY_ACTION_BASE + 11))
     {
         s_setting_focus = (uint8_t)((s_setting_focus + 1) % SETTING_ITEM_COUNT);
         setting_secondary_refresh();

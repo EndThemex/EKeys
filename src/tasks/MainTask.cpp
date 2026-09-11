@@ -88,6 +88,22 @@ namespace ekeys
 
         portMUX_TYPE g_ui_settings_lock = portMUX_INITIALIZER_UNLOCKED;
         PendingUiSettingsRequest g_ui_settings_request{};
+
+        /*
+         * 键映射二级页旋钮切 Profile 请求（与设置屏反向同步同款通道）：
+         * LVGL 事件回调经 ui_keymap_request_profile_switch() 写入，
+         * MainTask::loop() 消费。快速旋转时 step 累积，合并为一次
+         * 切换 + 一次 INI 落盘。
+         */
+        struct PendingProfileSwitchRequest
+        {
+            bool pending{false};
+            int16_t step{0};
+        };
+
+        portMUX_TYPE g_profile_switch_lock = portMUX_INITIALIZER_UNLOCKED;
+        PendingProfileSwitchRequest g_profile_switch_request{};
+
         MainTask *g_main_task = nullptr;
 
     } // namespace
@@ -123,6 +139,33 @@ namespace ekeys
         g_ui_settings_request.pending = true;
         g_ui_settings_request.persist = true;
         taskEXIT_CRITICAL(&g_ui_settings_lock);
+        return true;
+    }
+
+    /*
+     * 供 SquareLine 生成的 ui_KeyMappedSecondary.c 调用（C 链接）。
+     * 旋钮旋转切 Profile：step=+1 顺时针 / -1 逆时针，累积合并消费。
+     */
+    extern "C" bool ui_keymap_request_profile_switch(int step)
+    {
+        if (step == 0 || g_main_task == nullptr)
+        {
+            return false;
+        }
+
+        taskENTER_CRITICAL(&g_profile_switch_lock);
+        int32_t total = static_cast<int32_t>(g_profile_switch_request.step) + step;
+        if (total > 100)
+        {
+            total = 100;
+        }
+        else if (total < -100)
+        {
+            total = -100;
+        }
+        g_profile_switch_request.step = static_cast<int16_t>(total);
+        g_profile_switch_request.pending = true;
+        taskEXIT_CRITICAL(&g_profile_switch_lock);
         return true;
     }
 
@@ -228,6 +271,34 @@ namespace ekeys
         if (hasPending)
         {
             applyUiSettingsSnapshot(pending, persist);
+        }
+
+        /* 键映射二级页旋钮切 Profile 请求（合并消费，一次落盘 + 一次重载） */
+        int16_t profile_step = 0;
+        {
+            taskENTER_CRITICAL(&g_profile_switch_lock);
+            if (g_profile_switch_request.pending)
+            {
+                profile_step = g_profile_switch_request.step;
+                g_profile_switch_request.pending = false;
+                g_profile_switch_request.step = 0;
+            }
+            taskEXIT_CRITICAL(&g_profile_switch_lock);
+        }
+        if (profile_step != 0)
+        {
+            DeviceSettings snap;
+            Configuration::instance().snapshot(snap);
+            const uint8_t count = Configuration::CONFIG_PROFILE_COUNT;
+            int next = static_cast<int>(snap.active_keymap_profile) + profile_step;
+            next = ((next % count) + count) % count;
+            if (static_cast<uint8_t>(next) != snap.active_keymap_profile)
+            {
+                Configuration::instance().switchActiveProfile(static_cast<uint8_t>(next));
+                reloadKeymap();
+                LOG_INFO("MAIN", "keymap secondary profile switch -> %u",
+                         static_cast<unsigned>(next));
+            }
         }
 
         /* 队列就绪后补发键映射屏数据（AppContext 在 begin() 后注入队列） */
@@ -453,7 +524,8 @@ namespace ekeys
                 String s;
                 if (!fk.isEmpty())
                 {
-                    s = fk;
+                    /* 功能键同样可能存 usage code 字面量（如 "0x52"），转可读名 */
+                    s = keyDisplayName(fk);
                 }
                 else if (!tk.isEmpty())
                 {
@@ -495,25 +567,9 @@ namespace ekeys
             }
             else
             {
+                /* 单击视图：只显示单击配置；组合层在 FUN 键按住时整屏切换预览 */
                 combo = layerSummary(mapping.function_key, mapping.text_key,
                                      mapping.normal_key);
-                /* 单击视图追加 FUN 组合层摘要（超长由 snprintf 截断） */
-                const String c1 = layerSummary(mapping.combo1_function_key,
-                                               mapping.combo1_text_key,
-                                               mapping.combo1_normal_key);
-                const String c2 = layerSummary(mapping.combo2_function_key,
-                                               mapping.combo2_text_key,
-                                               mapping.combo2_normal_key);
-                if (!c1.isEmpty())
-                {
-                    combo += "|1:";
-                    combo += c1;
-                }
-                if (!c2.isEmpty())
-                {
-                    combo += "|2:";
-                    combo += c2;
-                }
             }
             snprintf(p.keymap_labels[i], sizeof(p.keymap_labels[i]), "%u:%s",
                      static_cast<unsigned>(i + 1),

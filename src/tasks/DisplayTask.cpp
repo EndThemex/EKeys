@@ -278,8 +278,9 @@ namespace ekeys
              * LV_KEY_ENTER=10 冲突，导致按键 10 在主页被当成旋钮单击触发导航）。
              * 路由：
              *   - KEYMAPPED 屏：截胡 → 跳 KEYMAPPED_SECONDARY 并聚焦该键；
-             *   - KEYMAPPED_SECONDARY / SETTING_SECONDARY：key_id 裸传进 UI
-             *     （焦点跳转 / 矩阵键 7、11 移焦点）；
+             *   - KEYMAPPED_SECONDARY / SETTING_SECONDARY：编码后的 action
+             *     （BASE + key_id = 101~111）透传进 UI，与 LV_KEY_* 不重叠
+             *     （2026-09-11 修复：原裸传 key_id 时矩阵键 10 与旋钮单击冲突）；
              *   - 其它屏：矩阵键为 HID 专用，不触发 UI 导航。
              */
             const uint8_t action = msg.action;
@@ -301,7 +302,7 @@ namespace ekeys
                     if (active_screen != nullptr)
                     {
                         lv_event_send(active_screen, LV_EVENT_KEY,
-                                      (void *)(uintptr_t)key_id);
+                                      (void *)(uintptr_t)action);
                     }
                 }
                 break;
@@ -456,6 +457,16 @@ namespace ekeys
                  static_cast<unsigned>(p.active_profile));
         ui_KeyMappedSecondary_set_profile(p.profile_icon, p.profile_name,
                                           fileName);
+
+        /*
+         * FUN 键整体配色标识：把 fun_key1 / fun_key2 同步给二级页，
+         * 对应键位 cell 底色 + 边框按 FUN1/FUN2 配色渲染。
+         */
+        {
+            DeviceSettings snap;
+            Configuration::instance().snapshot(snap);
+            ui_KeyMappedSecondary_set_fun_keys(snap.fun_key1, snap.fun_key2);
+        }
 
         /*
          * A6 修复：Profile 图标显示。

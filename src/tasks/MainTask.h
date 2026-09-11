@@ -76,8 +76,8 @@ namespace ekeys
 
         /*
          * 当前键映射 + Profile → KEYMAP_PROFILE_UPDATE（11 键标签）。
-         * fun_layer：0=单击视图（含组合摘要后缀），1/2=FUN 按住时只显示
-         * 对应组合层摘要（键映射二级页 FUN 预览）。
+         * fun_layer：0=单击视图（只显示单击配置），1/2=FUN 按住时只显示
+         * 对应组合层摘要（键映射屏 FUN 预览）。
          */
         void sendKeymapProfileUi(uint8_t fun_layer);
 

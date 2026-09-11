@@ -23,6 +23,9 @@
 #include "../DeviceIdentity.h"
 #include "../SerialProtocol.h"
 
+#include <esp32s3/rom/rtc.h>
+#include <soc/rtc_cntl_reg.h>
+
 namespace ekeys::protocol::commands
 {
 
@@ -120,6 +123,22 @@ namespace ekeys::protocol::commands
             return 0;
         }
 
+        int handleFirmwareDownload(int cmd, int seq, JsonObject /*data*/)
+        {
+            /*
+             * 写 RTC_CNTL_OPTION1 的 FORCE_DOWNLOAD_EN 位再复位：
+             * ROM bootloader 检测到该位后进入 USB-Serial-JTAG 下载模式。
+             * 主机随后直接 idf.py flash / esptool 即可。
+             */
+            SerialProtocol::instance().sendSuccessResponse(cmd, seq,
+                                                           JsonObject());
+            LOG_INFO("CMD", "download mode requested, rebooting...");
+            delay(100); // 等响应经 CDC flush
+            REG_WRITE(RTC_CNTL_OPTION1_REG, RTC_CNTL_FORCE_DOWNLOAD_BOOT);
+            software_reset(); // ROM 直接复位，不再返回
+            return 0;
+        }
+
     } // namespace
 
     void registerFirmwareHandlers()
@@ -130,8 +149,11 @@ namespace ekeys::protocol::commands
                                                     handleConfVersionSet);
         CommandRegistry::instance().registerHandler(CMD_FIRMWARE_INFO,
                                                     handleFirmwareInfo);
-        LOG_INFO("CMD", "cmd_firmware registered (0x%02X/0x%02X/0x%02X)",
-                 CMD_CONF_VERSION_GET, CMD_CONF_VERSION_SET, CMD_FIRMWARE_INFO);
+        CommandRegistry::instance().registerHandler(CMD_FIRMWARE_DOWNLOAD,
+                                                    handleFirmwareDownload);
+        LOG_INFO("CMD", "cmd_firmware registered (0x%02X/0x%02X/0x%02X/0x%02X)",
+                 CMD_CONF_VERSION_GET, CMD_CONF_VERSION_SET, CMD_FIRMWARE_INFO,
+                 CMD_FIRMWARE_DOWNLOAD);
     }
 
     void unregisterFirmwareHandlers()
@@ -139,6 +161,7 @@ namespace ekeys::protocol::commands
         CommandRegistry::instance().unregisterHandler(CMD_CONF_VERSION_GET);
         CommandRegistry::instance().unregisterHandler(CMD_CONF_VERSION_SET);
         CommandRegistry::instance().unregisterHandler(CMD_FIRMWARE_INFO);
+        CommandRegistry::instance().unregisterHandler(CMD_FIRMWARE_DOWNLOAD);
     }
 
 } // namespace ekeys::protocol::commands

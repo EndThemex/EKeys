@@ -29,17 +29,17 @@
 
 所有 UI 屏幕只识别 6 种语义，编码来自 `lv_group.h`：
 
-| 语义     | LVGL 编码                | 旋钮   | 矩阵键 1~11    | 触屏兜底按钮   |
-| -------- | ------------------------ | ------ | -------------- | -------------- |
-| LEFT     | `LV_KEY_LEFT` (20)       | 逆时针 | —              | `ButtonLeft*`  |
-| RIGHT    | `LV_KEY_RIGHT` (19)      | 顺时针 | —              | `ButtonRight*` |
-| UP       | `LV_KEY_UP` (17)         | —      | key_id=7       | —              |
-| DOWN     | `LV_KEY_DOWN` (18)       | —      | key_id=11      | —              |
-| ENTER    | `LV_KEY_ENTER` (10)      | 单击   | —              | `ButtonEnter*` |
-| ESC      | `LV_KEY_ESC` (27)        | 双击   | —              | `ButtonExit*`  |
-| 焦点跳转 | `action = 100 + key_id` (101~111) | —      | KEYMAPPED 截胡 | —              |
+| 语义     | LVGL 编码                         | 旋钮   | 矩阵键 1~11         | 触屏兜底按钮   |
+| -------- | --------------------------------- | ------ | ------------------- | -------------- |
+| LEFT     | `LV_KEY_LEFT` (20)                | 逆时针 | —                   | `ButtonLeft*`  |
+| RIGHT    | `LV_KEY_RIGHT` (19)               | 顺时针 | —                   | `ButtonRight*` |
+| UP       | `LV_KEY_UP` (17)                  | —      | key_id=7            | —              |
+| DOWN     | `LV_KEY_DOWN` (18)                | —      | key_id=11           | —              |
+| ENTER    | `LV_KEY_ENTER` (10)               | 单击   | —                   | `ButtonEnter*` |
+| ESC      | `LV_KEY_ESC` (27)                 | 双击   | —                   | `ButtonExit*`  |
+| 焦点跳转 | `action = 100 + key_id` (101~111) | —      | 全程以 101~111 编码 | —              |
 
-矩阵键 `key_id`（1~11）以 `kMatrixKeyActionBase(100) + key_id` 编码进 `ActionInput.action`，与 `LV_KEY_*` 数值完全不重叠（2026-09-08 修复：原裸传 key_id 时 `LV_KEY_ENTER=10` 与矩阵键 10 冲突，主页按按键 10 会被当成旋钮单击进入键映射屏）。
+矩阵键 `key_id`（1~11）以 `kMatrixKeyActionBase(100) + key_id` 编码进 `ActionInput.action`，与 `LV_KEY_*` 数值完全不重叠（2026-09-08 修复：原裸传 key_id 时 `LV_KEY_ENTER=10` 与矩阵键 10 冲突，主页按按键 10 会被当成旋钮单击进入键映射屏；2026-09-11 修复：进 UI 的 `LV_EVENT_KEY` 也统一携带 101~111 编码，UI 侧经 `UI_MATRIX_KEY_ACTION_BASE`（[ui_settings_types.h](file:///d:/search/esp/Keys/EKeys/src/ui/ui_settings_types.h)）解码，禁止裸传 key_id）。
 
 ### 3. DisplayTask 路由规则
 
@@ -47,7 +47,7 @@
 
 - **矩阵键（101~111）**：
   - **KEYMAPPED 屏**：截胡 → 跳 `KEYMAPPED_SECONDARY` 并把 `key_id` 作为焦点键传 UI
-  - **KEYMAPPED_SECONDARY / SETTING_SECONDARY 屏**：解码后的 `key_id` 裸传 `LV_EVENT_KEY`（焦点跳转 / 矩阵键 7、11 移焦点）
+  - **KEYMAPPED_SECONDARY / SETTING_SECONDARY 屏**：编码后的 `action`（101~111）透传 `LV_EVENT_KEY`，UI 侧解码（焦点跳转 / 矩阵键 7、11 移焦点）
   - **其它屏**：丢弃，不触发 UI 导航（矩阵键为 HID 专用）
 - **旋钮动作（`LV_KEY_*`）**：`lv_event_send(active_screen, LV_EVENT_KEY, action)` 透传；主页单击（ENTER）= 无操作
 - 禁止在 UI 屏幕内部再把 `LV_KEY_LEFT/RIGHT` 改写为 `LV_KEY_UP/DOWN`，所有改写集中在 DisplayTask

@@ -242,7 +242,8 @@ namespace ekeys
 
         /*
          * usage code → 可读键名（keyDisplayName 专用，覆盖
-         * resolveKeyName 内置的全部可读段；未知 usage 保留十六进制）。
+         * resolveKeyName 内置的全部可读段 + 常用扩展键；
+         * 未覆盖的 usage 保留十六进制）。
          */
         String nameForUsage(uint8_t usage)
         {
@@ -286,6 +287,63 @@ namespace ekeys
             {
                 return "Win";
             }
+
+            /* 常用扩展键（App 端可能存 usage code 字面量，避免屏上显示 0xNN） */
+            switch (usage)
+            {
+            case 0x29:
+                return "Esc";
+            case 0x2B:
+                return "Tab";
+            case 0x39:
+                return "Caps";
+            case 0x3A: /* F1~F12 = 0x3A~0x45 */
+            case 0x3B:
+            case 0x3C:
+            case 0x3D:
+            case 0x3E:
+            case 0x3F:
+            case 0x40:
+            case 0x41:
+            case 0x42:
+            case 0x43:
+            case 0x44:
+            case 0x45:
+                return "F" + String(usage - 0x3A + 1);
+            case 0x46:
+                return "PrtSc";
+            case 0x47:
+                return "ScrlLk";
+            case 0x48:
+                return "Pause";
+            case 0x49:
+                return "Ins";
+            case 0x4A:
+                return "Home";
+            case 0x4B:
+                return "PgUp";
+            case 0x4C:
+                return "Del";
+            case 0x4D:
+                return "End";
+            case 0x4E:
+                return "PgDn";
+            case 0x4F:
+                return "Right";
+            case 0x50:
+                return "Left";
+            case 0x51:
+                return "Down";
+            case 0x52:
+                return "Up";
+            case 0x53:
+                return "NumLk";
+            case 0x58:
+                return "KPEnter";
+            default:
+                break;
+            }
+
             char buf[8];
             snprintf(buf, sizeof(buf), "0x%02X", static_cast<unsigned>(usage));
             return String(buf);
