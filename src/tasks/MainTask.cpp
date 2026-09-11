@@ -649,7 +649,12 @@ namespace ekeys
         p.profile_index = snap.active_keymap_profile;
 
         snprintf(p.profile_name, sizeof(p.profile_name), "%s",
-                 config.getProfileDisplayName(p.profile_index));
+                 /* 仅 APP 自定义名称下发 UI（UTF-8 中文）；无自定义时传空，
+                  * UI 回退 "Conf%u"——内置 LV_SYMBOL 文本在 CKJGT 中文字体
+                  * 下无法渲染，不能直接透传 */
+                 config.isProfileNameCustom(p.profile_index)
+                     ? config.getProfileDisplayName(p.profile_index)
+                     : "");
         snprintf(p.profile_icon, sizeof(p.profile_icon), "%s",
                  LV_SYMBOL_SETTINGS);
 
@@ -693,7 +698,10 @@ namespace ekeys
         p.is_preview = true;
 
         snprintf(p.profile_name, sizeof(p.profile_name), "%s",
-                 config.getProfileDisplayName(p.profile_index));
+                 /* 同 sendKeymapProfileUi：仅 APP 自定义名称下发 UI */
+                 config.isProfileNameCustom(p.profile_index)
+                     ? config.getProfileDisplayName(p.profile_index)
+                     : "");
         snprintf(p.profile_icon, sizeof(p.profile_icon), "%s",
                  LV_SYMBOL_SETTINGS);
 
@@ -837,25 +845,34 @@ namespace ekeys
                  static_cast<int>(s.device_volume));
 
         /*
-         * 持久化（saveSetting 内部自行加锁，不能放进 mutator）。
+         * 持久化（saveSettings 内部自行加锁）。
          * apply（persist=false）只改内存，不写 INI。
+         * 批量接口单次 config.ini 读/写覆盖全部键（2026-09-11 优化：
+         * 原逐键 saveSetting 为 14 次「整文件读入+解析+原子写」，
+         * SPIFFS 写放大严重且阻塞 MainTask 数秒）。
          */
         if (persist)
         {
-            config.saveSetting("work_mode", static_cast<int>(s.work_mode));
-            config.saveSetting("rgb_mode", static_cast<int>(s.rgb_mode));
-            config.saveSetting("rgb_single_color", rgbSingleColor);
-            config.saveSetting("rgb_click_mode", static_cast<int>(s.rgb_click_mode));
-            config.saveSetting("rgb_brightness", static_cast<int>(s.rgb_brightness));
-            config.saveSetting("tft_theme", static_cast<int>(s.tft_theme));
-            config.saveSetting("tft_brightness", static_cast<int>(s.tft_brightness));
-            config.saveSetting("device_volume", static_cast<int>(s.device_volume));
-            config.saveSetting("power_mode", static_cast<int>(s.power_mode));
-            config.saveSetting("audio_enable", static_cast<int>(s.audio_enable));
-            config.saveSetting("connect_host", static_cast<int>(s.connect_host));
-            config.saveSetting("voice_enable", static_cast<int>(s.voice_enable));
-            config.saveSetting("active_keymap_profile", static_cast<int>(s.active_keymap_profile));
-            config.saveSetting("ui_lang", static_cast<int>(s.ui_lang));
+            if (!config.saveSettings({
+                    {"work_mode", static_cast<int>(s.work_mode)},
+                    {"rgb_mode", static_cast<int>(s.rgb_mode)},
+                    {"rgb_single_color", rgbSingleColor},
+                    {"rgb_click_mode", static_cast<int>(s.rgb_click_mode)},
+                    {"rgb_brightness", static_cast<int>(s.rgb_brightness)},
+                    {"tft_theme", static_cast<int>(s.tft_theme)},
+                    {"tft_brightness", static_cast<int>(s.tft_brightness)},
+                    {"device_volume", static_cast<int>(s.device_volume)},
+                    {"power_mode", static_cast<int>(s.power_mode)},
+                    {"audio_enable", static_cast<int>(s.audio_enable)},
+                    {"connect_host", static_cast<int>(s.connect_host)},
+                    {"voice_enable", static_cast<int>(s.voice_enable)},
+                    {"active_keymap_profile",
+                     static_cast<int>(s.active_keymap_profile)},
+                    {"ui_lang", static_cast<int>(s.ui_lang)},
+                }))
+            {
+                LOG_ERROR("MAIN", "persist ui settings failed");
+            }
         }
 
         /* C6 修复：副作用统一走 AppContext::applyUiSideEffects，与 cmd_config 共用 */

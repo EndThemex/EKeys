@@ -61,7 +61,7 @@ static lv_obj_t *s_keymapped_secondary_main_screen_icon = NULL;
 static lv_obj_t *s_keymapped_secondary_main_screen_icon_image = NULL;
 static lv_obj_t *s_keymapped_secondary_main_screen_profile_name = NULL;
 static char s_keymapped_secondary_icon_src[48] = {0};
-static char s_keymapped_secondary_profile_name[24] = {0};
+static char s_keymapped_secondary_profile_name[32] = {0}; /* APP 下发名称（UTF-8 中文） */
 static char s_keymapped_secondary_profile_file_name[24] = {0};
 static char s_keymapped_secondary_profile_icon_symbol[8] = {0};
 static char s_keymapped_secondary_key_labels[KEYMAP_SECONDARY_KEY_NUM][24] = {{0}};
@@ -150,12 +150,22 @@ static void keymapped_secondary_apply_cached_profile(bool sync_main)
     const char *profile_symbol = s_keymapped_secondary_profile_icon_symbol[0]
                                      ? s_keymapped_secondary_profile_icon_symbol
                                      : LV_SYMBOL_LIST;
-    const char *profile_text = "Conf1";
-
-    if (profile_number > 0)
+    /*
+     * Profile 名称：优先 APP 下发名称（UTF-8 中文，标签用 CKJGT 字体
+     * 渲染）；未设置时回退 "Conf%u"（CKJGT 字体含 ASCII，可正常显示）。
+     */
+    const char *profile_text = profile_hint;
+    if (s_keymapped_secondary_profile_name[0])
+    {
+        profile_text = s_keymapped_secondary_profile_name;
+    }
+    else if (profile_number > 0)
     {
         snprintf(profile_hint, sizeof(profile_hint), "Conf%u", profile_number);
-        profile_text = profile_hint;
+    }
+    else
+    {
+        profile_text = "Conf1";
     }
 
     if (ui_KeyMappedSecondaryIcon)

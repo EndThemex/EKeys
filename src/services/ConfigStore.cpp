@@ -21,14 +21,19 @@ namespace ekeys
     namespace
     {
         /*
-         * F8 修复：写临时文件，成功后再覆盖原文件，尽量减少掉电导致半写。
-         * SPIFFS 无 rename 接口，所以采用：写 .tmp → 关闭 → remove 原 → move (.tmp → 原名)。
-         * 失败时保留原文件不动。
+         * F8 修复：写临时文件，成功后再原子替换原文件，尽量减少掉电导致半写。
+         * 2026-09-11 优化：SPIFFS 经 Arduino fs::FS 的 rename() 可用
+         * （VFS 层 SPIFFS_rename，仅改索引页），旧实现的 read+write
+         * 全文件拷贝（3 次整文件写 + 2 次读）改为 1 次整文件写 + 2 次 rename：
+         *   写 .tmp → 旧文件 rename 为 .bak → .tmp rename 为原文件 → 删 .bak。
+         * 任一时刻原文件/.bak 至少有一份完整内容；rename 失败时回滚保留原文件。
          */
         bool writeAtomic(const char *path, CSimpleIniA &ini)
         {
             char tmp_path[96];
+            char bak_path[96];
             snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
+            snprintf(bak_path, sizeof(bak_path), "%s.bak", path);
 
             /* 1) 序列化到内存（SimpleIni 的 SaveFile 内部用裸 fopen，
              *    无法访问 SPIFFS 挂载点，必须经 Arduino FS 写入；
@@ -62,92 +67,33 @@ namespace ekeys
                     return false;
                 }
             }
-            const size_t tmp_size = data.size();
 
-            /* 3) 备份原文件（如果存在）→ 写入新内容 → 删除备份 / 临时文件 */
-            char bak_path[96];
-            snprintf(bak_path, sizeof(bak_path), "%s.bak", path);
-
-            /* 备份（避免 write+remove 顺序下掉电导致原文件丢） */
-            if (SPIFFS.exists(path))
-            {
-                /* 先删旧 bak，避免 rename-style 冲突 */
-                if (SPIFFS.exists(bak_path))
-                {
-                    SPIFFS.remove(bak_path);
-                }
-                /* SPIFFS 无 rename：用 read+write 复制 */
-                File src = SPIFFS.open(path, "r");
-                File dst = SPIFFS.open(bak_path, "w");
-                if (src && dst)
-                {
-                    const size_t sz = src.size();
-                    if (sz > 0 && sz < 8192)
-                    {
-                        uint8_t buf[256];
-                        size_t remain = sz;
-                        while (remain > 0)
-                        {
-                            const size_t n = src.read(buf, sizeof(buf));
-                            if (n == 0)
-                            {
-                                break;
-                            }
-                            dst.write(buf, n);
-                            remain -= n;
-                        }
-                    }
-                }
-                if (src)
-                {
-                    src.close();
-                }
-                if (dst)
-                {
-                    dst.close();
-                }
-            }
-
-            /* 4) 把 tmp 内容拷到 path（SPIFFS 无 rename，open("w") truncate） */
-            {
-                File src = SPIFFS.open(tmp_path, "r");
-                File dst = SPIFFS.open(path, "w");
-                if (!src || !dst)
-                {
-                    LOG_ERROR("CFGSTORE", "open for swap failed (src=%d dst=%d)",
-                              src ? 1 : 0, dst ? 1 : 0);
-                    if (src)
-                    {
-                        src.close();
-                    }
-                    if (dst)
-                    {
-                        dst.close();
-                    }
-                    return false;
-                }
-                uint8_t buf[256];
-                size_t remain = tmp_size;
-                while (remain > 0)
-                {
-                    const size_t n = src.read(buf, sizeof(buf));
-                    if (n == 0)
-                    {
-                        break;
-                    }
-                    dst.write(buf, n);
-                    remain -= n;
-                }
-                src.close();
-                dst.close();
-            }
-
-            /* 5) 清理临时 / 备份 */
-            SPIFFS.remove(tmp_path);
+            /* 3) 旧文件改名 .bak（无内容拷贝）；旧 .bak 先删避免 rename 冲突 */
             if (SPIFFS.exists(bak_path))
             {
                 SPIFFS.remove(bak_path);
             }
+            if (SPIFFS.exists(path) && !SPIFFS.rename(path, bak_path))
+            {
+                LOG_ERROR("CFGSTORE", "rename %s -> %s failed", path, bak_path);
+                SPIFFS.remove(tmp_path);
+                return false;
+            }
+
+            /* 4) .tmp 改名为正式文件；失败时回滚 .bak 到原文件 */
+            if (!SPIFFS.rename(tmp_path, path))
+            {
+                LOG_ERROR("CFGSTORE", "rename %s -> %s failed", tmp_path, path);
+                SPIFFS.remove(tmp_path);
+                if (SPIFFS.exists(bak_path))
+                {
+                    (void)SPIFFS.rename(bak_path, path);
+                }
+                return false;
+            }
+
+            /* 5) 成功，清理 .bak */
+            SPIFFS.remove(bak_path);
             return true;
         }
     } // namespace

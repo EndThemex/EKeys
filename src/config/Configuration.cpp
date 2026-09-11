@@ -69,6 +69,11 @@ namespace ekeys
             {
                 return "voice";
             }
+            /* Profile 名称（APP 下发）：profile_name_0 ~ profile_name_7 */
+            if (strncmp(key, "profile_name_", 13) == 0)
+            {
+                return "profile";
+            }
             return nullptr;
         }
 
@@ -91,6 +96,7 @@ namespace ekeys
                      static_cast<unsigned>(i) + 1U);
             snprintf(icon_paths_[i], sizeof(icon_paths_[i]), kIconPathFmt,
                      static_cast<unsigned>(i) + 1U);
+            profile_names_[i][0] = '\0';
         }
 
         mutex_ = xSemaphoreCreateMutex();
@@ -233,6 +239,17 @@ namespace ekeys
             settings_.ui_lang = 0;
         }
 
+        /* Profile 名称（APP 下发，UTF-8，空=未设置回退内置符号名） */
+        for (uint8_t i = 0; i < CONFIG_PROFILE_COUNT; ++i)
+        {
+            char key[20];
+            snprintf(key, sizeof(key), "profile_name_%u",
+                     static_cast<unsigned>(i));
+            const char *name = ini.GetValue("profile", key, "");
+            strncpy(profile_names_[i], name, sizeof(profile_names_[i]) - 1);
+            profile_names_[i][sizeof(profile_names_[i]) - 1] = '\0';
+        }
+
         LOG_INFO("CONFIG", "config.ini loaded (active profile=%u)",
                  static_cast<unsigned>(settings_.active_keymap_profile));
     }
@@ -274,17 +291,23 @@ namespace ekeys
     bool Configuration::saveSettings(
         const std::initializer_list<std::pair<const char *, int>> &kvs)
     {
-        if (kvs.size() == 0)
+        return saveSettings(kvs.begin(), kvs.size());
+    }
+
+    bool Configuration::saveSettings(const std::pair<const char *, int> *kvs,
+                                     size_t count)
+    {
+        if (count == 0)
         {
             return true;
         }
 
         /* 先校验全部键，避免写了一半才发现非法 */
-        for (const auto &kv : kvs)
+        for (size_t i = 0; i < count; ++i)
         {
-            if (sectionOfKey(kv.first) == nullptr)
+            if (sectionOfKey(kvs[i].first) == nullptr)
             {
-                LOG_WARNING("CONFIG", "unknown setting key: %s", kv.first);
+                LOG_WARNING("CONFIG", "unknown setting key: %s", kvs[i].first);
                 return false;
             }
         }
@@ -292,11 +315,41 @@ namespace ekeys
         lock();
         CSimpleIniA ini(true, false, false);
         ConfigStore::loadGlobal(kGlobalConfigPath, ini); // 不存在则从空文件开始
-        for (const auto &kv : kvs)
+        for (size_t i = 0; i < count; ++i)
         {
             char buf[16];
-            snprintf(buf, sizeof(buf), "%d", kv.second);
-            ini.SetValue(sectionOfKey(kv.first), kv.first, buf);
+            snprintf(buf, sizeof(buf), "%d", kvs[i].second);
+            ini.SetValue(sectionOfKey(kvs[i].first), kvs[i].first, buf);
+        }
+        bool ok = ConfigStore::saveGlobal(kGlobalConfigPath, ini);
+        unlock();
+        return ok;
+    }
+
+    bool Configuration::saveSettings(
+        const std::pair<const char *, const char *> *kvs, size_t count)
+    {
+        if (count == 0)
+        {
+            return true;
+        }
+
+        for (size_t i = 0; i < count; ++i)
+        {
+            if (sectionOfKey(kvs[i].first) == nullptr)
+            {
+                LOG_WARNING("CONFIG", "unknown setting key: %s", kvs[i].first);
+                return false;
+            }
+        }
+
+        lock();
+        CSimpleIniA ini(true, false, false);
+        ConfigStore::loadGlobal(kGlobalConfigPath, ini);
+        for (size_t i = 0; i < count; ++i)
+        {
+            ini.SetValue(sectionOfKey(kvs[i].first), kvs[i].first,
+                         kvs[i].second);
         }
         bool ok = ConfigStore::saveGlobal(kGlobalConfigPath, ini);
         unlock();
@@ -382,6 +435,15 @@ namespace ekeys
 
     const char *Configuration::getProfileDisplayName(uint8_t idx) const
     {
+        if (idx >= CONFIG_PROFILE_COUNT)
+        {
+            idx = 0;
+        }
+        /* APP 下发名称优先（UTF-8 中文，设备 UI 用 CKJGT 字体渲染） */
+        if (profile_names_[idx][0] != '\0')
+        {
+            return profile_names_[idx];
+        }
         /* 内置 8 个 LVGL 符号（FEATURE_DOC §3.3） */
         static const char *kNames[CONFIG_PROFILE_COUNT] = {
             LV_SYMBOL_WIFI,
@@ -393,7 +455,72 @@ namespace ekeys
             LV_SYMBOL_KEYBOARD,
             LV_SYMBOL_BARS,
         };
-        return kNames[idx < CONFIG_PROFILE_COUNT ? idx : 0];
+        return kNames[idx];
+    }
+
+    bool Configuration::isProfileNameCustom(uint8_t idx) const
+    {
+        if (idx >= CONFIG_PROFILE_COUNT)
+        {
+            return false;
+        }
+        /*
+         * 读写均为 MainTask 单线程（协议命令处理与 UI 消息构造同任务），
+         * 32 字节数组读取无需持锁；写侧 setProfileName 亦在 MainTask。
+         */
+        return profile_names_[idx][0] != '\0';
+    }
+
+    bool Configuration::setProfileName(uint8_t idx, const char *name)
+    {
+        if (idx >= CONFIG_PROFILE_COUNT)
+        {
+            LOG_WARNING("CONFIG", "profile name idx %u out of range", idx);
+            return false;
+        }
+        if (name == nullptr)
+        {
+            name = "";
+        }
+
+        /*
+         * UTF-8 安全截断：只保留完整字符（首字节 10xxxxxx 为 continuation，
+         * 截断点回退到字符起始字节），避免把多字节中文截成非法序列。
+         */
+        char trimmed[kProfileNameMaxLen];
+        size_t len = strlen(name);
+        if (len >= sizeof(trimmed))
+        {
+            len = sizeof(trimmed) - 1;
+            while (len > 0 && (static_cast<unsigned char>(name[len]) & 0xC0) == 0x80)
+            {
+                --len; /* 回退到字符首字节 */
+            }
+        }
+        memcpy(trimmed, name, len);
+        trimmed[len] = '\0';
+        if (len != strlen(name))
+        {
+            LOG_WARNING("CONFIG", "profile name too long, truncated to %u bytes",
+                        static_cast<unsigned>(len));
+        }
+
+        lock();
+        strncpy(profile_names_[idx], trimmed, sizeof(profile_names_[idx]) - 1);
+        profile_names_[idx][sizeof(profile_names_[idx]) - 1] = '\0';
+        unlock();
+
+        /* 持久化（空串=清除，回退内置符号名）；saveSetting 内部自行加锁 */
+        char key[20];
+        snprintf(key, sizeof(key), "profile_name_%u", static_cast<unsigned>(idx));
+        if (!saveSetting(key, trimmed))
+        {
+            LOG_ERROR("CONFIG", "persist %s failed", key);
+            return false;
+        }
+        LOG_INFO("CONFIG", "profile_name_%u set to \"%s\"",
+                 static_cast<unsigned>(idx), trimmed);
+        return true;
     }
 
 } // namespace ekeys

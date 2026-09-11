@@ -14,6 +14,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 
+#include <cstddef>
 #include <functional>
 #include <initializer_list>
 #include <utility>
@@ -68,6 +69,15 @@ namespace ekeys
             const std::initializer_list<std::pair<const char *, int>> &kvs);
 
         /*
+         * 批量持久化（指针+数量版本）：供运行时动态收集的变更列表使用，
+         * 语义同上（单次读/写、任一键非法整体拒绝、不改内存 settings_）。
+         */
+        bool saveSettings(const std::pair<const char *, int> *kvs,
+                          size_t count);
+        bool saveSettings(const std::pair<const char *, const char *> *kvs,
+                          size_t count);
+
+        /*
          * 加载当前激活 Profile 的键映射；无文件返回 false。
          */
         bool loadActiveProfileKeyMapping(KeymapArray &out);
@@ -102,8 +112,8 @@ namespace ekeys
 
         /*
          * 加锁执行 mutator 修改内存 settings_（阶段 04 任务 4.5 原子写入）。
-         * 持久化由调用方在返回后经 saveSetting() 逐键完成（其内部自行加锁，
-         * 不能在 mutator 内调用）。
+         * 持久化由调用方在返回后经 saveSetting()/saveSettings() 完成
+         * （其内部自行加锁，不能在 mutator 内调用）。
          */
         using SettingsMutator = std::function<void(DeviceSettings &)>;
         bool mutateSettings(const SettingsMutator &mutator);
@@ -112,6 +122,17 @@ namespace ekeys
         const char *getProfileConfigPath(uint8_t idx) const;
         const char *getProfileDisplayName(uint8_t idx) const;
         const char *getProfileIconPath(uint8_t idx) const;
+
+        /*
+         * Profile 名称（APP 下发，UTF-8 中文，持久化到 config.ini
+         * [profile] 节 profile_name_N）。idx 0~7。
+         * - setProfileName：name 为空串表示清除，回退内置符号名；
+         *   超长按 UTF-8 字符边界安全截断。
+         * - isProfileNameCustom：是否设置了 APP 端名称。
+         */
+        static constexpr uint8_t kProfileNameMaxLen = 32; /* 含 '\0' */
+        bool setProfileName(uint8_t idx, const char *name);
+        bool isProfileNameCustom(uint8_t idx) const;
 
         /* 供后续阶段（ConfigStore 直连场景）共享互斥量 */
         void lock();
@@ -130,6 +151,8 @@ namespace ekeys
         /* 预生成的 Profile 路径 / 名称（避免运行时格式化） */
         char config_paths_[CONFIG_PROFILE_COUNT][16];
         char icon_paths_[CONFIG_PROFILE_COUNT][16];
+        /* APP 下发的 profile 名称（UTF-8，空串=未设置，回退内置符号名） */
+        char profile_names_[CONFIG_PROFILE_COUNT][kProfileNameMaxLen];
     };
 
 } // namespace ekeys

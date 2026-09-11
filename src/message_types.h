@@ -102,13 +102,15 @@ namespace ekeys
      *     is_preview=false（已应用消息）时恒等于 active_profile。
      *   is_preview：true=预览消息（仅展示，未应用）；默认 false=已应用
      *     语义（发送方漏设字段时退化为现状行为，更安全）。
+     *   profile_name：APP 下发名称（UTF-8 中文，可能显示于 CKJGT 字体），
+     *     容量须 ≥ Configuration::kProfileNameMaxLen。
      */
     struct KeymapProfileInfo
     {
         uint8_t active_profile{0};
         uint8_t profile_index{0};
         bool is_preview{false};
-        char profile_name[24]{0};
+        char profile_name[32]{0};
         char profile_icon[8]{0};
         char keymap_labels[11][24]{};
     };

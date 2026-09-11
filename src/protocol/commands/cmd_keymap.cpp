@@ -141,9 +141,28 @@ namespace ekeys::protocol::commands
             }
         }
 
-        int handleKeymapGet(int cmd, int seq, JsonObject /*data*/)
+        int handleKeymapGet(int cmd, int seq, JsonObject data)
         {
             (void)cmd;
+
+            /*
+             * 可选 data.profile（0~7）：单独获取指定 profile 的键映射，
+             * 供 App 进入键盘设置页时按选中方案拉取（缺省 = 当前激活）。
+             * 与 0x10 连接推送的「只有名称+图标、无映射内容」配合：
+             * 连接轻量同步，设置页按需取全量。
+             */
+            uint8_t profile = Configuration::instance().activeProfile();
+            if (!data["profile"].isNull())
+            {
+                const int req = data["profile"].as<int>();
+                if (req < 0 || req >= Configuration::CONFIG_PROFILE_COUNT)
+                {
+                    SerialProtocol::instance().sendErrorResponse(
+                        cmd, seq, "profile out of range");
+                    return -1;
+                }
+                profile = static_cast<uint8_t>(req);
+            }
 
             /*
              * KeymapArray 约 4.3KB（12 键 × KeyMapping，含 combo 通道），
@@ -151,14 +170,18 @@ namespace ekeys::protocol::commands
              * 必须放静态存储；命令处理为 MainTask 单线程，无并发问题。
              */
             static Configuration::KeymapArray map{};
-            if (!Configuration::instance().loadActiveProfileKeyMapping(map))
+            bool loaded = (profile == Configuration::instance().activeProfile())
+                              ? Configuration::instance().loadActiveProfileKeyMapping(map)
+                              : Configuration::instance().loadProfileKeyMapping(profile, map);
+            if (!loaded)
             {
                 /*
                  * keymap{N}.ini 缺失/全空：设备运行时（KeyResolver）此时
                  * 用的是默认 a~k，这里上报同样的默认值，保证 App 看到的
                  * 与设备实际行为一致。
                  */
-                LOG_WARNING("KEYMAP", "profile keymap unavailable, report defaults");
+                LOG_WARNING("KEYMAP", "profile %u keymap unavailable, report defaults",
+                            static_cast<unsigned>(profile));
                 keymapFillDefaults(map);
             }
 
@@ -166,6 +189,7 @@ namespace ekeys::protocol::commands
             doc["cmd"] = CMD_KEYMAP_GET | 0x80;
             doc["seq"] = seq;
             doc["status"] = 0;
+            doc["profile"] = profile; /* 实际返回的 profile，App 按此对齐 */
             doc["fun_key1"] = Configuration::instance().settings().fun_key1;
             doc["fun_key2"] = Configuration::instance().settings().fun_key2;
             JsonArray arr = doc["keymap"].to<JsonArray>();

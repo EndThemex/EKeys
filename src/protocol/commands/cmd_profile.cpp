@@ -4,9 +4,14 @@
  * 报文（参考工程 onProfileIconSetCommand / sendCurrentProfileState）：
  *   0x11 请求：data.profile_icon{profile?, clear?, png_base64?}
  *   0x11 响应：data{profile, profile_number, has_custom_icon, profile_name}
- *   0x10 推送：{"cmd":0x10,"seq":N,"profile_state":{
- *     active_profile, profile_number, profile_name,
- *     has_custom_icon, icon_path? }}
+ *   0x15 请求：data{profile?, name} 设置/清除 profile 名称（UTF-8 中文）
+ *   0x15 响应：data{profile, profile_number, profile_name, is_custom_name}
+ *   0x10 推送：{"cmd":0x10,"seq":N,"profile_state":{...},
+ *     "profiles":[{profile, profile_number, profile_name, is_custom_name,
+ *     has_custom_icon, icon_path?}, ...]}
+ *     —— profiles 数组仅含名称+图标元数据，不含键映射内容；
+ *     TCP 连接建立即推送（TcpChannel），App 进入键盘设置页后再用
+ *     0x05+data.profile 按需拉取选中方案的具体配置。
  */
 
 #include "cmd_profile.h"
@@ -171,10 +176,11 @@ namespace ekeys::protocol::commands
     void sendProfileState(int seq)
     {
         DeviceSettings snap;
-        Configuration::instance().snapshot(snap);
+        Configuration &config = Configuration::instance();
+        config.snapshot(snap);
         const uint8_t active = snap.active_keymap_profile;
         const bool has_icon =
-            SPIFFS.exists(Configuration::instance().getProfileIconPath(active));
+            SPIFFS.exists(config.getProfileIconPath(active));
 
         JsonDocument doc;
         doc["cmd"] = CMD_PROFILE_STATE;
@@ -182,15 +188,79 @@ namespace ekeys::protocol::commands
         JsonObject state = doc["profile_state"].to<JsonObject>();
         state["active_profile"] = active;
         state["profile_number"] = active + 1;
-        state["profile_name"] =
-            Configuration::instance().getProfileDisplayName(active);
+        state["profile_name"] = config.getProfileDisplayName(active);
         state["has_custom_icon"] = has_icon;
         if (has_icon)
         {
-            state["icon_path"] =
-                Configuration::instance().getProfileIconPath(active);
+            state["icon_path"] = config.getProfileIconPath(active);
+        }
+
+        /*
+         * 全部 profile 的名称 + 图标元数据（不含键映射内容）：
+         * App 连接时由此获取列表，进入键盘设置页后再按 0x05+profile
+         * 单独拉取选中的配置。
+         */
+        JsonArray profiles = doc["profiles"].to<JsonArray>();
+        for (uint8_t i = 0; i < Configuration::CONFIG_PROFILE_COUNT; ++i)
+        {
+            JsonObject p = profiles.add<JsonObject>();
+            p["profile"] = i;
+            p["profile_number"] = i + 1;
+            p["profile_name"] = config.getProfileDisplayName(i);
+            p["is_custom_name"] = config.isProfileNameCustom(i);
+            const bool custom_icon = SPIFFS.exists(config.getProfileIconPath(i));
+            p["has_custom_icon"] = custom_icon;
+            if (custom_icon)
+            {
+                p["icon_path"] = config.getProfileIconPath(i);
+            }
         }
         SerialProtocol::instance().sendDocument(doc);
+    }
+
+    /* 0x15：设置 / 清除（name=""）profile 名称（UTF-8 中文） */
+    int handleProfileNameSet(int cmd, int seq, JsonObject data)
+    {
+        DeviceSettings snap;
+        Configuration::instance().snapshot(snap);
+        const uint8_t profile = data["profile"] | snap.active_keymap_profile;
+        if (profile >= Configuration::CONFIG_PROFILE_COUNT)
+        {
+            SerialProtocol::instance().sendErrorResponse(cmd, seq,
+                                                         "profile out of range");
+            return -1;
+        }
+        if (!data["name"].is<const char *>())
+        {
+            SerialProtocol::instance().sendErrorResponse(cmd, seq,
+                                                         "missing 'name'");
+            return -1;
+        }
+
+        Configuration &config = Configuration::instance();
+        if (!config.setProfileName(profile, data["name"].as<const char *>()))
+        {
+            SerialProtocol::instance().sendErrorResponse(cmd, seq,
+                                                         "set profile name failed");
+            return -1;
+        }
+
+        {
+            JsonDocument resp;
+            resp["cmd"] = cmd | 0x80;
+            resp["seq"] = seq;
+            resp["status"] = 0;
+            JsonObject out = resp["data"].to<JsonObject>();
+            out["profile"] = profile;
+            out["profile_number"] = profile + 1;
+            out["profile_name"] = config.getProfileDisplayName(profile);
+            out["is_custom_name"] = config.isProfileNameCustom(profile);
+            SerialProtocol::instance().sendDocument(resp);
+        }
+
+        /* 名称变化后推送全量列表（seq=0），App 端刷新方案选择页 */
+        sendProfileState(0);
+        return 0;
     }
 
     void registerProfileHandlers()
@@ -199,14 +269,17 @@ namespace ekeys::protocol::commands
             CMD_PROFILE_STATE, handleProfileState);
         CommandRegistry::instance().registerHandler(
             CMD_PROFILE_ICON_SET, handleProfileIconSet);
-        LOG_INFO("CMD", "cmd_profile registered (0x%02X/0x%02X)",
-                 CMD_PROFILE_STATE, CMD_PROFILE_ICON_SET);
+        CommandRegistry::instance().registerHandler(
+            CMD_PROFILE_NAME_SET, handleProfileNameSet);
+        LOG_INFO("CMD", "cmd_profile registered (0x%02X/0x%02X/0x%02X)",
+                 CMD_PROFILE_STATE, CMD_PROFILE_ICON_SET, CMD_PROFILE_NAME_SET);
     }
 
     void unregisterProfileHandlers()
     {
         CommandRegistry::instance().unregisterHandler(CMD_PROFILE_STATE);
         CommandRegistry::instance().unregisterHandler(CMD_PROFILE_ICON_SET);
+        CommandRegistry::instance().unregisterHandler(CMD_PROFILE_NAME_SET);
     }
 
 } // namespace ekeys::protocol::commands

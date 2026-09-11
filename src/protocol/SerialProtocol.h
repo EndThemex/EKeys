@@ -41,8 +41,9 @@ namespace ekeys
         CMD_PROFILE_STATE = 0x10,
         CMD_PROFILE_ICON_SET = 0x11,
         CMD_HA_STATUS = 0x12,
-        CMD_TIME_SET = 0x13, /* App→主控：写入系统时间（epoch + tz） */
+        CMD_TIME_SET = 0x13,          /* App→主控：写入系统时间（epoch + tz） */
         CMD_FIRMWARE_DOWNLOAD = 0x14, /* App→主控：复位进 USB 下载模式（烧录） */
+        CMD_PROFILE_NAME_SET = 0x15,  /* App→主控：设置 profile 名称（UTF-8 中文） */
     };
 
     class SerialProtocol

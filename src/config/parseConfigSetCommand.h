@@ -4,7 +4,8 @@
  * CMD_CONFIG_SET 字段解析与原子写入（FEATURE_DOC §6；阶段 04 任务 4.5）。
  *
  * - 所有 DeviceSettings 修改经 Configuration::mutateSettings()（锁内原子完成）
- * - 变更键在 mutator 返回后逐键经 Configuration::saveSetting() 持久化
+ * - 变更键在 mutator 返回后经 Configuration::saveSettings(kvs, count)
+ *   批量持久化（单次 config.ini 读/写）
  * - 变更字段记录新旧值日志
  * - 副作用（work_mode 重建键盘 / WiFi 调度等）通过 ConfigSetResult 交由上层
  *   cmd_config handler 执行，本文件不依赖任务与协议模块

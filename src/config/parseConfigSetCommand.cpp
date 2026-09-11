@@ -24,16 +24,13 @@ namespace ekeys
         constexpr size_t kMaxStrChanges = 5;
         constexpr size_t kMaxMaskChanges = 2;
 
-        struct IntChange
-        {
-            const char *key;
-            int value;
-        };
-        struct StrChange
-        {
-            const char *key;
-            const char *value;
-        };
+        /*
+         * 变更列表直接用 pair 存储，可整体交给
+         * Configuration::saveSettings(kvs, count) 批量持久化
+         * （单次 config.ini 读/写，避免逐键 saveSetting 的写放大）。
+         */
+        using IntChange = std::pair<const char *, int>;
+        using StrChange = std::pair<const char *, const char *>;
         struct MaskChange
         {
             const char *key;
@@ -397,15 +394,16 @@ namespace ekeys
             }
         } });
 
-        /* ---- 逐键持久化（saveSetting 内部自行加锁） ---- */
-        for (size_t i = 0; i < n_int; ++i)
+        /* ---- 批量持久化（saveSettings 内部自行加锁，单次 config.ini 读/写） ---- */
+        if (n_int > 0)
         {
-            config.saveSetting(int_changes[i].key, int_changes[i].value);
+            config.saveSettings(int_changes, n_int);
         }
-        for (size_t i = 0; i < n_str; ++i)
+        if (n_str > 0)
         {
-            config.saveSetting(str_changes[i].key, str_changes[i].value);
+            config.saveSettings(str_changes, n_str);
         }
+        /* pc_status_mask（uint32）目前仅一个键，保持单键持久化 */
         for (size_t i = 0; i < n_mask; ++i)
         {
             snprintf(mask_bufs[i], sizeof(mask_bufs[i]), "%lu",
