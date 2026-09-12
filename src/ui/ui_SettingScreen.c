@@ -21,8 +21,9 @@ void ui_event_SettingScreen(lv_event_t * e)
     uintptr_t key = (uintptr_t)lv_event_get_param(e);
 
     if(event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_RIGHT) {
+        ui_set_active_screen_tag(UI_SCREEN_MAIN);
         _ui_screen_change(&ui_MainScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_MainScreen_screen_init);
-        lv_refr_now(NULL);    
+        lv_refr_now(NULL);
     }
     else if(event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_LEFT) {
         ui_set_active_screen_tag(UI_SCREEN_HA);

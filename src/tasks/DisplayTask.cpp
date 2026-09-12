@@ -759,10 +759,12 @@ namespace ekeys
         const TickType_t now = xTaskGetTickCount();
         if ((now - last_activity_tick_) >= kAutoReturnToMainTicks)
         {
-            LOG_INFO("DISP", "auto return to MAIN after %lu ms idle",
-                     (unsigned long)pdTICKS_TO_MS(now - last_activity_tick_));
+            const unsigned long idle_ms = (unsigned long)pdTICKS_TO_MS(now - last_activity_tick_);
+            /* 先清零再导航：即使 navigateNow 因目标屏已是当前屏而短路，
+             * 也不会下一 tick 重复触发（防日志刷屏与 tag 失配死循环） */
+            last_activity_tick_ = 0;
+            LOG_INFO("DISP", "auto return to MAIN after %lu ms idle", idle_ms);
             navigateNow(UI_SCREEN_MAIN);
-            /* navigateNow 内部会把 last_activity_tick_ 清零 */
         }
     }
 

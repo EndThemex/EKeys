@@ -63,12 +63,14 @@ void ui_event_MainScreen(lv_event_t *e)
     }
     if (event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_LEFT)
     {
+        ui_set_active_screen_tag(UI_SCREEN_SETTING);
         _ui_screen_change(&ui_SettingScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_SettingScreen_screen_init);
         lv_refr_now(NULL);
     }
     // 主页旋钮单击（ENTER）= 无操作；ESC = 进入 SettingScreen（与双击对齐）
     if (event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_ESC)
     {
+        ui_set_active_screen_tag(UI_SCREEN_SETTING);
         _ui_screen_change(&ui_SettingScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_SettingScreen_screen_init);
         lv_refr_now(NULL);
     }

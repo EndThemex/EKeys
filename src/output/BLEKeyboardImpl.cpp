@@ -20,6 +20,7 @@
 
 #include <esp_bt.h>
 #include <BleKeyboard.h>
+#include <BLESecurity.h>
 
 #include "logging/LogManager.h"
 
@@ -115,6 +116,19 @@ namespace ekeys
 
         ble.begin();
         s_ble = &ble;
+
+        /*
+         * F12 修复（S3 Bluedroid 兼容性，arduino-esp32 #7364 / t-vk #285）：
+         * 库 begin() 固定写 ESP_LE_AUTH_REQ_SC_MITM_BOND。S3/C3 上 Windows
+         * （双模主机）会因 SC 配对请求 CTKD（LE LTK → 经典蓝牙 link key 派生），
+         * 而 S3 已释放经典蓝牙控制器 → smp_derive_link_key_from_long_term_key
+         * failed → 绑定不完整 → 主机自动重连循环失败（秒连秒断，BT_SMP 报错）。
+         * 在 begin() 之后覆盖为 ESP_LE_AUTH_BOND（Just Works + 绑定，不触发
+         * CTKD），官方 issue 验证可正常配对与重连。改变配对方式后主机侧必须
+         * 删除设备重新配对。BGAP 安全参数在配对协商时才读取，此处覆盖安全。
+         */
+        static BLESecurity s_bleSecurity;
+        s_bleSecurity.setAuthenticationMode(ESP_LE_AUTH_BOND);
 
         /*
          * F11 修复（失败检测）：BleKeyboard::begin() 返回 void，
