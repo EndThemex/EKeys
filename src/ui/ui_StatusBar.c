@@ -64,7 +64,7 @@ void ui_StatusBar_init(void)
     recording_dot = lv_obj_create(status_bar);
     lv_obj_remove_style_all(recording_dot);
     lv_obj_set_size(recording_dot, 20, 20);
-    lv_obj_align(recording_dot, LV_ALIGN_TOP_LEFT, 278, 10);
+    lv_obj_align(recording_dot, LV_ALIGN_TOP_LEFT, 278, -5);
     lv_obj_set_style_radius(recording_dot, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(recording_dot, lv_color_hex(0xFF3030), 0);
     lv_obj_set_style_bg_opa(recording_dot, LV_OPA_COVER, 0);
@@ -73,24 +73,24 @@ void ui_StatusBar_init(void)
     workmode_icon = lv_label_create(status_bar);
     lv_label_set_text(workmode_icon, LV_SYMBOL_BLUETOOTH);
     lv_obj_add_style(workmode_icon, &icon_medium_style, 0); // 小图标
-    lv_obj_align(workmode_icon, LV_ALIGN_TOP_LEFT, 3, 15);
+    lv_obj_align(workmode_icon, LV_ALIGN_TOP_LEFT, 3, 0);
     lv_obj_set_style_text_color(workmode_icon, lv_color_hex(0x808080), 0);
 
     wifi_icon = lv_label_create(status_bar);
     lv_label_set_text(wifi_icon, LV_SYMBOL_WIFI);
     lv_obj_add_style(wifi_icon, &icon_medium_style, 0); // 小图标
-    lv_obj_align(wifi_icon, LV_ALIGN_TOP_LEFT, 313, 10);
+    lv_obj_align(wifi_icon, LV_ALIGN_TOP_LEFT, 313, -5);
     lv_obj_set_style_text_color(wifi_icon, lv_color_hex(0x808080), 0);
 
     volume_icon = lv_label_create(status_bar);
     lv_label_set_text(volume_icon, LV_SYMBOL_VOLUME_MAX);
     lv_obj_add_style(volume_icon, &icon_medium_style, 0); // 小图标
-    lv_obj_align(volume_icon, LV_ALIGN_TOP_LEFT, 348, 10);
+    lv_obj_align(volume_icon, LV_ALIGN_TOP_LEFT, 348, -5);
     lv_obj_set_style_text_color(volume_icon, lv_color_hex(0x808080), 0);
 
     battery_icon = lv_label_create(status_bar);
     lv_label_set_text(battery_icon, LV_SYMBOL_BATTERY_FULL);
-    lv_obj_align(battery_icon, LV_ALIGN_TOP_LEFT, 383, 10);
+    lv_obj_align(battery_icon, LV_ALIGN_TOP_LEFT, 383, -5);
     lv_obj_add_style(battery_icon, &icon_medium_style, 0); // 小图标
     lv_obj_set_style_text_color(battery_icon, lv_color_hex(0x808080), 0);
 }

@@ -15,13 +15,11 @@ static lv_obj_t *s_ui_MainScreenProfileIconLabel = NULL;
 static lv_obj_t *s_ui_MainScreenProfileIconImage = NULL;
 static lv_obj_t *s_ui_MainScreenProfileName = NULL;
 static lv_obj_t *s_ui_MainScreenHostConnectionIcon = NULL;
-static lv_obj_t *s_ui_MainScreenHostConnectionLabel = NULL;
 static bool s_ui_MainScreenHostConnected = false;
 lv_obj_t *ui_LabelTime = NULL;
 lv_obj_t *ui_LabelData = NULL;
 lv_obj_t *ui_LabelSecond = NULL;
 lv_obj_t *ui_LabelWeek = NULL;
-lv_obj_t *ui_LabelWorkmode = NULL;
 lv_obj_t *ui_LabelRGBLight = NULL;
 lv_obj_t *ui_LabelTFTLight = NULL;
 lv_obj_t *ui_line1 = NULL;
@@ -29,22 +27,18 @@ lv_obj_t *ui_line2 = NULL;
 lv_obj_t *ui_line3 = NULL;
 lv_obj_t *ui_line5 = NULL;
 
+/*
+ * 主页连接状态：只显示图标（已移除 PC LINK / PC STOP 文本）。
+ * 键盘主机（BLE/USB）已连接 → 白色；未连接 → 橙色。
+ */
 static void ui_MainScreen_refresh_host_connection(void)
 {
-    if (s_ui_MainScreenHostConnectionLabel != NULL)
-    {
-        lv_label_set_text(s_ui_MainScreenHostConnectionLabel, s_ui_MainScreenHostConnected ? "PC LINK" : "PC STOP");
-        lv_obj_set_style_text_color(s_ui_MainScreenHostConnectionLabel,
-                                    s_ui_MainScreenHostConnected ? lv_color_hex(0x22C55E) : lv_color_hex(0xF59E0B),
-                                    LV_PART_MAIN | LV_STATE_DEFAULT);
-    }
-
     if (s_ui_MainScreenHostConnectionIcon != NULL)
     {
         lv_label_set_text(s_ui_MainScreenHostConnectionIcon,
                           s_ui_MainScreenHostConnected ? LV_SYMBOL_REFRESH : LV_SYMBOL_CLOSE);
         lv_obj_set_style_text_color(s_ui_MainScreenHostConnectionIcon,
-                                    s_ui_MainScreenHostConnected ? lv_color_hex(0x22C55E) : lv_color_hex(0xF59E0B),
+                                    s_ui_MainScreenHostConnected ? lv_color_hex(0xFFFFFF) : lv_color_hex(0xF59E0B),
                                     LV_PART_MAIN | LV_STATE_DEFAULT);
     }
 }
@@ -208,36 +202,16 @@ void ui_MainScreen_screen_init(void)
     lv_obj_set_style_text_opa(ui_LabelWeek, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_LabelWeek, &ui_font_FontCKJGT24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    ui_LabelWorkmode = lv_label_create(ui_MainScreen);
-    lv_obj_set_width(ui_LabelWorkmode, LV_SIZE_CONTENT);  /// 1
-    lv_obj_set_height(ui_LabelWorkmode, LV_SIZE_CONTENT); /// 1
-    lv_obj_set_x(ui_LabelWorkmode, -137);
-    lv_obj_set_y(ui_LabelWorkmode, -39);
-    lv_obj_set_align(ui_LabelWorkmode, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_LabelWorkmode, "BLT MODE");
-    lv_obj_set_style_text_color(ui_LabelWorkmode, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(ui_LabelWorkmode, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_LabelWorkmode, &ui_font_BebasNeueFont24, LV_PART_MAIN | LV_STATE_DEFAULT);
+    /* 工作模式文字（BLT/WIR MODE）已删除：状态栏左上角图标已表达模式 */
 
-    s_ui_MainScreenHostConnectionLabel = lv_label_create(ui_MainScreen);
-    lv_obj_set_width(s_ui_MainScreenHostConnectionLabel, 108);
-    lv_obj_set_height(s_ui_MainScreenHostConnectionLabel, LV_SIZE_CONTENT); /// 1
-    lv_obj_set_x(s_ui_MainScreenHostConnectionLabel, -125);
-    lv_obj_set_y(s_ui_MainScreenHostConnectionLabel, -4);
-    lv_obj_set_align(s_ui_MainScreenHostConnectionLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(s_ui_MainScreenHostConnectionLabel, "PC STOP");
-    lv_label_set_long_mode(s_ui_MainScreenHostConnectionLabel, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_align(s_ui_MainScreenHostConnectionLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(s_ui_MainScreenHostConnectionLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(s_ui_MainScreenHostConnectionLabel, &ui_font_BebasNeueFont24, LV_PART_MAIN | LV_STATE_DEFAULT);
-
+    /* 连接状态：只保留图标（位于原文本 + 图标区块的垂直居中位置） */
     s_ui_MainScreenHostConnectionIcon = lv_label_create(ui_MainScreen);
     lv_obj_set_width(s_ui_MainScreenHostConnectionIcon, LV_SIZE_CONTENT);  /// 1
     lv_obj_set_height(s_ui_MainScreenHostConnectionIcon, LV_SIZE_CONTENT); /// 1
     lv_obj_set_x(s_ui_MainScreenHostConnectionIcon, -125);
-    lv_obj_set_y(s_ui_MainScreenHostConnectionIcon, 35);
+    lv_obj_set_y(s_ui_MainScreenHostConnectionIcon, 15);
     lv_obj_set_align(s_ui_MainScreenHostConnectionIcon, LV_ALIGN_CENTER);
-    lv_label_set_text(s_ui_MainScreenHostConnectionIcon, LV_SYMBOL_REFRESH);
+    lv_label_set_text(s_ui_MainScreenHostConnectionIcon, LV_SYMBOL_CLOSE);
     lv_obj_set_style_text_opa(s_ui_MainScreenHostConnectionIcon, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(s_ui_MainScreenHostConnectionIcon, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -318,11 +292,6 @@ void ui_MainScreen_screen_init(void)
     lv_obj_add_event_cb(ui_MainScreen, ui_event_MainScreen, LV_EVENT_ALL, NULL);
 }
 
-void ui_MainScreen_set_work_mode(char *mode)
-{
-    lv_label_set_text(ui_LabelWorkmode, mode);
-}
-
 void ui_MainScreen_set_rgb_light(uint8_t percent)
 {
     if (ui_LabelRGBLight != NULL)
@@ -361,12 +330,10 @@ void ui_MainScreen_screen_destroy(void)
     s_ui_MainScreenProfileIconImage = NULL;
     s_ui_MainScreenProfileName = NULL;
     s_ui_MainScreenHostConnectionIcon = NULL;
-    s_ui_MainScreenHostConnectionLabel = NULL;
     ui_LabelTime = NULL;
     ui_LabelData = NULL;
     ui_LabelSecond = NULL;
     ui_LabelWeek = NULL;
-    ui_LabelWorkmode = NULL;
     ui_LabelRGBLight = NULL;
     ui_LabelTFTLight = NULL;
     ui_line1 = NULL;

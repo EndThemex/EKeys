@@ -65,6 +65,7 @@ namespace ekeys
         int wifi_rssi{-100};
         bool tcp_connected{false};
         int work_mode{0};
+        bool kb_connected{false}; /* 键盘主机连接（BLE/USB HID），主页连接图标 */
         bool voice_enabled{false};
         bool voice_recording{false};
         bool module_a_connected{false};

@@ -917,6 +917,9 @@ namespace ekeys
             HaStatusInfo ha;
             NetDiagnostics::fillNetworkFields(ha);
 
+            /* 键盘主机连接（BLE/USB HID）→ 主页连接图标，2.5s 节流刷新 */
+            ha.kb_connected = (keyboard_ != nullptr) && keyboard_->isConnected();
+
             DeviceSettings snap;
             Configuration::instance().snapshot(snap);
             ha.work_mode = snap.work_mode;

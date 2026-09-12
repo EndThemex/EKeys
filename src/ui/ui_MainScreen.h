@@ -14,7 +14,6 @@ extern "C"
   // SCREEN: ui_MainScreen
   extern void ui_MainScreen_screen_init(void);
   extern void ui_MainScreen_screen_destroy(void);
-  extern void ui_MainScreen_set_work_mode(char *mode);
   extern void ui_MainScreen_set_rgb_light(uint8_t percent);
   extern void ui_MainScreen_set_tft_light(uint8_t percent);
   extern void ui_MainScreen_set_host_connection(bool connected);
@@ -30,7 +29,6 @@ extern "C"
   extern lv_obj_t *ui_LabelData;
   extern lv_obj_t *ui_LabelSecond;
   extern lv_obj_t *ui_LabelWeek;
-  extern lv_obj_t *ui_LabelWorkmode;
   extern lv_obj_t *ui_line1;
   extern lv_obj_t *ui_line2;
   extern lv_obj_t *ui_line3;

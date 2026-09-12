@@ -76,20 +76,8 @@ namespace ekeys
 
         /*
          * DeviceSettings.work_mode（0=USB 1=BLE 2=2.4G）与
-         * ui_StatusBar 的 WORKMODE 枚举同序。
+         * ui_StatusBar 的 WORKMODE 枚举同序（状态栏图标显示，主页不再有模式文字）。
          */
-        const char *workModeText(uint8_t work_mode)
-        {
-            switch (work_mode)
-            {
-            case 1:
-                return "BLT MODE";
-            case 2:
-                return "2.4 MODE";
-            default:
-                return "WIR MODE";
-            }
-        }
 
     } // namespace
 
@@ -416,8 +404,7 @@ namespace ekeys
         status_bar_set_working_mode(s.work_mode);
         status_bar_set_volume(s.device_volume);
 
-        /* 主屏文字 */
-        ui_MainScreen_set_work_mode((char *)workModeText(s.work_mode));
+        /* 主屏文字（工作模式已由状态栏图标表达，无模式文字） */
         ui_MainScreen_set_rgb_light(s.rgb_brightness);
         ui_MainScreen_set_tft_light(s.tft_brightness);
 
@@ -605,7 +592,8 @@ namespace ekeys
     {
         const HaStatusInfo &ha = msg.ha_status;
 
-        ui_MainScreen_set_host_connection(ha.tcp_connected);
+        /* 主页连接图标：键盘主机（BLE/USB）连接状态，连接 = 白色 */
+        ui_MainScreen_set_host_connection(ha.kb_connected);
         /* 状态栏 WiFi 图标：与 HA 二级页共用 wifi_enabled/connected/rssi 字段 */
         status_bar_set_wifi_status(ha.wifi_enabled,
                                    ha.wifi_connected,
