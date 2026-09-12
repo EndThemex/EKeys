@@ -16,7 +16,6 @@
 #include "DisplayTask.h"
 
 #include <Arduino.h>
-#include <SPIFFS.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -550,16 +549,18 @@ namespace ekeys
          *
          * 设计：ui_*_set_profile_icon_image_data() 接口已实现真接通（malloc
          * 拷贝 + 构造 lv_img_dsc_t + set src），只是缺少解码 PNG 的中间层。
-         * 当前实现简化：仅检查 SPIFFS 上是否存在 PNG 文件，存在时用 file 路径
-         * 记录，未来接入 PNG 解码器（lodepng / PNGdec）只需替换以下
-         * readPngToRgba() 占位即可。两个 UI 入口保留 nullptr=回退符号 的语义。
+         * 当前实现简化：仅检查是否存在 PNG 文件（读 Configuration 内存缓存，
+         * 2026-09-12 优化：不再从 DisplayTask 直接 SPIFFS.exists——既避免
+         * 本任务渲染帧被 SPIFFS.stat 拖慢，也消除与 MainTask 的跨任务
+         * SPIFFS 并发访问），存在与否仅决定回退分支，未来接入 PNG 解码器
+         * （lodepng / PNGdec）只需替换以下 readPngToRgba() 占位即可。
+         * 两个 UI 入口保留 nullptr=回退符号 的语义。
          *
          * TODO：把 readPngToRgba() 接上 lodepng（当前 LV_USE_PNG=0 让 LVGL
          * 不链入 lodepng.c.o，链接失败；可考虑 LV_USE_PNG=1 或显式 src/util）。
          */
-        const char *icon_path = Configuration::instance().getProfileIconPath(
+        const bool has_icon = Configuration::instance().isProfileIconPresent(
             p.profile_index);
-        const bool has_icon = SPIFFS.exists(icon_path);
         if (!has_icon)
         {
             ui_KeyMapped_set_profile_icon_image_data(nullptr, 0, 0, 0,
@@ -574,7 +575,6 @@ namespace ekeys
                                                      p.profile_icon);
             ui_KeyMappedSecondary_set_profile_icon_image_data(nullptr, 0, 0, 0,
                                                               p.profile_icon);
-            (void)icon_path;
         }
 
         for (uint8_t i = 0; i < 11; ++i)

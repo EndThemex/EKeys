@@ -124,6 +124,19 @@ namespace ekeys
         const char *getProfileIconPath(uint8_t idx) const;
 
         /*
+         * Profile 自定义图标存在性缓存（/icon{N}.png）。
+         * 图标文件只在 0x11 上传/清除时变化（唯一写入口在 cmd_profile.cpp），
+         * load() 时全量探测一次入缓存，之后 0x07/0x10/DisplayTask 均读缓存，
+         * 不再碰 SPIFFS——连接窗口的协议处理器零 flash 访问（SPIFFS.stat
+         * 在大分区/文件多时单次可达百 ms 级，0x10 原 9 次 exists 是
+         * 连接握手慢的主因之一）。
+         * 线程安全：写侧仅 MainTask（0x11 处理），读侧 MainTask + DisplayTask，
+         * 单字节 bool 对齐读写天然原子，无需持锁（同 g_active_screen_tag 约定）。
+         */
+        bool isProfileIconPresent(uint8_t idx) const;
+        void setProfileIconPresent(uint8_t idx, bool present);
+
+        /*
          * Profile 名称（APP 下发，UTF-8 中文，持久化到 config.ini
          * [profile] 节 profile_name_N）。idx 0~7。
          * - setProfileNameInMemory：name 为空串表示清除，回退内置符号名；
@@ -157,6 +170,8 @@ namespace ekeys
         char icon_paths_[CONFIG_PROFILE_COUNT][16];
         /* APP 下发的 profile 名称（UTF-8，空串=未设置，回退内置符号名） */
         char profile_names_[CONFIG_PROFILE_COUNT][kProfileNameMaxLen];
+        /* /icon{N}.png 存在性缓存（见 isProfileIconPresent 注释） */
+        bool icon_exists_[CONFIG_PROFILE_COUNT];
     };
 
 } // namespace ekeys

@@ -38,9 +38,17 @@ namespace ekeys::protocol::commands
                 Configuration::instance().getProfileIconPath(profile);
             if (!SPIFFS.exists(path))
             {
-                return true; // 幂等：本就不存在
+                /* 幂等：本就不存在 */
+                Configuration::instance().setProfileIconPresent(profile, false);
+                return true;
             }
-            return SPIFFS.remove(path);
+            const bool ok = SPIFFS.remove(path);
+            if (ok)
+            {
+                /* 同步图标存在性缓存（运行期唯一写入口） */
+                Configuration::instance().setProfileIconPresent(profile, false);
+            }
+            return ok;
         }
 
         bool saveProfileIconFromBase64(uint8_t profile, const char *png_base64)
@@ -89,6 +97,11 @@ namespace ekeys::protocol::commands
             const size_t written = f.write(png, decoded);
             f.close();
             free(png);
+            if (written == decoded)
+            {
+                /* 同步图标存在性缓存（运行期唯一写入口） */
+                Configuration::instance().setProfileIconPresent(profile, true);
+            }
             LOG_INFO("PROFILE", "icon saved to %s (%u bytes)",
                      path, static_cast<unsigned>(written));
             return written == decoded;
@@ -96,8 +109,8 @@ namespace ekeys::protocol::commands
 
         bool profileIconExists(uint8_t profile)
         {
-            return SPIFFS.exists(
-                Configuration::instance().getProfileIconPath(profile));
+            /* 读缓存，不再碰 SPIFFS（见 Configuration::isProfileIconPresent） */
+            return Configuration::instance().isProfileIconPresent(profile);
         }
 
         int handleProfileState(int cmd, int seq, JsonObject /*data*/)
@@ -179,8 +192,12 @@ namespace ekeys::protocol::commands
         Configuration &config = Configuration::instance();
         config.snapshot(snap);
         const uint8_t active = snap.active_keymap_profile;
-        const bool has_icon =
-            SPIFFS.exists(config.getProfileIconPath(active));
+        /*
+         * 图标存在性读内存缓存（2026-09-12 优化）：原 9 次 SPIFFS.exists
+         * 在大分区/文件多时单次可达百 ms 级，是连接握手 0x10 响应 ~2s 的
+         * 主因之一；缓存仅在 0x11 上传/清除时由写入口同步，此处零 flash 访问。
+         */
+        const bool has_icon = config.isProfileIconPresent(active);
 
         JsonDocument doc;
         doc["cmd"] = CMD_PROFILE_STATE;
@@ -208,7 +225,7 @@ namespace ekeys::protocol::commands
             p["profile_number"] = i + 1;
             p["profile_name"] = config.getProfileDisplayName(i);
             p["is_custom_name"] = config.isProfileNameCustom(i);
-            const bool custom_icon = SPIFFS.exists(config.getProfileIconPath(i));
+            const bool custom_icon = config.isProfileIconPresent(i);
             p["has_custom_icon"] = custom_icon;
             if (custom_icon)
             {

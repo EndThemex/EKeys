@@ -22,7 +22,6 @@
 #include "logging/LogManager.h"
 #include "message_types.h"
 #include "network/WiFiManager.h"
-#include "services/ConfigStore.h"
 #include "tasks/DisplayTask.h"
 #include "../CommandRegistry.h"
 #include "../SerialProtocol.h"
@@ -71,8 +70,9 @@ namespace ekeys::protocol::commands
             cfg["active_keymap_profile"] = profile;
             cfg["active_profile_name"] =
                 Configuration::instance().getProfileDisplayName(profile);
+            /* 读内存缓存，连接窗口零 flash 访问（同 sendProfileState） */
             cfg["active_profile_has_custom_icon"] =
-                ConfigStore::exists(Configuration::instance().getProfileIconPath(profile));
+                Configuration::instance().isProfileIconPresent(profile);
 
             SerialProtocol::instance().sendDocument(doc);
         }

@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include <SimpleIni.h>
+#include <SPIFFS.h>
 #include <lvgl.h> // LV_SYMBOL_*
 
 #include "logging/LogManager.h"
@@ -97,6 +98,7 @@ namespace ekeys
             snprintf(icon_paths_[i], sizeof(icon_paths_[i]), kIconPathFmt,
                      static_cast<unsigned>(i) + 1U);
             profile_names_[i][0] = '\0';
+            icon_exists_[i] = false;
         }
 
         mutex_ = xSemaphoreCreateMutex();
@@ -131,6 +133,16 @@ namespace ekeys
         lock();
         loadGlobalSettings_locked();
         unlock();
+
+        /*
+         * 图标存在性缓存全量探测（SPIFFS 已由 main.cpp 提前挂载）。
+         * 仅启动时一次 9 次 exists，运行期 0x07/0x10/DisplayTask 读缓存，
+         * 连接窗口协议处理器零 flash 访问。
+         */
+        for (uint8_t i = 0; i < CONFIG_PROFILE_COUNT; ++i)
+        {
+            icon_exists_[i] = SPIFFS.exists(icon_paths_[i]);
+        }
     }
 
     void Configuration::loadGlobalSettings_locked()
@@ -530,6 +542,21 @@ namespace ekeys
         LOG_INFO("CONFIG", "profile_name_%u set to \"%s\"",
                  static_cast<unsigned>(idx), profile_names_[idx]);
         return true;
+    }
+
+    bool Configuration::isProfileIconPresent(uint8_t idx) const
+    {
+        return icon_exists_[idx < CONFIG_PROFILE_COUNT ? idx : 0];
+    }
+
+    void Configuration::setProfileIconPresent(uint8_t idx, bool present)
+    {
+        if (idx >= CONFIG_PROFILE_COUNT)
+        {
+            return;
+        }
+        /* 单字节写，读侧（MainTask/DisplayTask）原子可见，见头文件注释 */
+        icon_exists_[idx] = present;
     }
 
 } // namespace ekeys
