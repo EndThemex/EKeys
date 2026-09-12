@@ -45,9 +45,13 @@
  * 避免静态数组占内部 RAM（ASR TLS 握手需要 ~35KB 内部堆，见 LvglPort 双缓冲教训）。
  * 2026-09-11：UI 增至 11 屏（新增 AudioScreen）后 48KB 池耗尽，启动时
  * lv_obj_create 收到 NULL 直接解引用崩溃（EXCVADDR 0x22），扩到 64KB。
+ * 2026-09-13：13 屏常驻对象逼近 64KB（唱片二级页 ~30 对象 + 音效二级页重构），
+ * 音乐二级页渲染的瞬时分配（circle mask 缓冲/渐变 map）OOM → LV_ASSERT_MALLOC
+ * 的 while(1) 死循环 → IDLE0 饿死 → WDT abort（backtrace 恒停在 circ_calc_aa4
+ * 的 lv_mem_alloc 行，同栈复现 3 次）。扩到 128KB；水位监控见 DisplayTask::run。
  * 池分配源实现见 src/display/LvglMemPool.c。 */
 #define LV_MEM_CUSTOM      0
-#define LV_MEM_SIZE        (64U * 1024U)
+#define LV_MEM_SIZE        (128U * 1024U)
 #define LV_MEM_BUF_MAX_NUM 16
 #define LV_MEM_POOL_ALLOC(size) lvgl_pool_alloc(size)
 #include "LvglMemPool.h"

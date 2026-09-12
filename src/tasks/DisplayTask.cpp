@@ -152,17 +152,27 @@ namespace ekeys
     {
         uint32_t last = millis();
 
-        /* SquareLine UI：一次性创建 11 屏 */
+        /* SquareLine UI：一次性创建 13 屏（ui_init 全部常驻，切屏不销毁） */
         ui_init();
 
-        /* 池水位快照（一次性）：11 屏全建完后 LVGL 池的用量与碎片率，
-         * 用于发现"加屏耗尽 LV_MEM_SIZE"类问题（2026-09-11 启动崩溃根因） */
+        /*
+         * LVGL 池水位监控（每 30s，首轮立即打）：13 屏对象全部常驻于
+         * lv_conf.h LV_MEM_SIZE 的 PSRAM 池，2026-09-11（48KB 启动崩）与
+         * 2026-09-12（64KB，音乐二级页渲染瞬时分配 OOM → LV_ASSERT_MALLOC
+         * while(1) → IDLE0 饿死 WDT abort）两次耗尽后保留水位日志，
+         * 用于在下次爆池前发现增长苗头。
+         */
         {
-            lv_mem_monitor_t mon;
-            lv_mem_monitor(&mon);
-            LOG_INFO("DISP", "LVGL pool: used %u/%u, frag %u%%",
-                     (unsigned)(mon.total_size - mon.free_size),
-                     (unsigned)mon.total_size, (unsigned)mon.frag_pct);
+            static uint32_t s_last_pool_log_ms = 0;
+            if ((uint32_t)(millis() - s_last_pool_log_ms) >= 30000)
+            {
+                s_last_pool_log_ms = millis();
+                lv_mem_monitor_t mon;
+                lv_mem_monitor(&mon);
+                LOG_INFO("DISP", "LVGL pool: used %u/%u, frag %u%%",
+                         (unsigned)(mon.total_size - mon.free_size),
+                         (unsigned)mon.total_size, (unsigned)mon.frag_pct);
+            }
         }
 
         /*
@@ -213,6 +223,14 @@ namespace ekeys
 
             /* 一级页 5s 无操作 → 自动回主页（run() 主循环每帧检查） */
             checkAutoReturn();
+
+            /*
+             * 每轮无条件让出一个 tick：重渲染屏（切屏 init + lv_refr_now 同步整帧、
+             * 频谱每帧重绘）配合同步 SPI flush 会长时间占用 CPU0，唯一的让出点
+             * xQueueReceive 在消息持续到达时立即返回 → IDLE0 被 5s 饿死，
+             * task_wdt abort（2026-09-12 进入音乐二级页崩溃）。
+             */
+            vTaskDelay(1);
         }
     }
 
