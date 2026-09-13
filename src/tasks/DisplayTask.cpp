@@ -153,7 +153,10 @@ namespace ekeys
         uint32_t last = millis();
 
         /* SquareLine UI：一次性创建 13 屏（ui_init 全部常驻，切屏不销毁） */
+        uint32_t t_ui0 = millis();
         ui_init();
+        LOG_INFO("DISP", "ui_init %lu ms, ready at %lu ms uptime",
+                 (unsigned long)(millis() - t_ui0), (unsigned long)millis());
 
         /*
          * LVGL 池水位监控（每 30s，首轮立即打）：13 屏对象全部常驻于

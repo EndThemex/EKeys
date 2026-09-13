@@ -3,9 +3,9 @@
  *
  * 阶段 03 启动顺序（SPIFFS 由 main.cpp 提前挂载）：
  *   1) 创建 KeymapRepository 并注入 Configuration 单例
- *   2) 键盘后端（USB CDC 等）
- *   3) MainTask.begin()（内部 Configuration::load() → resolver 加载键映射）
- *   4) DisplayTask.begin()（run() 内 ui_init() 创建 11 屏）
+ *   2) MainTask.begin()（内部 Configuration::load() → resolver 加载键映射）
+ *   3) DisplayTask.begin()（run() 内 ui_init() 创建 13 屏，Core 0 并行渲染）
+ *   4) 键盘后端（USB CDC / BLE，BLE init 阻塞期间 UI 已在渲染）
  */
 
 #include "AppContext.h"
@@ -42,6 +42,18 @@ namespace ekeys
 
         main_task_.begin(); // 内部 Configuration::load()
 
+        /*
+         * 启动提速（2026-09-13 黑屏优化）：
+         * DisplayTask（Core 0）立刻开始 ui_init() 建 13 屏 + 首帧渲染，
+         * 与 Core 1 上 setup() 的后续串行步骤并行——尤其是 BLE 模式下
+         * BLEDevice::init 会阻塞 1~3s，此前 UI 排在其后才启动，
+         * 开机黑屏要等满这几秒。
+         * 依赖检查：此刻 SPIFFS 已挂载、Configuration::load 已完成
+         * （run() 启动快照读配置）、AudioPad 已 load。
+         */
+        DisplayTask::instance().begin();
+        main_task_.setDisplayQueue(DisplayTask::instance().queueHandle());
+
         /* F1 修复：按加载后的 work_mode 选择键盘后端，
          * 避免 BLE/2.4G 模式下重启仍为 USB。 */
         {
@@ -67,15 +79,6 @@ namespace ekeys
          */
         SerialProtocol::instance().begin();
         protocol::registration::registerAllCommandHandlers();
-
-        /*
-         * 启动 DisplayTask：其 run() 内部调用 ui_init() 创建 11 屏
-         * （SquareLine 生成的 src/ui），并把队列句柄注入 MainTask。
-         */
-        DisplayTask::instance().begin();
-
-        /* F1 修复：键盘已按 work_mode 创建；DisplayTask 仅补注入队列句柄 */
-        main_task_.setDisplayQueue(DisplayTask::instance().queueHandle());
 
         LOG_INFO("APP", "AppContext initialized");
     }
