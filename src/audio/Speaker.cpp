@@ -9,6 +9,7 @@
 #include <Arduino.h>
 #include <Audio.h>
 #include <SPIFFS.h>
+#include <driver/i2s.h>
 
 #include "hardware/PinMap.h"
 #include "logging/LogManager.h"
@@ -17,9 +18,53 @@
 namespace ekeys {
 
 namespace {
-/* 淡入时长：覆盖 MP3 首帧解码伪影 / 采样率切换瞬态（几十 ms 量级），
- * 又短到人耳不会察觉是"渐入"。 */
-constexpr uint32_t kRampDurationMs = 150;
+
+/*
+ * 空闲静音泵（消除冷启动开头"呲"声，2026-09-13）：
+ *
+ * 现象：上一段播放结束并空闲一段时间后再触发播放，开头必有一声"呲"；
+ *       不等播放完毕就触发下一段（I2S DMA 链从未空闲）则无此声。
+ *       此前的 150ms 音量淡入完全无效——库内 volumetable[0]=0，vol=0
+ *       是真静音，说明爆音根本不在数字样本域，淡入方向从根上就错。
+ *
+ * 根因：库从不调用 i2s_stop，BCLK 常开；但播放结束后 TX DMA 描述符链
+ *       （16×512 帧）耗尽进入 done/idle 态。下次播放的第一笔 i2s_write
+ *       重启 DMA 链，BCLK/LRCLK 时序毛刺被 MAX98357 解析成垃圾帧 →
+ *       模拟域爆音，任何数字音量处理都压不住。热启动（连续播放）时
+ *       链从未空闲，无重启毛刺，所以干净。
+ *
+ * 对策：非播放期按实时节奏持续向 I2S 写零样本，让描述符链永不空闲，
+ *       冷启动在 I2S 层面与热启动完全一致。每 tick 写 rate/180 帧
+ *       （略超实时 ~11% 保证永不欠载），超出实时部分由 i2s_write 阻塞
+ *       吸收（≤0.6ms/tick，与播放期阻塞同级）。副作用：暂停后恢复时
+ *       内容需排空 DMA 内最多 ~186ms 的零样本，恢复略迟滞，可接受。
+ */
+constexpr uint32_t kSilencePumpDenom = 180;
+constexpr size_t kSilencePumpMaxFrames = 288; /* 48kHz/180 ≈ 267 帧，留余量 */
+
+int16_t s_silenceBuf[kSilencePumpMaxFrames * 2]; /* 立体声帧，静态零初始化 */
+
+void pumpSilence(i2s_port_t port, uint32_t sample_rate)
+{
+    if (sample_rate == 0)
+    {
+        sample_rate = 16000; /* Audio 库 driver_install 的默认采样率 */
+    }
+    size_t frames = sample_rate / kSilencePumpDenom;
+    if (frames < 1)
+    {
+        frames = 1;
+    }
+    else if (frames > kSilencePumpMaxFrames)
+    {
+        frames = kSilencePumpMaxFrames;
+    }
+    size_t written = 0;
+    /* 20ms 超时防异常长阻塞；正常时 DMA 有余量立即入队返回 */
+    i2s_write(port, s_silenceBuf, frames * 2 * sizeof(int16_t),
+              &written, pdMS_TO_TICKS(20));
+}
+
 }  // namespace
 
 Speaker &Speaker::instance()
@@ -40,8 +85,6 @@ void Speaker::begin()
     auto *audio = new Audio(false, 3, I2S_NUM_1);
     audio->setPinout(kPinI2sBclkSpeaker, kPinI2sLrclkSpeaker, kPinI2sDataSpeaker);
     audio->setVolume(12);  // 默认中等音量（0~21）
-    target_volume_ = 12;
-    ramping_ = false;  // end() 重建后不残留旧淡入状态
     impl_ = audio;
     inited_ = true;
     LOG_INFO("SPK", "MAX98357 ready (bclk=%u lrc=%u dout=%u)",
@@ -50,37 +93,20 @@ void Speaker::begin()
 
 void Speaker::loop()
 {
-    if (inited_)
-    {
-        tickVolumeRamp();
-        static_cast<Audio *>(impl_)->loop();
-    }
-}
-
-void Speaker::startVolumeRamp()
-{
-    Audio *audio = static_cast<Audio *>(impl_);
-    audio->setVolume(0);
-    ramp_start_ms_ = millis();
-    ramping_ = true;
-}
-
-void Speaker::tickVolumeRamp()
-{
-    if (!ramping_)
+    if (!inited_)
     {
         return;
     }
-    uint32_t elapsed = millis() - ramp_start_ms_;
-    if (elapsed >= kRampDurationMs)
+    Audio *audio = static_cast<Audio *>(impl_);
+    if (audio->isRunning())
     {
-        ramping_ = false;
-        static_cast<Audio *>(impl_)->setVolume(target_volume_);
+        audio->loop();
     }
     else
     {
-        static_cast<Audio *>(impl_)->setVolume(
-            static_cast<uint8_t>(target_volume_ * elapsed / kRampDurationMs));
+        /* 空闲静音泵：保持 TX DMA 链活跃（见文件头静音泵说明）。
+         * 采样率跟随库内保留值（上次播放的速率 / 首播前 16000）。 */
+        pumpSilence(I2S_NUM_1, audio->getSampleRate());
     }
 }
 
@@ -107,14 +133,6 @@ void Speaker::SetVolume(uint8_t volume_0_21)
     {
         volume_0_21 = 21;
     }
-    if (ramping_)
-    {
-        /* 淡入进行中：只更新目标值，淡入结束自动落到新目标，
-         * 直接打断爬升会产生音量跳变。 */
-        target_volume_ = volume_0_21;
-        return;
-    }
-    target_volume_ = volume_0_21;
     static_cast<Audio *>(impl_)->setVolume(volume_0_21);
 }
 
@@ -142,12 +160,7 @@ bool Speaker::PlayRemoteAudio(const char *url)
         begin();
     }
     LOG_INFO("SPK", "remote: %s", url);
-    bool ok = static_cast<Audio *>(impl_)->connecttohost(url);
-    if (ok)
-    {
-        startVolumeRamp();  /* 压掉流启动瞬态（本地/网络同样适用） */
-    }
-    return ok;
+    return static_cast<Audio *>(impl_)->connecttohost(url);
 }
 
 bool Speaker::PlayLocalAudio(const char *path)
@@ -172,12 +185,7 @@ bool Speaker::PlayLocalAudio(const char *path)
         return false;
     }
     LOG_INFO("SPK", "local: %s", path);
-    bool ok = static_cast<Audio *>(impl_)->connecttoFS(SPIFFS, path);
-    if (ok)
-    {
-        startVolumeRamp();  /* 抑制 MP3 开头轻微电流音（首帧解码伪影/瞬态） */
-    }
-    return ok;
+    return static_cast<Audio *>(impl_)->connecttoFS(SPIFFS, path);
 }
 
 void Speaker::Pause()
@@ -200,7 +208,6 @@ void Speaker::Stop()
 {
     if (inited_)
     {
-        ramping_ = false;  /* 停止即取消淡入，否则 SetVolume 会被悬空延迟 */
         static_cast<Audio *>(impl_)->stopSong();
     }
 }
