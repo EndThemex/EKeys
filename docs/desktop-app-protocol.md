@@ -295,8 +295,12 @@ App 应始终按 `cmd`、`seq`、`status` 解析，不要依赖响应字段的�
 | `0x0F` | `CMD_MUSIC_CONTROL`    | 固件 → App | 发送函数已实现 | 推送上一首、播放/暂停、下一首 |
 | `0x10` | `CMD_PROFILE_STATE`    | 双向       | 已接通         | 查询或推送当前 Profile        |
 | `0x11` | `CMD_PROFILE_ICON_SET` | App → 固件 | 已接通         | 上传或删除 Profile 图标       |
-| `0x12` | `CMD_HA_STATUS`        | 固件 → App | 仅定义         | 预留的 HA 状态推送            |
-| `0x13` | `CMD_TIME_SET`         | App → 固件 | 已接通         | 写入系统时间（epoch + tz）    |
+| `0x12` | `CMD_HA_STATUS`        | 主控→App | 仅定义         | 预留的 HA 状态推送（当前仅本机屏消费） |
+| `0x13` | `CMD_TIME_SET`         | App→主控 | 已接通         | 写入系统时间（epoch + tz）    |
+| `0x14` | `CMD_FIRMWARE_DOWNLOAD`| App→主控 | 已接通         | 复位进 USB 下载模式（烧录）   |
+| `0x15` | `CMD_PROFILE_NAME_SET` | App→主控 | 已接通         | 设置/清除 Profile 名称（UTF-8 中文） |
+| `0x16` | `CMD_AUDIO_FILE`       | App→主控 | 已接通         | 音效文件管理（data.op 分发）  |
+| `0x17` | `CMD_AUDIO_PAD`        | App→主控 | 已接通         | 音效板绑定与播放（data.op 分发） |
 
 命令注册表最多支持 64 个命令，使用 FreeRTOS 临界区保护，见 [CommandRegistry.h](../src/protocol/CommandRegistry.h#L28-L63)。
 
@@ -583,11 +587,183 @@ App 应始终按 `cmd`、`seq`、`status` 解析，不要依赖响应字段的�
 
 实现见 [cmd_firmware.cpp](../src/protocol/commands/cmd_firmware.cpp#L83-L121)。OTA 前应确保 `url` 可被 ESP32 访问，且本地局域网或服务器允许下载。
 
+### 6.6 复位进 USB 下载模式：`0x14`
+
+App 可远程让主控立即重启进入 USB 烧录模式（无需按 BOOT 键）：
+
+```json
+{ "cmd": 14, "seq": 1, "data": {} }
+```
+
+固件先回 `cmd=0x94` 成功响应，再延迟数百毫秒后调用 `esp_restart()` 拉低 GPIO0 并复位。App 收到响应后可立即通过 USB CDC 重新枚举并执行 `pio run -t upload`。
+
+实现见 [cmd_firmware.cpp](../src/protocol/commands/cmd_firmware.cpp)。
+
+### 6.7 Profile 名称（UTF-8 中文）：`0x15`
+
+设置或清除指定 Profile 的显示名：
+
+```json
+{
+  "cmd": 21,
+  "seq": 1,
+  "data": {
+    "profile": 0,
+    "name": "剪辑"
+  }
+}
+```
+
+字段：
+
+| 字段      | 类型    | 必填 | 说明                                                           |
+| --------- | ------- | ---- | -------------------------------------------------------------- |
+| `profile` | integer | 否   | Profile 索引 0~7；省略时使用当前激活 Profile                  |
+| `name`    | string  | 是   | 名称字符串；空串 = 清除自定义名（恢复 LVGL 内置符号）        |
+
+成功响应：
+
+```json
+{
+  "cmd": 149,
+  "seq": 1,
+  "status": 0,
+  "data": {
+    "profile": 0,
+    "profile_number": 1,
+    "profile_name": "剪辑",
+    "is_custom_name": true
+  }
+}
+```
+
+实现见 [cmd_profile.cpp](../src/protocol/commands/cmd_profile.cpp#L238-L307)。
+
+### 6.8 系统时间注入：`0x13`
+
+把桌面 App 持有的系统时间注入主控，替代或优先于 NTP 同步：
+
+```json
+{
+  "cmd": 19,
+  "seq": 1,
+  "data": {
+    "epoch": 1757236200,
+    "tz": "CST-8"
+  }
+}
+```
+
+字段：
+
+- `epoch`：自 `1970-01-01 00:00:00 UTC` 起的秒数，整数；必填
+- `tz`：POSIX TZ 字符串（如 `CST-8`、`UTC`），可选；省略或空字符串保持当前 TZ（默认 `CST-8`）
+
+行为：
+
+- 主控调用 `settimeofday()` 写入系统时间，`setenv("TZ", ...)` 切换时区；
+- 写入后立即标记 `synced_ = true`，下一 1s tick 主屏刷新时间（`HH:MM:SS`）+ 日期（`MMM DD`，例如 `SEP 07`）+ 星期缩写（`MON`/`TUE`/.../`SUN`）；
+- 若 NTP 同步尚未完成，写入即生效；若 NTP 已同步，请求后 SNTP 后续仍可能再次校时，行为可接受；
+- `epoch` 缺失时返回 `status: 1, error: "missing 'epoch'"`。
+
+实现见 [cmd_time.cpp](../src/protocol/commands/cmd_time.cpp) 与 [NtpSync.cpp](../src/network/NtpSync.cpp#L52-L79)。
+
 ---
 
-## 7. 键映射、Profile 和图标
+## 7. 音效板（Sound Pad）
 
-### 7.1 键映射：`0x05/0x06`
+`CMD_AUDIO_FILE` (0x16) 与 `CMD_AUDIO_PAD` (0x17) 是配套命令：0x16 管理 SPIFFS 上的音频文件，0x17 管理 11 键绑定与播放控制。
+
+### 7.1 文件管理：`0x16`
+
+按 `data.op` 分发：
+
+| `op`       | 请求 `data`              | 响应 `data`                                              |
+| ---------- | ------------------------ | -------------------------------------------------------- |
+| `list`     | —                        | `files:[{name,size}]`（≤64 条）、`total_bytes/used_bytes/free_bytes` |
+| `begin`    | `{name, size}`           | ack；校验后创建 `/name.part`                             |
+| `data`     | `{name, index, b64}`     | `{received:N}`；1024 B / 块（base64 后 ~1.4 KB < 2048 行缓冲） |
+| `end`      | `{name, size}`           | 校验大小一致 → `SPIFFS.rename(.part → 终名)` 原子提交 → 回 `free_bytes` |
+| `abort`    | `{name}`                 | 删 `.part`（App 取消 / 失败回滚）                        |
+| `delete`   | `{name}`                 | 删终名；先清绑定表中引用该文件的键 → `{pads:[{key,file}], free_bytes}` |
+
+约束（固件侧强校验）：
+
+- 文件名白名单 `^[a-z0-9_]{1,20}\.(mp3|wav)$`，存 SPIFFS **根目录**
+- 单文件 ≤ 2 MB；`begin` 时校验 `free_bytes ≥ size + 64 KB headroom`
+- 上传互斥：同一时刻仅一个 in_progress；正在播放的同名文件拒绝 `delete`
+
+### 7.2 绑定与播放：`0x17`
+
+| `op`   | 请求 `data`            | 响应 `data`                                                |
+| ------ | ---------------------- | ---------------------------------------------------------- |
+| `get`  | —                      | `pads:[{key, file}]`（11 键全量，空绑定 `""`）            |
+| `set`  | `{key, file}`          | 单键即改即发，`file:""` 清除；先 ACK 再落盘 → `{key, file}` |
+| `play` | `{key}` 或 `{file}`    | 立即 ACK（试播不亮键位高亮）                               |
+| `stop` | —                      | ACK                                                        |
+
+字段：
+
+- `key`：1~11；省略时按 `file` 试播
+- `file`：文件名（不含路径），白名单同 0x16；空串清除
+
+### 7.3 报文示例
+
+列出文件：
+
+```json
+{ "cmd": 22, "seq": 1, "data": { "op": "list" } }
+```
+
+```json
+{
+  "cmd": 150,
+  "seq": 1,
+  "status": 0,
+  "data": {
+    "files": [
+      { "name": "kick.mp3", "size": 24576 },
+      { "name": "coin2.wav", "size": 8192 }
+    ],
+    "total_bytes": 4055040,
+    "used_bytes": 32768,
+    "free_bytes": 4022272
+  }
+}
+```
+
+分块上传 1024 B（base64 内嵌 JSON，索引 `index` 从 0 开始）：
+
+```json
+{
+  "cmd": 22,
+  "seq": 3,
+  "data": {
+    "op": "data",
+    "name": "kick.mp3",
+    "index": 0,
+    "b64": "SUQzAwAAAAA..."
+  }
+}
+```
+
+设置键 1 绑定：
+
+```json
+{
+  "cmd": 23,
+  "seq": 1,
+  "data": { "op": "set", "key": 1, "file": "kick.mp3" }
+}
+```
+
+实现见 [cmd_audio.cpp](../src/protocol/commands/cmd_audio.cpp)。
+
+---
+
+## 8. 键映射、Profile 和图标
+
+### 8.1 键映射：`0x05/0x06`
 
 #### 查询键映射
 
@@ -737,7 +913,7 @@ FUN 键在设备端「设置二级页 → FUN键 1 / FUN键 2」或 `0x06` 的
 
 实现见 [cmd_keymap.cpp](../src/protocol/commands/cmd_keymap.cpp#L83-L185)。
 
-### 7.2 Profile 状态：`0x10`
+### 8.2 Profile 状态：`0x10`
 
 App 查询当前 Profile：
 
@@ -770,7 +946,7 @@ App 查询当前 Profile：
 
 实现见 [cmd_profile.cpp](../src/protocol/commands/cmd_profile.cpp#L171-L193)。App 端应按命令名称识别，不要把所有响应都按 `cmd | 0x80` 解析。
 
-### 7.3 Profile 图标：`0x11`
+### 8.3 Profile 图标：`0x11`
 
 上传图标：
 
@@ -820,9 +996,9 @@ App 查询当前 Profile：
 
 ---
 
-## 8. 心跳、状态和音乐
+## 9. 心跳、状态和音乐
 
-### 8.1 心跳：`0x0A`
+### 9.1 心跳：`0x0A`
 
 App 定时发送：
 
@@ -851,7 +1027,7 @@ App 定时发送：
 3. `timestamp` 是设备开机后的 `millis()`，可用于粗略判断设备是否重启；
 4. 固件不会主动周期发送心跳。
 
-### 8.2 PC 状态：`0x0D`
+### 9.2 PC 状态：`0x0D`
 
 推送 PC 状态到设备：
 
@@ -902,7 +1078,7 @@ App 定时发送：
 
 实现见 [cmd_pc_status.cpp](../src/protocol/commands/cmd_pc_status.cpp#L31-L78)。
 
-### 8.3 音乐状态：`0x0E`
+### 9.3 音乐状态：`0x0E`
 
 App 推送播放器状态：
 
@@ -931,7 +1107,7 @@ App 推送播放器状态：
 
 固件将毫秒进度转换为秒后更新音乐屏。实现见 [cmd_music.cpp](../src/protocol/commands/cmd_music.cpp#L60-L95)。
 
-### 8.4 音乐控制：`0x0F`
+### 9.4 音乐控制：`0x0F`
 
 固件端协议函数定义的动作格式为：
 
@@ -955,7 +1131,7 @@ App 推送播放器状态：
 
 实现位于 [SerialProtocol.cpp](../src/protocol/SerialProtocol.cpp#L170-L178)。目前没有找到 UI 事件到 `sendMusicControl()` 的实际调用链，因此桌面 App 可以按该格式解析，但当前不能依赖设备端一定发送此消息。
 
-### 8.5 语音文本：`0x0C`
+### 9.5 语音文本：`0x0C`
 
 语音识别得到文本后，固件主动推送：
 
@@ -972,9 +1148,9 @@ App 推送播放器状态：
 
 ---
 
-## 9. 已定义但当前未接通的命令
+## 10. 已定义但当前未接通的命令
 
-### 9.1 `CMD_KEY_EVENT`：`0x09`
+### 10.1 `CMD_KEY_EVENT`：`0x09`
 
 命令 ID 已在协议头文件中定义，但当前源码没有实现 `CMD_KEY_EVENT` 序列化发送。
 
@@ -986,7 +1162,7 @@ App 推送播放器状态：
 
 物理按键目前主要走本机 HID/UI 路径。
 
-### 9.2 `CMD_HA_STATUS`：`0x12`
+### 10.2 `CMD_HA_STATUS`：`0x12`
 
 命令 ID 已定义，但当前 `MainTask` 只是将 HA 状态聚合为 `DisplayMessageType::HaStatus` 刷新本机 UI，尚未转换为 `cmd=0x12` 协议帧发送给桌面 App。
 
@@ -996,44 +1172,15 @@ App 推送播放器状态：
 - [`NetDiagnostics.cpp`](../src/network/NetDiagnostics.cpp#L19-L47)
 - [`message_types.h`](../src/message_types.h#L62-L76)
 
-### 9.3 Profile 图标尺寸校验
+### 10.3 Profile 图标尺寸校验
 
 `0x11` 注释中描述了 `48×48 PNG`，但当前协议处理代码只做 Base64 解码和文件写入，没有尺寸校验。App 应自行保证图片格式和大小。
 
-### 9.4 系统时间注入：`0x13`
-
-把桌面 App 持有的系统时间注入主控，替代或优先于 NTP 同步：
-
-```json
-{
-  "cmd": 19,
-  "seq": 1,
-  "data": {
-    "epoch": 1757236200,
-    "tz": "CST-8"
-  }
-}
-```
-
-字段：
-
-- `epoch`：自 `1970-01-01 00:00:00 UTC` 起的秒数，整数；必填
-- `tz`：POSIX TZ 字符串（如 `CST-8`、`UTC`），可选；省略或空字符串保持当前 TZ（默认 `CST-8`）
-
-行为：
-
-- 主控调用 `settimeofday()` 写入系统时间，`setenv("TZ", ...)` 切换时区；
-- 写入后立即标记 `synced_ = true`，下一 1s tick 主屏刷新时间（`HH:MM:SS`）+ 日期（`MMM DD`，例如 `SEP 07`）+ 星期缩写（`MON`/`TUE`/.../`SUN`）；
-- 若 NTP 同步尚未完成，写入即生效；若 NTP 已同步，请求后 SNTP 后续仍可能再次校时，行为可接受；
-- `epoch` 缺失时返回 `status: 1, error: "missing 'epoch'"`。
-
-实现见 [cmd_time.cpp](../src/protocol/commands/cmd_time.cpp) 与 [NtpSync.cpp](../src/network/NtpSync.cpp#L52-L79)。
-
 ---
 
-## 10. 桌面 App 接入流程
+## 11. 桌面 App 接入流程
 
-### 10.1 USB 方式
+### 11.1 USB 方式
 
 推荐流程：
 
@@ -1049,7 +1196,7 @@ App 推送播放器状态：
 9. 监听 0x0C 等主动消息
 ```
 
-### 10.2 WiFi/TCP 方式
+### 11.2 WiFi/TCP 方式
 
 推荐流程：
 
@@ -1071,7 +1218,7 @@ App 端的离线/重连行为要点（与 §2.2 重连状态机对应）：
 - TCP 断开后，App 只需保持 `TCP 30000` 监听 + 继续应答 `FUNKEYBOARD_DISCOVER`，由固件侧 `TcpChannel` / `WiFiManager` 自动恢复；
 - 心跳连续失败并不立即触发任何固件端动作；App 在判定离线后建议降低心跳频率或暂停一段时间再恢复探测，避免在 WiFi 重连窗口期反复发起请求。
 
-### 10.3 请求/响应匹配
+### 11.3 请求/响应匹配
 
 App 建议为每个请求生成唯一自增的 `seq`，并维护待响应队列：
 
@@ -1087,7 +1234,7 @@ App 建议为每个请求生成唯一自增的 `seq`，并维护待响应队列�
 
 如果 USB 和 TCP 同时在线，固件可能从两条通道各发送一次相同内容。App 端应根据 `seq` 去重，或者只选择一个主动维护的连接。
 
-### 10.4 最小 Python USB 示例
+### 11.4 最小 Python USB 示例
 
 ```python
 import json
@@ -1141,9 +1288,9 @@ with serial.Serial("COM5", 115200, timeout=1) as ser:
 
 ---
 
-## 11. 异常处理和兼容性建议
+## 12. 异常处理和兼容性建议
 
-### 11.1 必须忽略未知字段和未知命令
+### 12.1 必须忽略未知字段和未知命令
 
 协议后续版本可能增加字段。App 应：
 
@@ -1152,15 +1299,15 @@ with serial.Serial("COM5", 115200, timeout=1) as ser:
 - 对未知命令记录日志，不应导致界面崩溃；
 - 不应因为当前没有 `status` 字段就丢弃整个 JSON。
 
-### 11.2 不应依赖固定行长度
+### 12.2 不应依赖固定行长度
 
 App 始终使用 `\n` 分帧，不应假设每条消息固定长度。USB 和 TCP 都是流式连接。
 
-### 11.3 注意日志和协议混流
+### 12.3 注意日志和协议混流
 
 只有以 `{` 开头的行才应进入协议解析器。日志行可能以 `[` 开头，也可能包含 JSON 文本片段，不能简单查找第一个 `{`。
 
-### 11.4 配置和密钥信息
+### 12.4 配置和密钥信息
 
 `CMD_CONFIG_GET` 会返回以下敏感信息：
 
@@ -1170,7 +1317,7 @@ App 始终使用 `\n` 分帧，不应假设每条消息固定长度。USB 和 TC
 
 桌面 App 不应将完整快照写入普通日志，也不要通过不可信局域网长期暴露 TCP 30000。
 
-### 11.5 大帧限制
+### 12.5 大帧限制
 
 当前每帧最大 2048 字节：
 
@@ -1179,7 +1326,7 @@ App 始终使用 `\n` 分帧，不应假设每条消息固定长度。USB 和 TC
 - 当前没有协议分帧机制；
 - 大图传输需要后续改为独立二进制文件通道或增加长度字段/分片协议。
 
-### 11.6 识别命令格式差异
+### 12.6 识别命令格式差异
 
 `0x10 Profile State` 不是标准 `cmd | 0x80` 响应。解析时建议优先判断命令类型，再判断是否存在 `status`：
 
@@ -1194,7 +1341,7 @@ elif frame.get("cmd", 0) & 0x80:
 
 ---
 
-## 12. 当前实现状态和后续建议
+## 13. 当前实现状态和后续建议
 
 当前项目已经具备：
 
@@ -1219,6 +1366,8 @@ elif frame.get("cmd", 0) & 0x80:
 | PC/音乐状态  | 周期性发送 `0x0D` 和 `0x0E`                               |
 | OTA          | 先用 `0x0B` 查询，再携带 URL 和 MD5 触发                  |
 | 语音文本     | 监听主动 `0x0C`                                           |
+| 音效板       | 连接后先 `0x17 get` + `0x16 list`，再分块 `0x16 begin/data/end` 上传，`0x17 set` 绑定 11 键 |
+| 系统时间注入 | 发送 `0x13`（epoch + tz）覆盖或优先于 NTP                 |
 | 设备发现     | 监听 UDP 30001，回复 `FUNKEYBOARD_HERE`，再等待 TCP 30000 |
 
 后续若要完成完整桌面 App 联动，还需要补齐：
@@ -1232,7 +1381,7 @@ elif frame.get("cmd", 0) & 0x80:
 
 ---
 
-## 13. 主要源码索引
+## 14. 主要源码索引
 
 | 内容               | 文件                                                                            |
 | ------------------ | ------------------------------------------------------------------------------- |
@@ -1247,8 +1396,9 @@ elif frame.get("cmd", 0) & 0x80:
 | 键映射             | [`cmd_keymap.cpp`](../src/protocol/commands/cmd_keymap.cpp#L83-L185)            |
 | PC 状态            | [`cmd_pc_status.cpp`](../src/protocol/commands/cmd_pc_status.cpp#L31-L78)       |
 | 音乐状态           | [`cmd_music.cpp`](../src/protocol/commands/cmd_music.cpp#L60-L95)               |
-| Profile 状态和图标 | [`cmd_profile.cpp`](../src/protocol/commands/cmd_profile.cpp#L98-L193)          |
+| Profile 状态、图标、名称 | [`cmd_profile.cpp`](../src/protocol/commands/cmd_profile.cpp)                  |
 | 系统时间注入       | [`cmd_time.cpp`](../src/protocol/commands/cmd_time.cpp)                         |
+| 音效板（文件+绑定+播放） | [`cmd_audio.cpp`](../src/protocol/commands/cmd_audio.cpp) / [`AudioPad.cpp`](../src/audio/AudioPad.cpp) |
 | TCP 通道           | [`TcpChannel.cpp`](../src/network/TcpChannel.cpp#L27-L223)                      |
 | UDP 发现           | [`DiscoveryService.cpp`](../src/network/DiscoveryService.cpp#L22-L145)          |
 | WiFi 管理          | [`WiFiManager.cpp`](../src/network/WiFiManager.cpp#L34-L47)                     |

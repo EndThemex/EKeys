@@ -1,37 +1,26 @@
-# EKeys 任务计划索引
+# EKeys 文档索引
 
-本目录存放从 [`../ARCHITECTURE.md`](../ARCHITECTURE.md) 拆分的实施任务计划。每个阶段对应一份 `NN-xxx.md`，按顺序推进；每完成一项即在该文件中勾选状态。
+本目录汇总 `EKeys` 项目的专题文档，按主题分类。功能总览见 [`../FEATURE_DOC.md`](../FEATURE_DOC.md)；项目结构见 [`../ARCHITECTURE.md`](../ARCHITECTURE.md)；引脚定义见 [`../PINOUT.md`](../PINOUT.md)。
 
-## 阶段列表
+## 文档列表
 
-| 阶段 | 文档                                                             | 目标简述                               | 依赖  |
-| ---- | ---------------------------------------------------------------- | -------------------------------------- | ----- |
-| 01   | [01-minimal-hid.md](./01-minimal-hid.md)                         | 按键矩阵 → USB HID 键盘                | —     |
-| 02   | [02-display-lvgl-port.md](./02-display-lvgl-port.md)             | 把 NV3007 + LVGL 初始化迁出 `main.cpp` | 01    |
-| 03   | [03-config-persistence.md](./03-config-persistence.md)           | SPIFFS + SimpleIni 持久化键映射        | 01    |
-| 04   | [04-protocol-config-sync.md](./04-protocol-config-sync.md)       | 私有协议 `CMD_CONFIG_SET` 同步         | 03    |
-| 05   | [05-ui-screens.md](./05-ui-screens.md)                           | 音乐 / PC 状态 / HA / 设置屏           | 02/04 |
-| 06   | [06-network-voice-rgb-audio.md](./06-network-voice-rgb-audio.md) | WiFi / BLE / 语音 / RGB / 音频         | 04    |
-| 07   | [07-placeholder-completion.md](./07-placeholder-completion.md)   | 2.4G / 频谱 / OTA / 占位命令补齐       | 06    |
+| 文档                                                       | 主题                                                                 |
+| ---------------------------------------------------------- | -------------------------------------------------------------------- |
+| [desktop-app-protocol.md](./desktop-app-protocol.md)       | 桌面 App 通信协议（命令清单、字段、报文示例、连接流程、重连状态机）  |
+| [COMPILING.md](./COMPILING.md)                             | 编译、烧录、SPIFFS 上传、串口监视、擦除 Flash                        |
+| [PROJECT_LAYOUT.md](./PROJECT_LAYOUT.md)                   | 仓库目录速览 / 关键文件 / 文档体系                                   |
+| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)                 | 硬件 / 软件注意事项与常见问题速查                                    |
 
-## 其他文档
+## 项目规则
 
-| 文档 | 说明 |
-| ---- | ---- |
-| [COMPILING.md](./COMPILING.md) | 编译、烧录、SPIFFS 上传、串口监视、擦除 Flash |
-| [PROJECT_LAYOUT.md](./PROJECT_LAYOUT.md) | 仓库目录速览 / 关键文件 / 文档体系 |
-| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | 硬件 / 软件注意事项与常见问题速查 |
-| [desktop-app-protocol.md](./desktop-app-protocol.md) | 桌面 App 开发对接：通信协议、命令与字段约定 |
+长期约束（如引脚定义、UI 输入语义、DisplayTask 路由、SettingScreenSecondary 行为契约、跨任务 `g_active_screen_tag` 原子性等）见 [`../.trae/rules/rules.md`](../.trae/rules/rules.md)。
 
-## 使用方式
+## 阶段任务文档（已归档）
 
-1. 阅读 `../FEATURE_DOC.md` 了解整体功能背景。
-2. 阅读 `../ARCHITECTURE.md` 了解目录结构与模块边界。
-3. 从 `01-` 开始按顺序实现，每完成一项修改对应文件中的复选框 `- [ ]` → `- [x]`。
-4. 阶段性产出（接口变更、行为差异、新增配置项）在该阶段文档的 `变更记录` 小节追加。
+阶段 01 ~ 09 的实施计划与变更记录已并入 [`../FEATURE_DOC.md`](../FEATURE_DOC.md) / [`../ARCHITECTURE.md`](../ARCHITECTURE.md) 的"已完成项"小节，原 `docs/01-` ~ `docs/08-` 阶段文件已归档删除。
 
-## 文件命名规范
+## 文档维护约定
 
-- `NN-阶段名.md`：`NN` 为两位阶段序号；阶段名使用英文短横线连接，全小写。
-- 每个文档内部固定使用以下小节：`目标`、`范围`、`前置条件`、`任务清单`、`验收标准`、`变更记录`、`备注`。
-- 不在本目录放置实现代码或二进制产物，仅保留规划与进度。
+- 改代码后**先**同步对应文档章节，再提交。
+- 新增专题文档：在 `docs/` 添加并在此索引登记。
+- 项目规则变更：仅修改 `../.trae/rules/rules.md`，不在专题文档中重复。
