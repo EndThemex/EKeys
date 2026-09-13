@@ -30,6 +30,15 @@ public:
      */
     void tick(uint32_t elapsed_ms);
 
+    /*
+     * 开机画面（黑底 + 橙色大字 EKeys）：init() 之后立即调用，
+     * 同步渲染一帧上屏，覆盖 SPIFFS 挂载 / 配置加载 / ui_init 建屏
+     * 期间的黑屏窗口。主 UI 由 DisplayTask::run() 内 ui_init() 接管后
+     * 调 clearSplash() 销毁，回收 LVGL 池内存。
+     */
+    void showSplash();
+    void clearSplash();
+
 private:
     LvglPort();
     LvglPort(const LvglPort &) = delete;

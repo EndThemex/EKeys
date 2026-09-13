@@ -278,8 +278,8 @@ namespace ekeys
 
     void MainTask::begin()
     {
-        /* 加载 /config.ini（文件缺失时使用默认值），再加载键映射 */
-        Configuration::instance().load();
+        /* /config.ini 已由 AppContext::init 提前加载（DisplayTask 并行
+         * 启动的前提），这里只取活动配置档索引，随后加载键映射 */
         g_preview_profile_index = Configuration::instance().activeProfile();
 
         scanner_.begin();

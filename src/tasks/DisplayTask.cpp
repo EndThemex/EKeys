@@ -155,6 +155,11 @@ namespace ekeys
         /* SquareLine UI：一次性创建 13 屏（ui_init 全部常驻，切屏不销毁） */
         uint32_t t_ui0 = millis();
         ui_init();
+        /*
+         * 主屏已接管（ui_init 末尾 lv_disp_load_scr(ui_MainScreen)）：
+         * 销毁 main.cpp 阶段渲染的开机画面，回收 LVGL 池内存。
+         */
+        LvglPort::instance().clearSplash();
         LOG_INFO("DISP", "ui_init %lu ms, ready at %lu ms uptime",
                  (unsigned long)(millis() - t_ui0), (unsigned long)millis());
 

@@ -23,12 +23,17 @@
 
 void setup()
 {
+    /*
+     * TinyUSB CDC begin 不阻塞，host 未打开端口（DTR）前日志本就会被
+     * 丢弃，无需 delay 等 CDC 就绪（原 200ms 纯开机浪费，2026-09-13 提速移除）。
+     */
     Serial.begin(115200);
-    delay(200);
 
-    LOG_INFO("MAIN", "===== EKeys boot (stage 06) =====");
+    LOG_INFO("MAIN", "===== EKeys boot (stage 06) t=%lu ms =====", (unsigned long)millis());
 
     ekeys::Backlight::instance().begin();
+    /* 黑屏起点锚点：背光已亮、面板尚未初始化 */
+    LOG_INFO("MAIN", "t=%lu ms backlight on (black screen starts)", (unsigned long)millis());
 
     if (!ekeys::DisplayDriver::instance().begin(40000000))
     {
@@ -39,8 +44,18 @@ void setup()
         }
     }
     ekeys::DisplayDriver::instance().fillScreen(RGB565_BLACK);
+    LOG_INFO("MAIN", "t=%lu ms panel ready", (unsigned long)millis());
 
     ekeys::LvglPort::instance().init();
+    LOG_INFO("MAIN", "t=%lu ms lvgl port ready", (unsigned long)millis());
+
+    /*
+     * 开机画面（黑底 + 橙色大字 EKeys）：面板就绪后立即同步渲染上屏，
+     * 覆盖后续 SPIFFS 挂载 / 配置加载 / ui_init 建屏期间的黑屏窗口。
+     * 主 UI 建好后由 DisplayTask::run() 调 clearSplash() 销毁回收。
+     */
+    ekeys::LvglPort::instance().showSplash();
+    LOG_INFO("MAIN", "t=%lu ms splash shown", (unsigned long)millis());
 
     /*
      * SPIFFS 必须先于 AppContext::init()：
@@ -56,9 +71,11 @@ void setup()
         }
     }
 
+    LOG_INFO("MAIN", "t=%lu ms spiffs mounted", (unsigned long)millis());
+
     ekeys::AppContext::instance().init();
 
-    LOG_INFO("MAIN", "setup completed");
+    LOG_INFO("MAIN", "setup completed at %lu ms", (unsigned long)millis());
 }
 
 void loop()

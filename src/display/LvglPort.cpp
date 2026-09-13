@@ -36,6 +36,44 @@ namespace {
 lv_color_t *buf1 = nullptr;
 lv_color_t *buf2 = nullptr;
 
+/*
+ * 开机画面屏对象（黑底 + 橙色 EKeys）。仅在主 UI 接管前存在，
+ * DisplayTask::run() 内 ui_init() 后由 clearSplash() 销毁，
+ * 不长期占用 LVGL 池（池历史上两次耗尽，见 LvglMemPool 注释）。
+ */
+lv_obj_t *splash_scr = nullptr;
+
+void showSplashImpl()
+{
+    splash_scr = lv_obj_create(NULL);
+    lv_obj_remove_style_all(splash_scr);
+    lv_obj_set_style_bg_color(splash_scr, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(splash_scr, LV_OPA_COVER, 0);
+
+    lv_obj_t *label = lv_label_create(splash_scr);
+    lv_label_set_text(label, "EKeys");
+    lv_obj_set_style_text_color(label, lv_palette_main(LV_PALETTE_ORANGE), 0);
+    lv_obj_set_style_text_font(label, &lv_font_montserrat_48, 0);
+    lv_obj_center(label);
+
+    /* 设为活动屏并同步渲染一帧，立即上屏（不依赖 lv_tick / timer） */
+    lv_scr_load(splash_scr);
+    lv_refr_now(NULL);
+}
+
+void clearSplashImpl()
+{
+    if (splash_scr == nullptr) {
+        return;
+    }
+    lv_obj_t *scr = splash_scr;
+    splash_scr = nullptr;
+    /* 仅在主屏已接管（开机画面非活动屏）时删除，避免悬空 act_scr */
+    if (lv_disp_get_default() != NULL && lv_scr_act() != scr) {
+        lv_obj_del(scr);
+    }
+}
+
 void my_disp_flush(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p)
 {
     uint32_t width  = (area->x2 - area->x1 + 1);
@@ -136,6 +174,19 @@ void LvglPort::init()
 
     lv_disp_drv_register(&disp_drv_);
     inited_ = true;
+}
+
+void LvglPort::showSplash()
+{
+    if (!inited_ || splash_scr != nullptr) {
+        return;
+    }
+    showSplashImpl();
+}
+
+void LvglPort::clearSplash()
+{
+    clearSplashImpl();
 }
 
 void LvglPort::tick(uint32_t elapsed_ms)
