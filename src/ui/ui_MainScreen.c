@@ -4,6 +4,8 @@
 // Project name: SquareLine_Project
 
 #include "ui.h"
+#include "ui_FlipClock.h"
+#include "ui_StatusBar.h" /* 工作模式枚举 WIRED/BLUETOOTH/WIRELESS_2_4G_KEYBOARD_MODE */
 #include <stdint.h>
 
 lv_obj_t *ui_MainScreen = NULL;
@@ -15,17 +17,10 @@ static lv_obj_t *s_ui_MainScreenProfileIconLabel = NULL;
 static lv_obj_t *s_ui_MainScreenProfileIconImage = NULL;
 static lv_obj_t *s_ui_MainScreenProfileName = NULL;
 static lv_obj_t *s_ui_MainScreenHostConnectionIcon = NULL;
+static lv_obj_t *s_ui_MainScreenWorkmodeIcon = NULL;
 static bool s_ui_MainScreenHostConnected = false;
-lv_obj_t *ui_LabelTime = NULL;
 lv_obj_t *ui_LabelData = NULL;
-lv_obj_t *ui_LabelSecond = NULL;
 lv_obj_t *ui_LabelWeek = NULL;
-lv_obj_t *ui_LabelRGBLight = NULL;
-lv_obj_t *ui_LabelTFTLight = NULL;
-lv_obj_t *ui_line1 = NULL;
-lv_obj_t *ui_line2 = NULL;
-lv_obj_t *ui_line3 = NULL;
-lv_obj_t *ui_line5 = NULL;
 
 /*
  * 主页连接状态：只显示图标（已移除 PC LINK / PC STOP 文本）。
@@ -158,92 +153,79 @@ void ui_MainScreen_screen_init(void)
     lv_obj_set_style_bg_color(ui_ButtonExit1, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_ButtonExit1, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    ui_LabelTime = lv_label_create(ui_MainScreen);
-    lv_obj_set_width(ui_LabelTime, LV_SIZE_CONTENT);  /// 1
-    lv_obj_set_height(ui_LabelTime, LV_SIZE_CONTENT); /// 1
-    lv_obj_set_x(ui_LabelTime, -18);
-    lv_obj_set_y(ui_LabelTime, -24);
-    lv_obj_set_align(ui_LabelTime, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_LabelTime, "10:34");
-    lv_obj_set_style_text_color(ui_LabelTime, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(ui_LabelTime, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_LabelTime, &ui_font_BebasNeueFont86, LV_PART_MAIN | LV_STATE_DEFAULT);
+    /* ---------- 中部：翻页时钟（HH:MM 大卡片 + 秒小卡片，见 ui_FlipClock.c） ---------- */
+    ui_FlipClock_create(ui_MainScreen);
+
+    /* ---------- 底部：分隔线 + 图标/日期星期/键盘配置（单行，y 99~142） ---------- */
+    {
+        lv_obj_t *divider = lv_obj_create(ui_MainScreen);
+        lv_obj_remove_style_all(divider);
+        lv_obj_set_pos(divider, 10, 99);
+        lv_obj_set_size(divider, 408, 1);
+        lv_obj_set_style_bg_color(divider, lv_color_hex(0x333333), 0);
+        lv_obj_set_style_bg_opa(divider, LV_OPA_COVER, 0);
+    }
 
     ui_LabelData = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_LabelData, LV_SIZE_CONTENT);  /// 1
     lv_obj_set_height(ui_LabelData, LV_SIZE_CONTENT); /// 1
-    lv_obj_set_x(ui_LabelData, 52);
-    lv_obj_set_y(ui_LabelData, 44);
-    lv_obj_set_align(ui_LabelData, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_LabelData, "09月08日");
+    lv_obj_align(ui_LabelData, LV_ALIGN_TOP_MID, -10, 108);
+    lv_label_set_text(ui_LabelData, "09月14日");
     lv_obj_set_style_text_color(ui_LabelData, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_LabelData, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_LabelData, &ui_font_FontCKJGT24, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    ui_LabelSecond = lv_label_create(ui_MainScreen);
-    lv_obj_set_width(ui_LabelSecond, LV_SIZE_CONTENT);  /// 1
-    lv_obj_set_height(ui_LabelSecond, LV_SIZE_CONTENT); /// 1
-    lv_obj_set_x(ui_LabelSecond, 4);
-    lv_obj_set_y(ui_LabelSecond, -6);
-    lv_obj_align_to(ui_LabelSecond, ui_LabelTime, LV_ALIGN_OUT_RIGHT_BOTTOM, 4, -36);
-    lv_label_set_text(ui_LabelSecond, "56");
-    lv_obj_set_style_text_color(ui_LabelSecond, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(ui_LabelSecond, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_LabelSecond, &ui_font_BebasNeueFont48, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_LabelData, &ui_font_FontCKJGT16, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_LabelWeek = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_LabelWeek, LV_SIZE_CONTENT);  /// 1
     lv_obj_set_height(ui_LabelWeek, LV_SIZE_CONTENT); /// 1
-    lv_obj_set_x(ui_LabelWeek, -58);
-    lv_obj_set_y(ui_LabelWeek, 44);
-    lv_obj_set_align(ui_LabelWeek, LV_ALIGN_CENTER);
+    /* 星期紧跟日期右侧（日期文本宽度变化时相对关系保持），同字号同色 */
+    lv_obj_align_to(ui_LabelWeek, ui_LabelData, LV_ALIGN_OUT_RIGHT_BOTTOM, 6, 0);
     lv_label_set_text(ui_LabelWeek, "星期一");
     lv_obj_set_style_text_color(ui_LabelWeek, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_LabelWeek, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_LabelWeek, &ui_font_FontCKJGT24, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_LabelWeek, &ui_font_FontCKJGT16, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    /* 工作模式文字（BLT/WIR MODE）已删除：状态栏左上角图标已表达模式 */
+    /* ---------- 底部左侧：工作模式图标（有线/蓝牙/2.4G） + 主机连接状态 ---------- */
+    s_ui_MainScreenWorkmodeIcon = lv_label_create(ui_MainScreen);
+    lv_obj_set_style_text_font(s_ui_MainScreenWorkmodeIcon, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_color(s_ui_MainScreenWorkmodeIcon, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_label_set_text(s_ui_MainScreenWorkmodeIcon, LV_SYMBOL_USB);
+    lv_obj_align(s_ui_MainScreenWorkmodeIcon, LV_ALIGN_TOP_LEFT, 8, 106);
 
-    /* 连接状态：只保留图标（位于原文本 + 图标区块的垂直居中位置） */
+    /* 工作模式文字（BLT/WIR MODE）已删除：底部左列图标已表达模式 */
+
+    /* 连接状态：只保留图标（底部，工作模式图标右侧） */
     s_ui_MainScreenHostConnectionIcon = lv_label_create(ui_MainScreen);
     lv_obj_set_width(s_ui_MainScreenHostConnectionIcon, LV_SIZE_CONTENT);  /// 1
     lv_obj_set_height(s_ui_MainScreenHostConnectionIcon, LV_SIZE_CONTENT); /// 1
-    lv_obj_set_x(s_ui_MainScreenHostConnectionIcon, -125);
-    lv_obj_set_y(s_ui_MainScreenHostConnectionIcon, 15);
-    lv_obj_set_align(s_ui_MainScreenHostConnectionIcon, LV_ALIGN_CENTER);
+    lv_obj_align(s_ui_MainScreenHostConnectionIcon, LV_ALIGN_TOP_LEFT, 32, 104);
     lv_label_set_text(s_ui_MainScreenHostConnectionIcon, LV_SYMBOL_CLOSE);
     lv_obj_set_style_text_opa(s_ui_MainScreenHostConnectionIcon, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(s_ui_MainScreenHostConnectionIcon, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(s_ui_MainScreenHostConnectionIcon, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_MainScreen_refresh_host_connection();
 
     s_ui_MainScreenProfileIconLabel = lv_label_create(ui_MainScreen);
     lv_obj_set_width(s_ui_MainScreenProfileIconLabel, LV_SIZE_CONTENT);  /// 1
     lv_obj_set_height(s_ui_MainScreenProfileIconLabel, LV_SIZE_CONTENT); /// 1
-    lv_obj_set_x(s_ui_MainScreenProfileIconLabel, -185);
-    lv_obj_set_y(s_ui_MainScreenProfileIconLabel, 35);
-    lv_obj_set_align(s_ui_MainScreenProfileIconLabel, LV_ALIGN_CENTER);
+    lv_obj_align(s_ui_MainScreenProfileIconLabel, LV_ALIGN_TOP_LEFT, 300, 106);
     lv_label_set_text(s_ui_MainScreenProfileIconLabel, LV_SYMBOL_LIST);
     lv_obj_set_style_text_color(s_ui_MainScreenProfileIconLabel, lv_color_hex(0xF5F7FA), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(s_ui_MainScreenProfileIconLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(s_ui_MainScreenProfileIconLabel, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(s_ui_MainScreenProfileIconLabel, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     s_ui_MainScreenProfileIconImage = lv_img_create(ui_MainScreen);
     lv_obj_set_size(s_ui_MainScreenProfileIconImage, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_img_set_size_mode(s_ui_MainScreenProfileIconImage, LV_IMG_SIZE_MODE_REAL);
-    lv_img_set_zoom(s_ui_MainScreenProfileIconImage, 192);
-    lv_obj_set_x(s_ui_MainScreenProfileIconImage, -185);
-    lv_obj_set_y(s_ui_MainScreenProfileIconImage, 35);
-    lv_obj_set_align(s_ui_MainScreenProfileIconImage, LV_ALIGN_CENTER);
+    lv_img_set_zoom(s_ui_MainScreenProfileIconImage, 100); /* 原始 48px 图标缩到 ~19px 适配底栏行高 */
+    lv_obj_align(s_ui_MainScreenProfileIconImage, LV_ALIGN_TOP_LEFT, 294, 102);
     lv_obj_add_flag(s_ui_MainScreenProfileIconImage, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(s_ui_MainScreenProfileIconImage, LV_OBJ_FLAG_SCROLLABLE);
 
     s_ui_MainScreenProfileName = lv_label_create(ui_MainScreen);
-    lv_obj_set_width(s_ui_MainScreenProfileName, 108);
+    lv_obj_set_width(s_ui_MainScreenProfileName, 98);
     lv_obj_set_height(s_ui_MainScreenProfileName, LV_SIZE_CONTENT); /// 1
-    lv_obj_set_x(s_ui_MainScreenProfileName, -185);
-    lv_obj_set_y(s_ui_MainScreenProfileName, -4);
-    lv_obj_set_align(s_ui_MainScreenProfileName, LV_ALIGN_CENTER);
+    lv_obj_align(s_ui_MainScreenProfileName, LV_ALIGN_TOP_RIGHT, -8, 106);
     lv_label_set_text(s_ui_MainScreenProfileName, "CONF1");
     lv_label_set_long_mode(s_ui_MainScreenProfileName, LV_LABEL_LONG_CLIP);
     lv_obj_set_style_text_align(s_ui_MainScreenProfileName, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -253,58 +235,61 @@ void ui_MainScreen_screen_init(void)
      * 中文全高字形偏大，降为 16 号与 PC 状态文字视觉协调 */
     lv_obj_set_style_text_font(s_ui_MainScreenProfileName, &ui_font_FontCKJGT16, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    /* RGB / TFT 亮度文字与状态栏顶部图标区域重叠，已移除显示。亮度数值仍由
-     * ui_MainScreen_set_rgb_light / ui_MainScreen_set_tft_light 写入并用于
-     * Backlight::setDuty 与 RGBLightControl::applySettings。*/
-
     /* WiFi 状态仅在 ui_StatusBar 中显示，主页不再渲染 */
 
     ui_KeyMappedSecondary_bind_main_screen_summary(s_ui_MainScreenProfileIconLabel,
                                                    s_ui_MainScreenProfileIconImage,
                                                    s_ui_MainScreenProfileName);
 
-    ui_line1 = lv_obj_create(ui_MainScreen);
-    lv_obj_set_width(ui_line1, 108);
-    lv_obj_set_height(ui_line1, 1);
-    lv_obj_set_x(ui_line1, -152);
-    lv_obj_set_y(ui_line1, -26);
-    lv_obj_set_align(ui_line1, LV_ALIGN_CENTER);
-    lv_obj_clear_flag(ui_line1, LV_OBJ_FLAG_SCROLLABLE); /// Flags
-
-    ui_line2 = lv_obj_create(ui_MainScreen);
-    lv_obj_set_width(ui_line2, 1);
-    lv_obj_set_height(ui_line2, 60);
-    lv_obj_set_x(ui_line2, -159);
-    lv_obj_set_y(ui_line2, 18);
-    lv_obj_set_align(ui_line2, LV_ALIGN_CENTER);
-    lv_obj_clear_flag(ui_line2, LV_OBJ_FLAG_SCROLLABLE); /// Flags
-
-    ui_line3 = lv_obj_create(ui_MainScreen);
-    lv_obj_set_width(ui_line3, 186);
-    lv_obj_set_height(ui_line3, 1);
-    lv_obj_set_x(ui_line3, 3);
-    lv_obj_set_y(ui_line3, 13);
-    lv_obj_set_align(ui_line3, LV_ALIGN_CENTER);
-    lv_obj_clear_flag(ui_line3, LV_OBJ_FLAG_SCROLLABLE); /// Flags
-
     lv_obj_add_event_cb(ui_ButtonLeft1, ui_event_ButtonLeft1, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_ButtonRight1, ui_event_ButtonRight1, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_MainScreen, ui_event_MainScreen, LV_EVENT_ALL, NULL);
 }
 
-void ui_MainScreen_set_rgb_light(uint8_t percent)
+/*
+ * 日期 + 星期文本更新：星期相对日期右侧对齐，而日期文本宽度随语言
+ * 切换变化（中文"09月14日" ↔ 英文"SEP 08"），lv_obj_align_to 是一次性
+ * 布局，因此每次更新文本后必须重新对齐，否则星期位置脱离日期。
+ * 空字段跳过（未同步时避免覆盖初始占位）。
+ */
+void ui_MainScreen_set_date_week(const char *date, const char *week)
 {
-    if (ui_LabelRGBLight != NULL)
+    if (ui_LabelData == NULL || ui_LabelWeek == NULL)
     {
-        lv_label_set_text_fmt(ui_LabelRGBLight, "RGB %u%%", (unsigned)percent);
+        return;
     }
+    if (date != NULL && date[0] != '\0')
+    {
+        lv_label_set_text(ui_LabelData, date);
+    }
+    if (week != NULL && week[0] != '\0')
+    {
+        lv_label_set_text(ui_LabelWeek, week);
+    }
+    lv_obj_update_layout(ui_LabelData); /* 先落定新文本宽度再取对齐坐标 */
+    lv_obj_align_to(ui_LabelWeek, ui_LabelData, LV_ALIGN_OUT_RIGHT_BOTTOM, 6, 0);
 }
 
-void ui_MainScreen_set_tft_light(uint8_t percent)
+/* 工作模式图标：有线 → USB，蓝牙 → BT，2.4G → DRIVE（由 DisplayTask 推送） */
+void ui_MainScreen_set_working_mode(int mode)
 {
-    if (ui_LabelTFTLight != NULL)
+    if (s_ui_MainScreenWorkmodeIcon == NULL)
     {
-        lv_label_set_text_fmt(ui_LabelTFTLight, "TFT %u%%", (unsigned)percent);
+        return;
+    }
+    switch (mode)
+    {
+    case WIRED_KEYBOARD_MODE:
+        lv_label_set_text(s_ui_MainScreenWorkmodeIcon, LV_SYMBOL_USB);
+        break;
+    case BLUETOOTH_KEYBOARD_MODE:
+        lv_label_set_text(s_ui_MainScreenWorkmodeIcon, LV_SYMBOL_BLUETOOTH);
+        break;
+    case WIRELESS_2_4G_KEYBOARD_MODE:
+        lv_label_set_text(s_ui_MainScreenWorkmodeIcon, LV_SYMBOL_DRIVE);
+        break;
+    default:
+        break;
     }
 }
 
@@ -317,6 +302,7 @@ void ui_MainScreen_set_host_connection(bool connected)
 void ui_MainScreen_screen_destroy(void)
 {
     ui_KeyMappedSecondary_bind_main_screen_summary(NULL, NULL, NULL);
+    ui_FlipClock_destroy();
     if (ui_MainScreen)
         lv_obj_del(ui_MainScreen);
 
@@ -330,14 +316,7 @@ void ui_MainScreen_screen_destroy(void)
     s_ui_MainScreenProfileIconImage = NULL;
     s_ui_MainScreenProfileName = NULL;
     s_ui_MainScreenHostConnectionIcon = NULL;
-    ui_LabelTime = NULL;
+    s_ui_MainScreenWorkmodeIcon = NULL;
     ui_LabelData = NULL;
-    ui_LabelSecond = NULL;
     ui_LabelWeek = NULL;
-    ui_LabelRGBLight = NULL;
-    ui_LabelTFTLight = NULL;
-    ui_line1 = NULL;
-    ui_line2 = NULL;
-    ui_line3 = NULL;
-    ui_line5 = NULL;
 }

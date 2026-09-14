@@ -25,7 +25,6 @@ extern "C" {
 extern void ui_StatusBar_init(void);
 extern void ui_StatusBar_show(bool show);
 
-extern void status_bar_set_working_mode(int mode);
 extern void status_bar_set_recording_state(bool is_recording);
 extern void status_bar_set_volume(uint8_t volume);
 extern void status_bar_set_battery_level(uint8_t level);

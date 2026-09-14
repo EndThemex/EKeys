@@ -32,6 +32,7 @@
 #include "rgb/RGBLightControl.h"
 #include "ui/ui.h"
 #include "ui/ui_AudioScreen.h"
+#include "ui/ui_FlipClock.h"
 #include "ui/ui_HaScreenSecondary.h"
 #include "ui/ui_KeyMapped.h"
 #include "ui/ui_KeyMappedSecondary.h"
@@ -184,9 +185,9 @@ namespace ekeys
         }
 
         /*
-         * C7 修复：移除 status_bar_set_working_mode(WIRED_KEYBOARD_MODE) 硬编码。
-         * 紧随其后的"启动快照"块会从 Configuration 读出真实 work_mode
-         * 并通过 applySetting → status_bar_set_working_mode() 覆盖，
+         * C7 修复：移除工作模式硬编码（现由 applySetting →
+         * ui_MainScreen_set_working_mode() 覆盖）。
+         * 紧随其后的"启动快照"块会从 Configuration 读出真实 work_mode，
          * 这里写死反而会在首帧渲染前多一次冗余赋值。
          */
         status_bar_set_recording_state(false);
@@ -248,42 +249,16 @@ namespace ekeys
         {
         case DisplayMessageType::TimeUpdate:
         {
-            /* "HH:MM:SS" → 主屏 ui_LabelTime（HH:MM）+ ui_LabelSecond（SS） */
-            const char *t = msg.time_text;
-            /*
-             * C8 修复：长度 ≥ 8 才解析，避免上游格式变化（如 "H:MM:SS"）
-             * 导致 t[7] 越界。冒号位（t[2] / t[5]）也校验为 ':'，双重保险。
-             */
-            if (strlen(t) >= 8 && t[2] == ':' && t[5] == ':')
-            {
-                static char hm[6];
-                static char ss[3];
-                hm[0] = t[0];
-                hm[1] = t[1];
-                hm[2] = ':';
-                hm[3] = t[3];
-                hm[4] = t[4];
-                hm[5] = '\0';
-                ss[0] = t[6];
-                ss[1] = t[7];
-                ss[2] = '\0';
-                lv_label_set_text(ui_LabelTime, hm);
-                lv_label_set_text(ui_LabelSecond, ss);
-            }
+            /* "HH:MM:SS" → 主屏翻页时钟（HH:MM 大卡片 + SS 小卡片 + 冒号闪烁） */
+            ui_FlipClock_update(msg.time_text);
 
             /*
              * 日期 + 星期：MainTask 已按 ui_lang 生成最终显示文本
              * （中文 "09月08日"/"星期一"，英文 "SEP 08"/"MON"），
-             * 字段为空（未同步）时跳过，避免覆盖初始占位。
+             * 统一走 ui_MainScreen_set_date_week：空字段跳过，
+             * 且星期相对日期的右对齐随文本宽度变化重算。
              */
-            if (msg.date_text[0] != '\0')
-            {
-                lv_label_set_text(ui_LabelData, msg.date_text);
-            }
-            if (msg.week_text[0] != '\0')
-            {
-                lv_label_set_text(ui_LabelWeek, msg.week_text);
-            }
+            ui_MainScreen_set_date_week(msg.date_text, msg.week_text);
             break;
         }
 
@@ -310,40 +285,40 @@ namespace ekeys
              *     （不另发消息；播完由 AudioPad::loop 经 AudioPad 消息清除）；
              *   - 其它屏：矩阵键为 HID 专用，不触发 UI 导航。
              */
-        const uint8_t action = msg.action;
-        if (action > kMatrixKeyActionBase &&
-            action <= kMatrixKeyActionBase + kMatrixKeyCount)
-        {
-            const uint8_t key_id =
-                static_cast<uint8_t>(action - kMatrixKeyActionBase);
-            const ui_screen_tag_t tag = ui_get_active_screen_tag();
-            if (tag == UI_SCREEN_KEYMAPPED)
+            const uint8_t action = msg.action;
+            if (action > kMatrixKeyActionBase &&
+                action <= kMatrixKeyActionBase + kMatrixKeyCount)
             {
-                ui_KeyMappedSecondary_set_focus(key_id);
-                navigateNow(UI_SCREEN_KEYMAPPED_SECONDARY);
-            }
-            else if (tag == UI_SCREEN_KEYMAPPED_SECONDARY ||
-                     tag == UI_SCREEN_SETTING_SECONDARY)
-            {
-                lv_obj_t *active_screen = lv_scr_act();
-                if (active_screen != nullptr)
+                const uint8_t key_id =
+                    static_cast<uint8_t>(action - kMatrixKeyActionBase);
+                const ui_screen_tag_t tag = ui_get_active_screen_tag();
+                if (tag == UI_SCREEN_KEYMAPPED)
                 {
-                    lv_event_send(active_screen, LV_EVENT_KEY,
-                                  (void *)(uintptr_t)action);
+                    ui_KeyMappedSecondary_set_focus(key_id);
+                    navigateNow(UI_SCREEN_KEYMAPPED_SECONDARY);
                 }
-            }
-            else if (tag == UI_SCREEN_AUDIO_SECONDARY)
-            {
-                /* 只置播放请求（MainTask service 消费执行，Audio 实例跨核
-                 * 串行保护），绑定存在即亮键位高亮；播放被拒时 service
-                 * 重投 AudioPad 消息纠正 */
-                if (AudioPad::instance().requestTrigger(key_id))
+                else if (tag == UI_SCREEN_KEYMAPPED_SECONDARY ||
+                         tag == UI_SCREEN_SETTING_SECONDARY)
                 {
-                    ui_AudioScreenSecondary_set_playing(key_id);
+                    lv_obj_t *active_screen = lv_scr_act();
+                    if (active_screen != nullptr)
+                    {
+                        lv_event_send(active_screen, LV_EVENT_KEY,
+                                      (void *)(uintptr_t)action);
+                    }
                 }
+                else if (tag == UI_SCREEN_AUDIO_SECONDARY)
+                {
+                    /* 只置播放请求（MainTask service 消费执行，Audio 实例跨核
+                     * 串行保护），绑定存在即亮键位高亮；播放被拒时 service
+                     * 重投 AudioPad 消息纠正 */
+                    if (AudioPad::instance().requestTrigger(key_id))
+                    {
+                        ui_AudioScreenSecondary_set_playing(key_id);
+                    }
+                }
+                break;
             }
-            break;
-        }
             /*
              * SettingScreenSecondary 旋钮行为：旋转直接发出 LV_KEY_LEFT/RIGHT
              * 进 UI，由 setting_secondary_handle_key 走调值分支
@@ -426,13 +401,9 @@ namespace ekeys
             ClickHighlight::applySettings(snap);
         }
 
-        /* 状态条：工作模式 + 音量 */
-        status_bar_set_working_mode(s.work_mode);
+        /* 主屏底部：工作模式图标；状态栏：音量 */
+        ui_MainScreen_set_working_mode(s.work_mode);
         status_bar_set_volume(s.device_volume);
-
-        /* 主屏文字（工作模式已由状态栏图标表达，无模式文字） */
-        ui_MainScreen_set_rgb_light(s.rgb_brightness);
-        ui_MainScreen_set_tft_light(s.tft_brightness);
 
         /* 设置屏反向显示当前快照 */
         ui_SettingScreenSecondary_set_snapshot(&s);

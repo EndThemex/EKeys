@@ -4,8 +4,7 @@
 // 状态栏对象
 static lv_obj_t *status_bar = NULL;
 
-// 状态栏组件
-static lv_obj_t *workmode_icon = NULL;
+// 状态栏组件（工作模式图标已移至主页底部左列，见 ui_MainScreen.c）
 static lv_obj_t *recording_dot = NULL;
 static lv_obj_t *volume_icon = NULL;
 static lv_obj_t *wifi_icon = NULL;
@@ -60,38 +59,34 @@ void ui_StatusBar_init(void)
     lv_style_set_text_color(&style, lv_color_white());
     lv_obj_add_style(status_bar, &style, 0);
 
-    // 添加图标
+    // 添加图标（状态栏不再占顶部，所有图标移到屏幕底部一行：
+    // [录音点][工作模式|主机连接(主页绘制)] [WiFi][音量][电量]，右侧日期/方案。
+    // 注意 status_bar 有 pad_all(5)，坐标按内容区写，实际渲染 = 设定值 + 5）
     recording_dot = lv_obj_create(status_bar);
     lv_obj_remove_style_all(recording_dot);
-    lv_obj_set_size(recording_dot, 20, 20);
-    lv_obj_align(recording_dot, LV_ALIGN_TOP_LEFT, 278, -5);
+    lv_obj_set_size(recording_dot, 12, 12);
+    lv_obj_align(recording_dot, LV_ALIGN_TOP_LEFT, 51, 103);
     lv_obj_set_style_radius(recording_dot, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(recording_dot, lv_color_hex(0xFF3030), 0);
     lv_obj_set_style_bg_opa(recording_dot, LV_OPA_COVER, 0);
     lv_obj_add_flag(recording_dot, LV_OBJ_FLAG_HIDDEN);
 
-    workmode_icon = lv_label_create(status_bar);
-    lv_label_set_text(workmode_icon, LV_SYMBOL_BLUETOOTH);
-    lv_obj_add_style(workmode_icon, &icon_medium_style, 0); // 小图标
-    lv_obj_align(workmode_icon, LV_ALIGN_TOP_LEFT, 3, 0);
-    lv_obj_set_style_text_color(workmode_icon, lv_color_hex(0x808080), 0);
-
     wifi_icon = lv_label_create(status_bar);
     lv_label_set_text(wifi_icon, LV_SYMBOL_WIFI);
-    lv_obj_add_style(wifi_icon, &icon_medium_style, 0); // 小图标
-    lv_obj_align(wifi_icon, LV_ALIGN_TOP_LEFT, 313, -5);
+    lv_obj_add_style(wifi_icon, &icon_medium_style, 0);
+    lv_obj_align(wifi_icon, LV_ALIGN_TOP_LEFT, 64, 99);
     lv_obj_set_style_text_color(wifi_icon, lv_color_hex(0x808080), 0);
 
     volume_icon = lv_label_create(status_bar);
     lv_label_set_text(volume_icon, LV_SYMBOL_VOLUME_MAX);
-    lv_obj_add_style(volume_icon, &icon_medium_style, 0); // 小图标
-    lv_obj_align(volume_icon, LV_ALIGN_TOP_LEFT, 348, -5);
+    lv_obj_add_style(volume_icon, &icon_medium_style, 0);
+    lv_obj_align(volume_icon, LV_ALIGN_TOP_LEFT, 92, 99);
     lv_obj_set_style_text_color(volume_icon, lv_color_hex(0x808080), 0);
 
     battery_icon = lv_label_create(status_bar);
     lv_label_set_text(battery_icon, LV_SYMBOL_BATTERY_FULL);
-    lv_obj_align(battery_icon, LV_ALIGN_TOP_LEFT, 383, -5);
-    lv_obj_add_style(battery_icon, &icon_medium_style, 0); // 小图标
+    lv_obj_align(battery_icon, LV_ALIGN_TOP_LEFT, 123, 99);
+    lv_obj_add_style(battery_icon, &icon_medium_style, 0);
     lv_obj_set_style_text_color(battery_icon, lv_color_hex(0x808080), 0);
 }
 
@@ -222,31 +217,6 @@ void status_bar_set_recording_state(bool is_recording)
         recording_blink_visible = false;
         lv_obj_set_style_bg_opa(recording_dot, LV_OPA_COVER, 0);
         lv_obj_add_flag(recording_dot, LV_OBJ_FLAG_HIDDEN);
-    }
-}
-
-// 更新工作模式
-void status_bar_set_working_mode(int mode)
-{
-    switch (mode)
-    {
-    case WIRED_KEYBOARD_MODE:
-    {
-        lv_label_set_text(workmode_icon, LV_SYMBOL_USB);
-        break;
-    }
-    case BLUETOOTH_KEYBOARD_MODE:
-    {
-        lv_label_set_text(workmode_icon, LV_SYMBOL_BLUETOOTH);
-        break;
-    }
-    case WIRELESS_2_4G_KEYBOARD_MODE:
-    {
-        lv_label_set_text(workmode_icon, LV_SYMBOL_DRIVE);
-        break;
-    }
-    default:
-        break;
     }
 }
 
