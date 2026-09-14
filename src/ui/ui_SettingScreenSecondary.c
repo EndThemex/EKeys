@@ -297,6 +297,10 @@ static const char *setting_secondary_rgb_mode_text(int32_t value)
         return "火焰";
     case 7:
         return "脉冲";
+    case 8:
+        return "拾音";
+    case 9:
+        return "矩阵";
     default:
         return "关闭";
     }
@@ -511,7 +515,7 @@ static int setting_secondary_adjust_value(setting_item_id_t item, int step)
     case SETTING_ITEM_RGB_MODE:
     {
         const int32_t next = s_setting_edit.rgb_mode + step;
-        if (next < 0 || next > 7 || next == s_setting_edit.rgb_mode)
+        if (next < 0 || next > 9 || next == s_setting_edit.rgb_mode)
         {
             return 0;
         }

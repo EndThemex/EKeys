@@ -620,8 +620,11 @@ namespace ekeys
     void DisplayTask::updateSpectrum()
     {
         const ui_screen_tag_t tag = ui_get_active_screen_tag();
-        const bool visible = (tag == UI_SCREEN_MUSIC ||
-                              tag == UI_SCREEN_MUSIC_SECONDARY);
+        const bool music_visible = (tag == UI_SCREEN_MUSIC ||
+                                    tag == UI_SCREEN_MUSIC_SECONDARY);
+        /* 拾音 RGB 模式与音乐屏共用 Mic 链路（调度/退避/ASR 互斥同套逻辑） */
+        const bool rgb_sound = RGBLightControl::instance().wantsMic();
+        const bool visible = music_visible || rgb_sound;
 
         if (!visible)
         {
@@ -672,13 +675,21 @@ namespace ekeys
         }
         AudioAnalyzer::instance().process(chunk, n, bands, AudioAnalyzer::kBandCount);
 
-        /* 0~1 → 0~255（ui_MusicScreen_drawAudioBandsCool 期望刻度） */
-        float draw_bands[AudioAnalyzer::kBandCount];
-        for (size_t i = 0; i < AudioAnalyzer::kBandCount; ++i)
+        if (rgb_sound)
         {
-            draw_bands[i] = bands[i] * 255.0f;
+            RGBLightControl::instance().setAudioBands(bands, AudioAnalyzer::kBandCount);
         }
-        ui_MusicScreen_drawAudioBandsCool(draw_bands);
+
+        if (music_visible)
+        {
+            /* 0~1 → 0~255（ui_MusicScreen_drawAudioBandsCool 期望刻度） */
+            float draw_bands[AudioAnalyzer::kBandCount];
+            for (size_t i = 0; i < AudioAnalyzer::kBandCount; ++i)
+            {
+                draw_bands[i] = bands[i] * 255.0f;
+            }
+            ui_MusicScreen_drawAudioBandsCool(draw_bands);
+        }
     }
 
     /*

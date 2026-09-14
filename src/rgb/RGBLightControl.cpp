@@ -10,6 +10,8 @@
 
 #include "rgb/RGBDriver.h"
 
+#include "audio/AudioAnalyzer.h"
+
 namespace ekeys
 {
 
@@ -17,6 +19,20 @@ namespace ekeys
     {
 
         constexpr uint32_t kFrameIntervalMs = 30;
+
+        /* 拾音模式：每帧回落步长（30ms/帧 → 满量程回落约 0.6s） */
+        constexpr float kSoundDecayPerFrame = 0.045f;
+        /* 拾音模式：静默时的最低亮度比例（保持模式可见） */
+        constexpr float kSoundIdleFloor = 0.12f;
+
+        /* 矩阵律动滤波：
+         * AudioAnalyzer 每帧按帧内峰值自适应归一化，底噪/帧间波动会被放大成
+         * 高频微闪。门限以下视为 0；起跳/回落改用指数平滑（非对称：
+         * 起跳快而不过冲、回落缓），消掉帧间抖动。 */
+        constexpr float kMatrixNoiseGate = 0.07f; /* 静噪门限（归一化 0~1） */
+        constexpr float kMatrixAttack = 0.50f;    /* 起跳平滑系数（越大越跟手） */
+        constexpr float kMatrixDecay = 0.10f;     /* 回落平滑系数（越小越缓） */
+        constexpr float kMatrixEpsilon = 0.004f;  /* 残留截断，避免半亮像素长亮 */
 
         /* 0~255 色相 → RGB（简化色环，256 步一循环） */
         void hueToRgb(uint8_t hue, uint8_t &r, uint8_t &g, uint8_t &b)
@@ -95,6 +111,22 @@ namespace ekeys
         if (led < 11)
         {
             highlight_[led] = active;
+        }
+    }
+
+    void RGBLightControl::setAudioBands(const float *bands, uint8_t count)
+    {
+        if (bands == nullptr || count == 0)
+        {
+            return;
+        }
+        if (count > 16)
+        {
+            count = 16;
+        }
+        for (uint8_t i = 0; i < count; ++i)
+        {
+            audio_bands_[i] = bands[i];
         }
     }
 
@@ -224,6 +256,113 @@ namespace ekeys
             led.setAll(static_cast<uint8_t>(c.r * breath),
                        static_cast<uint8_t>(c.g * breath),
                        static_cast<uint8_t>(c.b * breath));
+            break;
+        }
+
+        case RGB_SOUND_MODE:
+        {
+            /*
+             * 拾音：16 频段能量 → 11 灯（按段覆盖范围取峰值）。
+             * 快速起跳、慢速回落形成"峰值下落"效果；色相沿灯带铺开。
+             */
+            for (uint8_t i = 0; i < RGBDriver::kLedCount; ++i)
+            {
+                const uint8_t start = static_cast<uint8_t>(
+                    i * AudioAnalyzer::kBandCount / RGBDriver::kLedCount);
+                const uint8_t stop = static_cast<uint8_t>(
+                    (i + 1) * AudioAnalyzer::kBandCount / RGBDriver::kLedCount);
+                float target = 0.0f;
+                for (uint8_t b = start; b < stop; ++b)
+                {
+                    if (audio_bands_[b] > target)
+                    {
+                        target = audio_bands_[b];
+                    }
+                }
+
+                float level = audio_level_[i];
+                level = (target > level) ? target : level - kSoundDecayPerFrame;
+                if (level < 0.0f)
+                {
+                    level = 0.0f;
+                }
+                else if (level > 1.0f)
+                {
+                    level = 1.0f;
+                }
+                audio_level_[i] = level;
+
+                uint8_t r, g, b;
+                hueToRgb(hueWheel(i * 256 / RGBDriver::kLedCount), r, g, b);
+                const float scale = (level > kSoundIdleFloor) ? level : kSoundIdleFloor;
+                led.setPixel(i,
+                             static_cast<uint8_t>(r * scale),
+                             static_cast<uint8_t>(g * scale),
+                             static_cast<uint8_t>(b * scale));
+            }
+            break;
+        }
+
+        case RGB_MATRIX_MODE:
+        {
+            /*
+             * 矩阵律动：3 行 × 4 列（ROW0 的 COL3 空置，共 11 灯）。
+             * 4 列对应 4 组频段（左低右高），每列按音量自下而上点亮 0~3 行，
+             * 行亮度支持小数过渡；VU 配色：底行绿 / 中行黄 / 顶行红。
+             */
+            for (uint8_t col = 0; col < 4; ++col)
+            {
+                const uint8_t start = static_cast<uint8_t>(col * 4);
+                float target = 0.0f;
+                for (uint8_t b = start; b < start + 4; ++b)
+                {
+                    if (audio_bands_[b] > target)
+                    {
+                        target = audio_bands_[b];
+                    }
+                }
+                /* 静噪门限：底噪不点亮 */
+                if (target < kMatrixNoiseGate)
+                {
+                    target = 0.0f;
+                }
+
+                /* 非对称指数平滑：起跳快跟随、回落缓，消除帧间微闪 */
+                float level = audio_col_[col];
+                const float k = (target > level) ? kMatrixAttack : kMatrixDecay;
+                level += (target - level) * k;
+                if (level < kMatrixEpsilon)
+                {
+                    level = 0.0f;
+                }
+                else if (level > 1.0f)
+                {
+                    level = 1.0f;
+                }
+                audio_col_[col] = level;
+
+                /* 行下标 → LED 下标（与 MatrixScanner::keyIdToRowCol 同布局，
+                 * ROW0 只有 COL0~2，故行基址 0/3/7） */
+                static const uint8_t kRowLedBase[3] = {0, 3, 7};
+                /* VU 配色：底行绿、中行黄、顶行红（row=0 为底行） */
+                static const uint8_t kRowColor[3][3] = {
+                    {0, 255, 0}, {255, 200, 0}, {255, 40, 0}};
+                for (uint8_t row = 0; row < 3; ++row)
+                {
+                    const float lit = level * 3.0f - row;
+                    const uint8_t led_idx = kRowLedBase[2 - row] + col;
+                    if (lit <= 0.0f)
+                    {
+                        led.setPixel(led_idx, 0, 0, 0);
+                        continue;
+                    }
+                    const float inten = (lit > 1.0f) ? 1.0f : lit;
+                    led.setPixel(led_idx,
+                                 static_cast<uint8_t>(kRowColor[row][0] * inten),
+                                 static_cast<uint8_t>(kRowColor[row][1] * inten),
+                                 static_cast<uint8_t>(kRowColor[row][2] * inten));
+                }
+            }
             break;
         }
         }
