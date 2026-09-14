@@ -5,7 +5,6 @@
 
 #include "ui.h"
 #include "ui_FlipClock.h"
-#include "ui_StatusBar.h" /* 工作模式枚举 WIRED/BLUETOOTH/WIRELESS_2_4G_KEYBOARD_MODE */
 #include <stdint.h>
 
 lv_obj_t *ui_MainScreen = NULL;
@@ -16,27 +15,8 @@ lv_obj_t *ui_ButtonExit1 = NULL;
 static lv_obj_t *s_ui_MainScreenProfileIconLabel = NULL;
 static lv_obj_t *s_ui_MainScreenProfileIconImage = NULL;
 static lv_obj_t *s_ui_MainScreenProfileName = NULL;
-static lv_obj_t *s_ui_MainScreenHostConnectionIcon = NULL;
-static lv_obj_t *s_ui_MainScreenWorkmodeIcon = NULL;
-static bool s_ui_MainScreenHostConnected = false;
 lv_obj_t *ui_LabelData = NULL;
 lv_obj_t *ui_LabelWeek = NULL;
-
-/*
- * 主页连接状态：只显示图标（已移除 PC LINK / PC STOP 文本）。
- * 键盘主机（BLE/USB）已连接 → 白色；未连接 → 橙色。
- */
-static void ui_MainScreen_refresh_host_connection(void)
-{
-    if (s_ui_MainScreenHostConnectionIcon != NULL)
-    {
-        lv_label_set_text(s_ui_MainScreenHostConnectionIcon,
-                          s_ui_MainScreenHostConnected ? LV_SYMBOL_REFRESH : LV_SYMBOL_CLOSE);
-        lv_obj_set_style_text_color(s_ui_MainScreenHostConnectionIcon,
-                                    s_ui_MainScreenHostConnected ? lv_color_hex(0xFFFFFF) : lv_color_hex(0xF59E0B),
-                                    LV_PART_MAIN | LV_STATE_DEFAULT);
-    }
-}
 
 // event funtions
 void ui_event_MainScreen(lv_event_t *e)
@@ -185,25 +165,7 @@ void ui_MainScreen_screen_init(void)
     lv_obj_set_style_text_opa(ui_LabelWeek, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_LabelWeek, &ui_font_FontCKJGT16, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    /* ---------- 底部左侧：工作模式图标（有线/蓝牙/2.4G） + 主机连接状态 ---------- */
-    s_ui_MainScreenWorkmodeIcon = lv_label_create(ui_MainScreen);
-    lv_obj_set_style_text_font(s_ui_MainScreenWorkmodeIcon, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(s_ui_MainScreenWorkmodeIcon, lv_color_hex(0x808080), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_label_set_text(s_ui_MainScreenWorkmodeIcon, LV_SYMBOL_USB);
-    lv_obj_align(s_ui_MainScreenWorkmodeIcon, LV_ALIGN_TOP_LEFT, 8, 106);
-
-    /* 工作模式文字（BLT/WIR MODE）已删除：底部左列图标已表达模式 */
-
-    /* 连接状态：只保留图标（底部，工作模式图标右侧） */
-    s_ui_MainScreenHostConnectionIcon = lv_label_create(ui_MainScreen);
-    lv_obj_set_width(s_ui_MainScreenHostConnectionIcon, LV_SIZE_CONTENT);  /// 1
-    lv_obj_set_height(s_ui_MainScreenHostConnectionIcon, LV_SIZE_CONTENT); /// 1
-    lv_obj_align(s_ui_MainScreenHostConnectionIcon, LV_ALIGN_TOP_LEFT, 32, 104);
-    lv_label_set_text(s_ui_MainScreenHostConnectionIcon, LV_SYMBOL_CLOSE);
-    lv_obj_set_style_text_opa(s_ui_MainScreenHostConnectionIcon, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(s_ui_MainScreenHostConnectionIcon, &lv_font_montserrat_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    ui_MainScreen_refresh_host_connection();
+    /* 工作模式图标已移入状态栏（ui_StatusBar.c），见 status_bar_set_working_mode */
 
     s_ui_MainScreenProfileIconLabel = lv_label_create(ui_MainScreen);
     lv_obj_set_width(s_ui_MainScreenProfileIconLabel, LV_SIZE_CONTENT);  /// 1
@@ -270,35 +232,6 @@ void ui_MainScreen_set_date_week(const char *date, const char *week)
     lv_obj_align_to(ui_LabelWeek, ui_LabelData, LV_ALIGN_OUT_RIGHT_BOTTOM, 6, 0);
 }
 
-/* 工作模式图标：有线 → USB，蓝牙 → BT，2.4G → DRIVE（由 DisplayTask 推送） */
-void ui_MainScreen_set_working_mode(int mode)
-{
-    if (s_ui_MainScreenWorkmodeIcon == NULL)
-    {
-        return;
-    }
-    switch (mode)
-    {
-    case WIRED_KEYBOARD_MODE:
-        lv_label_set_text(s_ui_MainScreenWorkmodeIcon, LV_SYMBOL_USB);
-        break;
-    case BLUETOOTH_KEYBOARD_MODE:
-        lv_label_set_text(s_ui_MainScreenWorkmodeIcon, LV_SYMBOL_BLUETOOTH);
-        break;
-    case WIRELESS_2_4G_KEYBOARD_MODE:
-        lv_label_set_text(s_ui_MainScreenWorkmodeIcon, LV_SYMBOL_DRIVE);
-        break;
-    default:
-        break;
-    }
-}
-
-void ui_MainScreen_set_host_connection(bool connected)
-{
-    s_ui_MainScreenHostConnected = connected;
-    ui_MainScreen_refresh_host_connection();
-}
-
 void ui_MainScreen_screen_destroy(void)
 {
     ui_KeyMappedSecondary_bind_main_screen_summary(NULL, NULL, NULL);
@@ -315,8 +248,6 @@ void ui_MainScreen_screen_destroy(void)
     s_ui_MainScreenProfileIconLabel = NULL;
     s_ui_MainScreenProfileIconImage = NULL;
     s_ui_MainScreenProfileName = NULL;
-    s_ui_MainScreenHostConnectionIcon = NULL;
-    s_ui_MainScreenWorkmodeIcon = NULL;
     ui_LabelData = NULL;
     ui_LabelWeek = NULL;
 }

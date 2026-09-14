@@ -186,7 +186,7 @@ namespace ekeys
 
         /*
          * C7 修复：移除工作模式硬编码（现由 applySetting →
-         * ui_MainScreen_set_working_mode() 覆盖）。
+         * status_bar_set_working_mode() 覆盖）。
          * 紧随其后的"启动快照"块会从 Configuration 读出真实 work_mode，
          * 这里写死反而会在首帧渲染前多一次冗余赋值。
          */
@@ -401,8 +401,8 @@ namespace ekeys
             ClickHighlight::applySettings(snap);
         }
 
-        /* 主屏底部：工作模式图标；状态栏：音量 */
-        ui_MainScreen_set_working_mode(s.work_mode);
+        /* 状态栏：工作模式图标、音量 */
+        status_bar_set_working_mode(s.work_mode);
         status_bar_set_volume(s.device_volume);
 
         /* 设置屏反向显示当前快照 */
@@ -589,8 +589,6 @@ namespace ekeys
     {
         const HaStatusInfo &ha = msg.ha_status;
 
-        /* 主页连接图标：键盘主机（BLE/USB）连接状态，连接 = 白色 */
-        ui_MainScreen_set_host_connection(ha.kb_connected);
         /* 状态栏 WiFi 图标：与 HA 二级页共用 wifi_enabled/connected/rssi 字段 */
         status_bar_set_wifi_status(ha.wifi_enabled,
                                    ha.wifi_connected,

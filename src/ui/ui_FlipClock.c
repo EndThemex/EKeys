@@ -2,10 +2,13 @@
  * @file ui_FlipClock.c
  * @brief 主页翻页时钟组件实现
  *
- * 结构：4 张大卡片（HH:MM）+ 2 个冒号圆点 + 2 张小卡片（秒）。
+ * 结构：6 张等宽大卡片（HH:MM:SS）+ 2 组冒号圆点（HH:MM 与 MM:SS 之间）。
  * 每张卡片 = 卡片容器（圆角裁剪）+ 上下两个半区容器（各含一个整字标签，
  * 通过 y 偏移让数字相对整卡居中，半区只露出各自一半）+ 中缝分割线
  * + 两个隐藏的翻页层（几何与半区一致）。
+ *
+ * 布局：卡片与冒号槽交替排列（卡:卡:卡卡卡卡），所有块间距统一 FLIP_GAP，
+ * 整体水平居中。
  *
  * 数字变化动画（经典翻页钟简化版，两段各 130ms，纯 height/translate 几何动画）：
  *   1. 上翻页层显示「旧数字上半部」，高度折叠（height half_h→0，translate_y
@@ -27,15 +30,14 @@
 LV_FONT_DECLARE(ui_font_BebasNeueFont48);
 
 /* ---------- 布局常量（LVGL 实际分辨率 428x142 横条屏，见 LvglPort.cpp） ---------- */
-#define FLIP_CARD_W 66   /* HH:MM 卡片宽 */
-#define FLIP_CARD_H 92   /* HH:MM 卡片高（y 4~96，下方整行留给状态/日期栏） */
-#define FLIP_SEC_W 40    /* 秒卡片宽（窄于大卡片，高度/字体与大卡片一致） */
-#define FLIP_SEC_H 92    /* 秒卡片高（与大卡片等高） */
-#define FLIP_CARD_X0 24  /* 第一张大卡片 x */
-#define FLIP_CARD_GAP 4  /* 卡片间距 */
-#define FLIP_CARD_Y 4    /* 大卡片 y */
-#define FLIP_SEC_X 318   /* 秒卡片起始 x（318~401，右缘留 27） */
-#define COLON_X 162      /* 冒号圆点 x（c2 结束 160 与 c3 开始 170 之间） */
+#define FLIP_CARD_W 56  /* 卡片宽（6 张卡片统一尺寸） */
+#define FLIP_CARD_H 92  /* 卡片高（y 4~96，下方整行留给状态/日期栏） */
+#define FLIP_COLON_W 14 /* 冒号槽宽 */
+#define FLIP_GAP 6      /* 相邻块（卡片/冒号槽）统一间距 */
+/* 8 个块（6 卡 + 2 冒号槽）7 个间距，整体水平居中 */
+#define FLIP_TOTAL_W (6 * FLIP_CARD_W + 2 * FLIP_COLON_W + 7 * FLIP_GAP)
+#define FLIP_X0 ((LV_HOR_RES - FLIP_TOTAL_W) / 2)
+#define FLIP_CARD_Y 4    /* 卡片 y */
 #define COLON_DOT_SIZE 6 /* 冒号圆点直径 */
 #define COLON_DOT_GAP 8  /* 冒号圆点间距 */
 #define FLIP_ANIM_MS 130 /* 单段翻页动画时长 */
@@ -63,8 +65,8 @@ typedef struct
 } flip_card_t;
 
 static lv_obj_t *s_root = NULL;
-static flip_card_t s_cards[6]; /* 0~3: HH:MM，4~5: 秒 */
-static lv_obj_t *s_colon_dots[2];
+static flip_card_t s_cards[6];    /* 0~5: HH:MM:SS */
+static lv_obj_t *s_colon_dots[4]; /* 2 组冒号 × 每组 2 圆点 */
 
 /* ---------- 工具 ---------- */
 
@@ -291,6 +293,19 @@ static void card_create(flip_card_t *c, lv_obj_t *parent, lv_coord_t x, lv_coord
     c->cur = '0';
 }
 
+static lv_obj_t *colon_dot_create(lv_obj_t *parent, lv_coord_t cx, lv_coord_t cy)
+{
+    lv_obj_t *dot = lv_obj_create(parent);
+    lv_obj_remove_style_all(dot);
+    lv_obj_set_pos(dot, cx - COLON_DOT_SIZE / 2,
+                   cy - (COLON_DOT_SIZE + COLON_DOT_GAP) / 2 - COLON_DOT_SIZE / 2);
+    lv_obj_set_size(dot, COLON_DOT_SIZE, COLON_DOT_SIZE);
+    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(dot, lv_color_hex(CARD_DIGIT_COLOR), 0);
+    lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
+    return dot;
+}
+
 void ui_FlipClock_create(lv_obj_t *parent)
 {
     if (parent == NULL)
@@ -305,38 +320,29 @@ void ui_FlipClock_create(lv_obj_t *parent)
     lv_obj_set_size(s_root, LV_HOR_RES, LV_VER_RES);
     lv_obj_clear_flag(s_root, LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE);
 
-    /* HH:MM 四张大卡片（x：24 / 94 / 170 / 244，中缝 160~170 让出冒号位） */
-    static const lv_coord_t xs[4] = {
-        FLIP_CARD_X0,
-        FLIP_CARD_X0 + FLIP_CARD_W + FLIP_CARD_GAP,
-        FLIP_CARD_X0 + 2 * FLIP_CARD_W + FLIP_CARD_GAP + 10, /* 中间让出冒号位 */
-        FLIP_CARD_X0 + 3 * FLIP_CARD_W + FLIP_CARD_GAP + 10,
-    };
-    for (int i = 0; i < 4; i++)
+    /* 8 个块依次排列：卡 卡 : 卡 卡 : 卡 卡，统一间距，水平居中 */
+    const lv_coord_t cy = FLIP_CARD_Y + FLIP_CARD_H / 2; /* 冒号垂直中心 */
+    int card_idx = 0;
+    int dot_idx = 0;
+    lv_coord_t x = FLIP_X0;
+    for (int slot = 0; slot < 8; slot++)
     {
-        card_create(&s_cards[i], s_root, xs[i], FLIP_CARD_Y, FLIP_CARD_W, FLIP_CARD_H,
-                    &ui_font_BebasNeueFont48);
+        if (slot == 2 || slot == 5)
+        {
+            /* 冒号槽：上下两个圆点 */
+            lv_coord_t cx = x + FLIP_COLON_W / 2;
+            s_colon_dots[dot_idx++] = colon_dot_create(s_root, cx, cy);
+            s_colon_dots[dot_idx++] =
+                colon_dot_create(s_root, cx, cy + COLON_DOT_SIZE + COLON_DOT_GAP);
+            x += FLIP_COLON_W + FLIP_GAP;
+        }
+        else
+        {
+            card_create(&s_cards[card_idx++], s_root, x, FLIP_CARD_Y, FLIP_CARD_W, FLIP_CARD_H,
+                        &ui_font_BebasNeueFont48);
+            x += FLIP_CARD_W + FLIP_GAP;
+        }
     }
-
-    /* 冒号：两个圆点，随秒闪烁（相对卡片垂直居中） */
-    for (int i = 0; i < 2; i++)
-    {
-        s_colon_dots[i] = lv_obj_create(s_root);
-        lv_obj_remove_style_all(s_colon_dots[i]);
-        lv_obj_set_pos(s_colon_dots[i], COLON_X,
-                       FLIP_CARD_Y + FLIP_CARD_H / 2 - (COLON_DOT_SIZE + COLON_DOT_GAP) / 2 -
-                           COLON_DOT_SIZE / 2 + i * (COLON_DOT_SIZE + COLON_DOT_GAP));
-        lv_obj_set_size(s_colon_dots[i], COLON_DOT_SIZE, COLON_DOT_SIZE);
-        lv_obj_set_style_radius(s_colon_dots[i], LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_bg_color(s_colon_dots[i], lv_color_hex(CARD_DIGIT_COLOR), 0);
-        lv_obj_set_style_bg_opa(s_colon_dots[i], LV_OPA_COVER, 0);
-    }
-
-    /* 秒：两张卡片（等高同字体，仅更窄） */
-    card_create(&s_cards[4], s_root, FLIP_SEC_X, FLIP_CARD_Y, FLIP_SEC_W, FLIP_SEC_H,
-                &ui_font_BebasNeueFont48);
-    card_create(&s_cards[5], s_root, FLIP_SEC_X + FLIP_SEC_W + 3, FLIP_CARD_Y, FLIP_SEC_W, FLIP_SEC_H,
-                &ui_font_BebasNeueFont48);
 }
 
 void ui_FlipClock_destroy(void)

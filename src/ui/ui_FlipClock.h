@@ -1,6 +1,6 @@
 /**
  * @file ui_FlipClock.h
- * @brief 主页翻页时钟组件（HH:MM 大卡片 + SS 小卡片，数字变化播放翻页动画）
+ * @brief 主页翻页时钟组件（HH:MM:SS 六张等宽卡片 + 两组冒号，数字变化播放翻页动画）
  */
 #ifndef UI_FLIPCLOCK_H
 #define UI_FLIPCLOCK_H
