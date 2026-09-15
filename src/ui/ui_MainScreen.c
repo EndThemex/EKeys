@@ -136,11 +136,11 @@ void ui_MainScreen_screen_init(void)
     /* ---------- 中部：翻页时钟（HH:MM 大卡片 + 秒小卡片，见 ui_FlipClock.c） ---------- */
     ui_FlipClock_create(ui_MainScreen);
 
-    /* ---------- 底部：分隔线 + 图标/日期星期/键盘配置（单行，y 99~142） ---------- */
+    /* ---------- 底部：分隔线 + 图标/日期星期/键盘配置（单行，y 103~142） ---------- */
     {
         lv_obj_t *divider = lv_obj_create(ui_MainScreen);
         lv_obj_remove_style_all(divider);
-        lv_obj_set_pos(divider, 10, 99);
+        lv_obj_set_pos(divider, 10, 103);
         lv_obj_set_size(divider, 408, 1);
         lv_obj_set_style_bg_color(divider, lv_color_hex(0x333333), 0);
         lv_obj_set_style_bg_opa(divider, LV_OPA_COVER, 0);
@@ -149,7 +149,7 @@ void ui_MainScreen_screen_init(void)
     ui_LabelData = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_LabelData, LV_SIZE_CONTENT);  /// 1
     lv_obj_set_height(ui_LabelData, LV_SIZE_CONTENT); /// 1
-    lv_obj_align(ui_LabelData, LV_ALIGN_TOP_MID, -10, 108);
+    lv_obj_align(ui_LabelData, LV_ALIGN_TOP_MID, -10, 112);
     lv_label_set_text(ui_LabelData, "09月14日");
     lv_obj_set_style_text_color(ui_LabelData, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_LabelData, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -170,7 +170,7 @@ void ui_MainScreen_screen_init(void)
     s_ui_MainScreenProfileIconLabel = lv_label_create(ui_MainScreen);
     lv_obj_set_width(s_ui_MainScreenProfileIconLabel, LV_SIZE_CONTENT);  /// 1
     lv_obj_set_height(s_ui_MainScreenProfileIconLabel, LV_SIZE_CONTENT); /// 1
-    lv_obj_align(s_ui_MainScreenProfileIconLabel, LV_ALIGN_TOP_LEFT, 300, 106);
+    lv_obj_align(s_ui_MainScreenProfileIconLabel, LV_ALIGN_TOP_LEFT, 300, 110);
     lv_label_set_text(s_ui_MainScreenProfileIconLabel, LV_SYMBOL_LIST);
     lv_obj_set_style_text_color(s_ui_MainScreenProfileIconLabel, lv_color_hex(0xF5F7FA), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(s_ui_MainScreenProfileIconLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -180,14 +180,14 @@ void ui_MainScreen_screen_init(void)
     lv_obj_set_size(s_ui_MainScreenProfileIconImage, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_img_set_size_mode(s_ui_MainScreenProfileIconImage, LV_IMG_SIZE_MODE_REAL);
     lv_img_set_zoom(s_ui_MainScreenProfileIconImage, 100); /* 原始 48px 图标缩到 ~19px 适配底栏行高 */
-    lv_obj_align(s_ui_MainScreenProfileIconImage, LV_ALIGN_TOP_LEFT, 294, 102);
+    lv_obj_align(s_ui_MainScreenProfileIconImage, LV_ALIGN_TOP_LEFT, 294, 106);
     lv_obj_add_flag(s_ui_MainScreenProfileIconImage, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clear_flag(s_ui_MainScreenProfileIconImage, LV_OBJ_FLAG_SCROLLABLE);
 
     s_ui_MainScreenProfileName = lv_label_create(ui_MainScreen);
     lv_obj_set_width(s_ui_MainScreenProfileName, 98);
     lv_obj_set_height(s_ui_MainScreenProfileName, LV_SIZE_CONTENT); /// 1
-    lv_obj_align(s_ui_MainScreenProfileName, LV_ALIGN_TOP_RIGHT, -8, 106);
+    lv_obj_align(s_ui_MainScreenProfileName, LV_ALIGN_TOP_RIGHT, -8, 110);
     lv_label_set_text(s_ui_MainScreenProfileName, "CONF1");
     lv_label_set_long_mode(s_ui_MainScreenProfileName, LV_LABEL_LONG_CLIP);
     lv_obj_set_style_text_align(s_ui_MainScreenProfileName, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);

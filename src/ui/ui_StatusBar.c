@@ -23,7 +23,7 @@ static bool recording_blink_visible = false;
  * 注意 status_bar 有 pad_all(5)，基准坐标按内容区写，实际渲染 = 设定值 + 5。
  */
 #define STATUS_BAR_FIRST_ICON_X 8
-#define STATUS_BAR_FIRST_ICON_Y 99
+#define STATUS_BAR_FIRST_ICON_Y 101
 #define STATUS_BAR_ICON_GAP 6
 
 static void recording_blink_timer_cb(lv_timer_t *timer)

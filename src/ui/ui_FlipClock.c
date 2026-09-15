@@ -26,18 +26,18 @@
 
 #include <string.h>
 
-/* BebasNeueFont48 已在 ui.h 声明（SquareLine 导出字号），六张卡片统一用 48 号 */
-LV_FONT_DECLARE(ui_font_BebasNeueFont48);
+/* BebasNeueFont86 已在 ui.h 声明（SquareLine 导出字号），六张卡片统一用 86 号 */
+LV_FONT_DECLARE(ui_font_BebasNeueFont86);
 
 /* ---------- 布局常量（LVGL 实际分辨率 428x142 横条屏，见 LvglPort.cpp） ---------- */
 #define FLIP_CARD_W 56  /* 卡片宽（6 张卡片统一尺寸） */
-#define FLIP_CARD_H 92  /* 卡片高（y 4~96，下方整行留给状态/日期栏） */
+#define FLIP_CARD_H 98  /* 卡片高（y 0~98，容纳 86 号数字，下方整行留给状态/日期栏） */
 #define FLIP_COLON_W 14 /* 冒号槽宽 */
 #define FLIP_GAP 6      /* 相邻块（卡片/冒号槽）统一间距 */
 /* 8 个块（6 卡 + 2 冒号槽）7 个间距，整体水平居中 */
 #define FLIP_TOTAL_W (6 * FLIP_CARD_W + 2 * FLIP_COLON_W + 7 * FLIP_GAP)
 #define FLIP_X0 ((LV_HOR_RES - FLIP_TOTAL_W) / 2)
-#define FLIP_CARD_Y 4    /* 卡片 y */
+#define FLIP_CARD_Y 0    /* 卡片 y（顶格，下方整行留给状态/日期栏） */
 #define COLON_DOT_SIZE 6 /* 冒号圆点直径 */
 #define COLON_DOT_GAP 8  /* 冒号圆点间距 */
 #define FLIP_ANIM_MS 130 /* 单段翻页动画时长 */
@@ -339,7 +339,7 @@ void ui_FlipClock_create(lv_obj_t *parent)
         else
         {
             card_create(&s_cards[card_idx++], s_root, x, FLIP_CARD_Y, FLIP_CARD_W, FLIP_CARD_H,
-                        &ui_font_BebasNeueFont48);
+                        &ui_font_BebasNeueFont86);
             x += FLIP_CARD_W + FLIP_GAP;
         }
     }
