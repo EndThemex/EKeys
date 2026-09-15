@@ -28,7 +28,7 @@ extern "C"
 	void ui_KeyMappedSecondary_set_profile(const char *icon, const char *name,
 																				 const char *file_name,
 																				 bool update_main_summary);
-	void ui_KeyMappedSecondary_set_profile_icon_source(const char *file_path, const char *fallback_symbol);
+	void ui_KeyMappedSecondary_set_profile_icon_source(const char *fallback_symbol);
 	void ui_KeyMappedSecondary_set_profile_icon_image_data(const uint8_t *image_data,
 																												 size_t image_size,
 																												 uint16_t width,

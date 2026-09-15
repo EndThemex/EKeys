@@ -114,6 +114,17 @@
 #define LV_FONT_DEFAULT &lv_font_montserrat_20
 
 /*====================
+   图片解码器
+ *====================*/
+
+/*
+ * PNG 解码（lodepng）：Profile 自定义图标（0x11 上传 /iconN.png）解码链路
+ * 依赖 lodepng_decode32（src/utils/ProfileIconImage.cpp 直接调用）。
+ * LV_USE_PNG=0 时 lv_png.c 被预处理空、lodepng.c.o 不参与链接。
+ */
+#define LV_USE_PNG 1
+
+/*====================
    Demo / 示例
  *====================*/
 

@@ -42,7 +42,7 @@ void ui_KeyMapped_screen_destroy(void);
 void ui_event_KeyMappedScreen(lv_event_t * e);
 void ui_event_ButtonLeftKeyMapped(lv_event_t * e);
 void ui_event_ButtonRightKeyMapped(lv_event_t * e);
-void ui_KeyMapped_set_profile_icon_source(const char *file_path, const char *fallback_symbol);
+void ui_KeyMapped_set_profile_icon_source(const char *fallback_symbol);
 void ui_KeyMapped_set_profile_icon_image_data(const uint8_t *image_data,
                                               size_t image_size,
                                               uint16_t width,

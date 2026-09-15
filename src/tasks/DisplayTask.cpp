@@ -42,20 +42,13 @@
 #include "ui/ui_PcStatusScreen.h"
 #include "ui/ui_SettingScreenSecondary.h"
 #include "ui/ui_StatusBar.h"
+#include "utils/ProfileIconImage.h"
 #include "voice/VoiceRecognizer.h"
 
 /*
- * A6 修复（占位）：Profile PNG 图标显示。
- *
- * 原计划：直接调用 lodepng_decode32() 解码 SPIFFS 上的 PNG。
- * 实现中发现 LV_USE_PNG=0 时 LVGL 整个 lv_png.c 被预处理空，LDF 不会链入
- * lodepng.c.o，导致 undefined reference to lodepng_decode32。
- * 简单可行的两个方案都会扩大变更面：
- *   1. 在 lv_conf.h 开 LV_USE_PNG=1（让 lv_png.c 真正起作用，链入 lodepng）
- *   2. 把 lodepng.c 复制到 src/util/ 并加入 build_src_filter
- * 两者都需要先做实测权衡，这里先保持符号回退路径，
- * UI 入口 ui_*_set_profile_icon_image_data() 已经实现真接通，
- * 后续接 PNG 解码只需在 applyKeymapProfile 里把 nullptr 换成解码产物。
+ * Profile PNG 图标显示（utils/ProfileIconImage）：
+ * LV_USE_PNG=1 后 lodepng 链入，applyKeymapProfile 在 applied 推送时
+ * 读 SPIFFS + 解码 + 转 16bpp TRUE_COLOR_ALPHA 后分发给 UI 层。
  */
 
 namespace ekeys
@@ -486,13 +479,18 @@ namespace ekeys
             /*
              * 预览消息：只刷新二级页展示，不应用不落盘。
              * - update_main_summary=false：预览不得污染主屏 summary（bind 缓存）
-             * - 跳过 SPIFFS.exists 图标检查与两个 set_profile_icon_image_data：
-             *   最贵的 SPIFFS 探测在预览高频路径上没必要（当前 icon 恒为
-             *   符号回退，无视觉差异），且避免一级屏图标被预览污染
+             * - 图标走符号回退：不做 SPIFFS 读 + 解码（预览高频路径，
+             *   逐 profile 解码不值得），也不释放像素缓存
              */
             ui_KeyMappedSecondary_set_profile(p.profile_icon, p.profile_name,
                                               fileName,
                                               /*update_main_summary=*/false);
+            /*
+             * 预览态图标：只显示符号回退（set_profile_icon_source 会隐藏
+             * 位图 widget 并显示符号）。不触碰像素缓存——预览切换/退出后
+             * bind 恢复时仍用缓存展示已应用方案的图标，避免预览污染。
+             */
+            ui_KeyMappedSecondary_set_profile_icon_source(p.profile_icon);
             {
                 DeviceSettings snap;
                 Configuration::instance().snapshot(snap);
@@ -529,36 +527,35 @@ namespace ekeys
         }
 
         /*
-         * A6 修复：Profile 图标显示。
-         *
-         * 设计：ui_*_set_profile_icon_image_data() 接口已实现真接通（malloc
-         * 拷贝 + 构造 lv_img_dsc_t + set src），只是缺少解码 PNG 的中间层。
-         * 当前实现简化：仅检查是否存在 PNG 文件（读 Configuration 内存缓存，
-         * 2026-09-12 优化：不再从 DisplayTask 直接 SPIFFS.exists——既避免
-         * 本任务渲染帧被 SPIFFS.stat 拖慢，也消除与 MainTask 的跨任务
-         * SPIFFS 并发访问），存在与否仅决定回退分支，未来接入 PNG 解码器
-         * （lodepng / PNGdec）只需替换以下 readPngToRgba() 占位即可。
-         * 两个 UI 入口保留 nullptr=回退符号 的语义。
-         *
-         * TODO：把 readPngToRgba() 接上 lodepng（当前 LV_USE_PNG=0 让 LVGL
-         * 不链入 lodepng.c.o，链接失败；可考虑 LV_USE_PNG=1 或显式 src/util）。
+         * Profile 图标显示（解码管线已接入，见 utils/ProfileIconImage）：
+         * 图标存在性读 Configuration 内存缓存（避免跨任务 SPIFFS.exists），
+         * 存在时读文件 + lodepng 解码 + 转 16bpp TRUE_COLOR_ALPHA，再经
+         * ui_*_set_profile_icon_image_data 分发（内部缓存像素并在
+         * bind / screen 重建时恢复）；失败或不存在走符号回退。
+         * 单次解码 <10ms（≤64×64），applied 推送为低频路径，可接受。
          */
         const bool has_icon = Configuration::instance().isProfileIconPresent(
             p.profile_index);
-        if (!has_icon)
+        uint8_t *icon_px = nullptr;
+        size_t icon_px_size = 0;
+        uint16_t icon_w = 0;
+        uint16_t icon_h = 0;
+        const bool icon_loaded =
+            has_icon && profileIconLoadTrueColorAlpha(p.profile_index,
+                                                      &icon_px, &icon_px_size,
+                                                      &icon_w, &icon_h);
+        ui_KeyMapped_set_profile_icon_image_data(icon_loaded ? icon_px : nullptr,
+                                                 icon_loaded ? icon_px_size : 0,
+                                                 icon_w, icon_h,
+                                                 p.profile_icon);
+        ui_KeyMappedSecondary_set_profile_icon_image_data(
+            icon_loaded ? icon_px : nullptr,
+            icon_loaded ? icon_px_size : 0,
+            icon_w, icon_h,
+            p.profile_icon);
+        if (icon_loaded)
         {
-            ui_KeyMapped_set_profile_icon_image_data(nullptr, 0, 0, 0,
-                                                     p.profile_icon);
-            ui_KeyMappedSecondary_set_profile_icon_image_data(nullptr, 0, 0, 0,
-                                                              p.profile_icon);
-        }
-        else
-        {
-            /* 占位：图标存在但解码管线未接 → 走符号回退。 */
-            ui_KeyMapped_set_profile_icon_image_data(nullptr, 0, 0, 0,
-                                                     p.profile_icon);
-            ui_KeyMappedSecondary_set_profile_icon_image_data(nullptr, 0, 0, 0,
-                                                              p.profile_icon);
+            free(icon_px); /* UI 侧 lv_mem_alloc 拷贝后即可释放 */
         }
 
         for (uint8_t i = 0; i < 11; ++i)

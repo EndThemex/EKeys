@@ -60,7 +60,6 @@ static void keymapped_secondary_apply_applied_marker(void);
 static lv_obj_t *s_keymapped_secondary_main_screen_icon = NULL;
 static lv_obj_t *s_keymapped_secondary_main_screen_icon_image = NULL;
 static lv_obj_t *s_keymapped_secondary_main_screen_profile_name = NULL;
-static char s_keymapped_secondary_icon_src[48] = {0};
 static char s_keymapped_secondary_profile_name[32] = {0}; /* APP 下发名称（UTF-8 中文） */
 static char s_keymapped_secondary_profile_file_name[24] = {0};
 static char s_keymapped_secondary_profile_icon_symbol[8] = {0};
@@ -220,6 +219,15 @@ static void keymapped_secondary_apply_cached_key_labels(void)
 
 static void keymapped_secondary_release_cached_image(void)
 {
+    /* 先摘除 widget 的 src 再释放像素，避免释放后渲染引用已清零的 dsc */
+    if (ui_KeyMappedSecondaryIconImage != NULL)
+    {
+        lv_img_set_src(ui_KeyMappedSecondaryIconImage, NULL);
+    }
+    if (s_keymapped_secondary_main_screen_icon_image != NULL)
+    {
+        lv_img_set_src(s_keymapped_secondary_main_screen_icon_image, NULL);
+    }
     if (s_keymapped_secondary_icon_image_data != NULL)
     {
         lv_mem_free(s_keymapped_secondary_icon_image_data);
@@ -268,82 +276,45 @@ void ui_KeyMappedSecondary_bind_main_screen_summary(lv_obj_t *icon_label,
     }
     else
     {
-        ui_KeyMappedSecondary_set_profile_icon_source(s_keymapped_secondary_icon_src,
-                                                      s_keymapped_secondary_profile_icon_symbol);
+        ui_KeyMappedSecondary_set_profile_icon_source(s_keymapped_secondary_profile_icon_symbol);
     }
 }
 
-void ui_KeyMappedSecondary_set_profile_icon_source(const char *file_path, const char *fallback_symbol)
+/*
+ * 图标回退路径：显示符号并隐藏位图 widget（含主屏 bind 的 image）。
+ * 原版的 file_path 分支（lv_img_set_src("/iconN.png")）已删除：
+ * 未注册 lv_fs 盘符驱动且 LV_USE_PNG 文件解码链路未接，该分支
+ * 从未被调用且无法工作；位图统一走 set_profile_icon_image_data。
+ */
+void ui_KeyMappedSecondary_set_profile_icon_source(const char *fallback_symbol)
 {
-    const bool has_file = file_path != NULL && file_path[0] != '\0';
-
     snprintf(s_keymapped_secondary_profile_icon_symbol,
              sizeof(s_keymapped_secondary_profile_icon_symbol),
              "%s",
              (fallback_symbol && fallback_symbol[0]) ? fallback_symbol : LV_SYMBOL_LIST);
 
-    if (has_file)
-    {
-        snprintf(s_keymapped_secondary_icon_src, sizeof(s_keymapped_secondary_icon_src), "%s", file_path);
-    }
-    else
-    {
-        s_keymapped_secondary_icon_src[0] = '\0';
-    }
-
     if (ui_KeyMappedSecondaryIcon)
     {
         lv_label_set_text(ui_KeyMappedSecondaryIcon,
                           s_keymapped_secondary_profile_icon_symbol);
-        if (has_file)
-        {
-            lv_obj_add_flag(ui_KeyMappedSecondaryIcon, LV_OBJ_FLAG_HIDDEN);
-        }
-        else
-        {
-            lv_obj_clear_flag(ui_KeyMappedSecondaryIcon, LV_OBJ_FLAG_HIDDEN);
-        }
+        lv_obj_clear_flag(ui_KeyMappedSecondaryIcon, LV_OBJ_FLAG_HIDDEN);
     }
     if (s_keymapped_secondary_main_screen_icon)
     {
         lv_label_set_text(s_keymapped_secondary_main_screen_icon,
                           s_keymapped_secondary_profile_icon_symbol);
-        if (has_file)
-        {
-            lv_obj_add_flag(s_keymapped_secondary_main_screen_icon, LV_OBJ_FLAG_HIDDEN);
-        }
-        else
-        {
-            lv_obj_clear_flag(s_keymapped_secondary_main_screen_icon, LV_OBJ_FLAG_HIDDEN);
-        }
+        lv_obj_clear_flag(s_keymapped_secondary_main_screen_icon, LV_OBJ_FLAG_HIDDEN);
     }
 
-    if (!has_file)
-    {
-        lv_img_cache_invalidate_src(s_keymapped_secondary_icon_src);
-        if (ui_KeyMappedSecondaryIconImage)
-        {
-            lv_img_set_src(ui_KeyMappedSecondaryIconImage, NULL);
-            lv_obj_add_flag(ui_KeyMappedSecondaryIconImage, LV_OBJ_FLAG_HIDDEN);
-        }
-        if (s_keymapped_secondary_main_screen_icon_image)
-        {
-            lv_img_set_src(s_keymapped_secondary_main_screen_icon_image, NULL);
-            lv_obj_add_flag(s_keymapped_secondary_main_screen_icon_image, LV_OBJ_FLAG_HIDDEN);
-        }
-        return;
-    }
-
-    lv_img_cache_invalidate_src(s_keymapped_secondary_icon_src);
     if (ui_KeyMappedSecondaryIconImage)
     {
-        lv_img_set_src(ui_KeyMappedSecondaryIconImage, s_keymapped_secondary_icon_src);
-        lv_obj_clear_flag(ui_KeyMappedSecondaryIconImage, LV_OBJ_FLAG_HIDDEN);
+        lv_img_set_src(ui_KeyMappedSecondaryIconImage, NULL);
+        lv_obj_add_flag(ui_KeyMappedSecondaryIconImage, LV_OBJ_FLAG_HIDDEN);
     }
     if (s_keymapped_secondary_main_screen_icon_image)
     {
-        lv_img_set_src(s_keymapped_secondary_main_screen_icon_image, s_keymapped_secondary_icon_src);
-        lv_obj_clear_flag(s_keymapped_secondary_main_screen_icon_image, LV_OBJ_FLAG_HIDDEN);
+        lv_img_set_src(s_keymapped_secondary_main_screen_icon_image, NULL);
+        lv_obj_add_flag(s_keymapped_secondary_main_screen_icon_image, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
@@ -353,7 +324,7 @@ void ui_KeyMappedSecondary_set_profile_icon_image_data(const uint8_t *image_data
                                                        uint16_t height,
                                                        const char *fallback_symbol)
 {
-    ui_KeyMappedSecondary_set_profile_icon_source(NULL, fallback_symbol);
+    ui_KeyMappedSecondary_set_profile_icon_source(fallback_symbol);
     keymapped_secondary_release_cached_image();
 
     if (image_data == NULL || image_size == 0 || width == 0 || height == 0)
@@ -751,7 +722,9 @@ void ui_KeyMappedSecondary_screen_init(void)
     ui_KeyMappedSecondaryIcon = lv_label_create(iconBadge);
     lv_label_set_text(ui_KeyMappedSecondaryIcon, LV_SYMBOL_LIST);
     lv_obj_center(ui_KeyMappedSecondaryIcon);
-    lv_obj_set_style_text_font(ui_KeyMappedSecondaryIcon, &ui_font_BebasNeueFont36, LV_PART_MAIN | LV_STATE_DEFAULT);
+    /* 符号字形只在 montserrat 内置图标集里有（BebasNeue 仅 0x20-0x7f，
+     * 缺字形渲染为空白），换 montserrat_24 适配 50×50 徽章 */
+    lv_obj_set_style_text_font(ui_KeyMappedSecondaryIcon, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(ui_KeyMappedSecondaryIcon, lv_color_hex(0xF5F7FA), LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_KeyMappedSecondaryIconImage = lv_img_create(iconBadge);
@@ -846,8 +819,7 @@ void ui_KeyMappedSecondary_screen_init(void)
     }
     else
     {
-        ui_KeyMappedSecondary_set_profile_icon_source(s_keymapped_secondary_icon_src,
-                                                      s_keymapped_secondary_profile_icon_symbol);
+        ui_KeyMappedSecondary_set_profile_icon_source(s_keymapped_secondary_profile_icon_symbol);
     }
     keymapped_secondary_apply_cached_key_labels();
     /* FUN 键整体配色 + focus 高亮（screen 重建后重刷一次） */

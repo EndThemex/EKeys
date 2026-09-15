@@ -812,9 +812,11 @@ App 查询当前 Profile：
 }
 ```
 
-成功后，固件还会主动推送一条 `cmd=16, seq=0` 的 Profile 状态。
+成功后，固件还会主动推送一条 `cmd=16, seq=0` 的 Profile 状态，同时触发设备 UI 重推键映射视图，各屏（主页 / 键映射屏 / 二级页）重新加载并显示自定义图标。
 
-当前固件代码会解码 Base64 并写入 SPIFFS，但**没有在协议处理函数中实际校验 PNG 尺寸**；注释中提到的 `48×48 PNG` 不能视为当前协议层的强制保证。实现见 [cmd_profile.cpp](../src/protocol/commands/cmd_profile.cpp#L41-L89)。
+固件展示侧约束（见 [ProfileIconImage.cpp](../src/utils/ProfileIconImage.cpp)）：图标文件 ≤ 16KB、解码尺寸 ≤ 64×64，超限或解码失败时该方案 UI 显示内置符号回退。建议 App 端上传 48×48 带 alpha 通道的 PNG。
+
+当前固件协议层本身不做 PNG 尺寸校验（写入 SPIFFS 原样保存），尺寸约束在 UI 解码路径上执行。实现见 [cmd_profile.cpp](../src/protocol/commands/cmd_profile.cpp#L41-L89)。
 
 由于主协议行缓冲区上限是 2048 字节，较大的 Base64 图标可能超过单帧限制。App 端应控制图片大小，或者在固件提供分帧/二进制通道后再传输大图。
 

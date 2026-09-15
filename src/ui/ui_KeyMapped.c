@@ -5,26 +5,35 @@
 #include <stdio.h>
 #include <string.h>
 
-lv_obj_t * ui_KeyMapped = NULL;
-static lv_obj_t * ui_KeyMappedButtonLeft = NULL;
-static lv_obj_t * ui_KeyMappedButtonRight = NULL;
-static lv_obj_t * ui_KeyMappedButtonEnter = NULL;
-static lv_obj_t * ui_KeyMappedButtonExit = NULL;
-static lv_obj_t * ui_KeyMappedIcon = NULL;
+lv_obj_t *ui_KeyMapped = NULL;
+static lv_obj_t *ui_KeyMappedButtonLeft = NULL;
+static lv_obj_t *ui_KeyMappedButtonRight = NULL;
+static lv_obj_t *ui_KeyMappedButtonEnter = NULL;
+static lv_obj_t *ui_KeyMappedButtonExit = NULL;
+static lv_obj_t *ui_KeyMappedIcon = NULL;
 static lv_style_t s_keymapped_title_style;
 static lv_style_t s_keymapped_icon_style;
 static bool s_keymapped_title_style_ready = false;
 static bool s_keymapped_icon_style_ready = false;
 static ui_screen_tag_t g_active_screen_tag = UI_SCREEN_UNKNOWN;
-static char s_keymapped_icon_src[48] = {0};
 static char s_keymapped_icon_symbol[8] = {0};
-static uint8_t * s_keymapped_icon_image_data = NULL;
+static uint8_t *s_keymapped_icon_image_data = NULL;
 static size_t s_keymapped_icon_image_size = 0;
 static lv_img_dsc_t s_keymapped_icon_image_dsc;
 
+/* 一级屏图标 widget 的原始尺寸（SquareLine 设计值，符号回退时恢复） */
+#define KEYMAPPED_ICON_W 80
+#define KEYMAPPED_ICON_H 80
+
 static void keymapped_release_cached_image(void)
 {
-    if (s_keymapped_icon_image_data != NULL) {
+    /* 先摘除 widget 的 src 再释放像素，避免释放后渲染引用已清零的 dsc */
+    if (ui_KeyMappedIcon != NULL)
+    {
+        lv_img_set_src(ui_KeyMappedIcon, NULL);
+    }
+    if (s_keymapped_icon_image_data != NULL)
+    {
         lv_mem_free(s_keymapped_icon_image_data);
         s_keymapped_icon_image_data = NULL;
     }
@@ -34,7 +43,8 @@ static void keymapped_release_cached_image(void)
 
 static void keymapped_apply_cached_image(void)
 {
-    if (ui_KeyMappedIcon == NULL) {
+    if (ui_KeyMappedIcon == NULL)
+    {
         return;
     }
     /* 先清掉之前的字符串 src（LV_SYMBOL_KEYBOARD），避免 cache 命中老符号 */
@@ -43,31 +53,24 @@ static void keymapped_apply_cached_image(void)
     lv_img_set_src(ui_KeyMappedIcon, &s_keymapped_icon_image_dsc);
 }
 
-void ui_KeyMapped_set_profile_icon_source(const char *file_path, const char *fallback_symbol)
+/*
+ * 图标回退路径：显示符号（lv_img 支持符号 src，走 montserrat_48 文字样式）。
+ * widget 恢复 80×80 设计尺寸——位图路径会按图标尺寸缩放 widget。
+ */
+void ui_KeyMapped_set_profile_icon_source(const char *fallback_symbol)
 {
-    const bool has_file = file_path != NULL && file_path[0] != '\0';
-
     snprintf(s_keymapped_icon_symbol,
              sizeof(s_keymapped_icon_symbol),
              "%s",
              (fallback_symbol && fallback_symbol[0]) ? fallback_symbol : LV_SYMBOL_KEYBOARD);
 
-    if (has_file) {
-        snprintf(s_keymapped_icon_src, sizeof(s_keymapped_icon_src), "%s", file_path);
-    } else {
-        s_keymapped_icon_src[0] = '\0';
-    }
-
-    if (ui_KeyMappedIcon == NULL) {
-        return;
-    }
-
-    if (!has_file) {
-        lv_img_set_src(ui_KeyMappedIcon, s_keymapped_icon_symbol);
+    if (ui_KeyMappedIcon == NULL)
+    {
         return;
     }
 
     lv_img_set_src(ui_KeyMappedIcon, s_keymapped_icon_symbol);
+    lv_obj_set_size(ui_KeyMappedIcon, KEYMAPPED_ICON_W, KEYMAPPED_ICON_H);
 }
 
 void ui_KeyMapped_set_profile_icon_image_data(const uint8_t *image_data,
@@ -80,23 +83,26 @@ void ui_KeyMapped_set_profile_icon_image_data(const uint8_t *image_data,
      * A6 修复：把 RGBA 像素数据缓存到 s_keymapped_icon_image_data，
      * 构造 lv_img_dsc_t 并 set 给 ui_KeyMappedIcon（与二级页同款实现）。
      * 没有像素数据 / 尺寸为 0 时回退到 fallback_symbol。
+     * lv_img 在 widget 大于 src 时会平铺重复，位图路径必须把 widget
+     * 缩到图标实际尺寸。
      */
     keymapped_release_cached_image();
 
-    if (image_data == NULL || image_size == 0 || width == 0 || height == 0) {
+    if (image_data == NULL || image_size == 0 || width == 0 || height == 0)
+    {
         ui_KeyMapped_set_profile_icon_source(
-            NULL,
             (fallback_symbol && fallback_symbol[0]) ? fallback_symbol : LV_SYMBOL_KEYBOARD);
-        if (ui_KeyMappedIcon != NULL) {
+        if (ui_KeyMappedIcon != NULL)
+        {
             lv_obj_clear_flag(ui_KeyMappedIcon, LV_OBJ_FLAG_HIDDEN);
         }
         return;
     }
 
     s_keymapped_icon_image_data = lv_mem_alloc(image_size);
-    if (s_keymapped_icon_image_data == NULL) {
+    if (s_keymapped_icon_image_data == NULL)
+    {
         ui_KeyMapped_set_profile_icon_source(
-            NULL,
             (fallback_symbol && fallback_symbol[0]) ? fallback_symbol : LV_SYMBOL_KEYBOARD);
         return;
     }
@@ -110,7 +116,9 @@ void ui_KeyMapped_set_profile_icon_image_data(const uint8_t *image_data,
     s_keymapped_icon_image_dsc.data_size = (uint32_t)s_keymapped_icon_image_size;
 
     keymapped_apply_cached_image();
-    if (ui_KeyMappedIcon != NULL) {
+    if (ui_KeyMappedIcon != NULL)
+    {
+        lv_obj_set_size(ui_KeyMappedIcon, width, height);
         lv_obj_clear_flag(ui_KeyMappedIcon, LV_OBJ_FLAG_HIDDEN);
     }
 }
@@ -120,7 +128,8 @@ static void keymapped_forward_key(uint32_t key)
     lv_obj_t *active_screen = lv_scr_act();
     lv_group_t *g = lv_group_get_default();
     lv_obj_t *target = g ? lv_group_get_focused(g) : active_screen;
-    if (target) {
+    if (target)
+    {
         lv_event_send(target, LV_EVENT_KEY, (void *)key);
     }
 }
@@ -135,20 +144,26 @@ void ui_set_active_screen_tag(ui_screen_tag_t tag)
     g_active_screen_tag = tag;
 }
 
-void ui_event_KeyMappedScreen(lv_event_t * e)
+void ui_event_KeyMappedScreen(lv_event_t *e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
-    if (event_code == LV_EVENT_KEY) {
+    if (event_code == LV_EVENT_KEY)
+    {
         uintptr_t key = (uintptr_t)lv_event_get_param(e);
-        if (key == (uintptr_t)LV_KEY_LEFT) {
+        if (key == (uintptr_t)LV_KEY_LEFT)
+        {
             ui_set_active_screen_tag(UI_SCREEN_MAIN);
             _ui_screen_change(&ui_MainScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_MainScreen_screen_init);
             lv_refr_now(NULL);
-        } else if (key == (uintptr_t)LV_KEY_RIGHT) {
+        }
+        else if (key == (uintptr_t)LV_KEY_RIGHT)
+        {
             ui_set_active_screen_tag(UI_SCREEN_MUSIC);
             _ui_screen_change(&ui_MusicScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_MusicScreen_screen_init);
             lv_refr_now(NULL);
-        } else if (key == (uintptr_t)LV_KEY_ENTER) {
+        }
+        else if (key == (uintptr_t)LV_KEY_ENTER)
+        {
             ui_set_active_screen_tag(UI_SCREEN_KEYMAPPED_SECONDARY);
             _ui_screen_change(&ui_KeyMappedSecondary, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_KeyMappedSecondary_screen_init);
             lv_refr_now(NULL);
@@ -156,16 +171,18 @@ void ui_event_KeyMappedScreen(lv_event_t * e)
     }
 }
 
-void ui_event_ButtonLeftKeyMapped(lv_event_t * e)
+void ui_event_ButtonLeftKeyMapped(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         keymapped_forward_key(LV_KEY_LEFT);
     }
 }
 
-void ui_event_ButtonRightKeyMapped(lv_event_t * e)
+void ui_event_ButtonRightKeyMapped(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         keymapped_forward_key(LV_KEY_RIGHT);
     }
 }
@@ -176,7 +193,8 @@ void ui_KeyMapped_screen_init(void)
     lv_obj_clear_flag(ui_KeyMapped, LV_OBJ_FLAG_SCROLLABLE);
     ui_set_active_screen_tag(UI_SCREEN_KEYMAPPED);
 
-    if (!s_keymapped_title_style_ready) {
+    if (!s_keymapped_title_style_ready)
+    {
         lv_style_init(&s_keymapped_title_style);
         lv_style_set_text_font(&s_keymapped_title_style, &ui_font_FontCKJGT28);
         lv_style_set_text_letter_space(&s_keymapped_title_style, 1);
@@ -185,7 +203,8 @@ void ui_KeyMapped_screen_init(void)
         s_keymapped_title_style_ready = true;
     }
 
-    if (!s_keymapped_icon_style_ready) {
+    if (!s_keymapped_icon_style_ready)
+    {
         lv_style_init(&s_keymapped_icon_style);
         lv_style_set_text_font(&s_keymapped_icon_style, &lv_font_montserrat_48);
         s_keymapped_icon_style_ready = true;
@@ -238,10 +257,20 @@ void ui_KeyMapped_screen_init(void)
     lv_obj_add_style(keymapped_title, &s_keymapped_title_style, 0);
     lv_obj_align_to(keymapped_title, ui_KeyMappedIcon, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
 
-    if (s_keymapped_icon_image_data != NULL && s_keymapped_icon_image_size > 0) {
+    if (s_keymapped_icon_image_data != NULL && s_keymapped_icon_image_size > 0)
+    {
         keymapped_apply_cached_image();
-    } else {
-        ui_KeyMapped_set_profile_icon_source(s_keymapped_icon_src, s_keymapped_icon_symbol);
+        /* 位图路径：widget 缩到缓存图标尺寸（重建后需重设） */
+        if (ui_KeyMappedIcon != NULL)
+        {
+            lv_obj_set_size(ui_KeyMappedIcon,
+                            s_keymapped_icon_image_dsc.header.w,
+                            s_keymapped_icon_image_dsc.header.h);
+        }
+    }
+    else
+    {
+        ui_KeyMapped_set_profile_icon_source(s_keymapped_icon_symbol);
     }
 
     lv_obj_add_event_cb(ui_KeyMappedButtonLeft, ui_event_ButtonLeftKeyMapped, LV_EVENT_ALL, NULL);
@@ -251,7 +280,8 @@ void ui_KeyMapped_screen_init(void)
 
 void ui_KeyMapped_screen_destroy(void)
 {
-    if (ui_KeyMapped) {
+    if (ui_KeyMapped)
+    {
         lv_obj_del(ui_KeyMapped);
     }
     ui_KeyMapped = NULL;

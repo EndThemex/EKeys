@@ -22,6 +22,7 @@
 #include <mbedtls/base64.h>
 
 #include "../../logging/LogManager.h"
+#include "../../app/AppContext.h"
 #include "../SerialProtocol.h"
 #include "../CommandRegistry.h"
 #include "../../config/Configuration.h"
@@ -179,7 +180,9 @@ namespace ekeys::protocol::commands
                 SerialProtocol::instance().sendDocument(resp);
             }
 
-            /* 图标变化后同步 profile 状态（seq=0 推送） */
+            /* 图标变化后同步 profile 状态（seq=0 推送），并触发设备 UI
+             * 侧重推键映射视图 → DisplayTask 重新加载图标刷新各屏 */
+            AppContext::instance().mainTask().notifyProfileIconChanged();
             sendProfileState(0);
             return 0;
         }

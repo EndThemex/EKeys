@@ -60,6 +60,13 @@ namespace ekeys
                          uint16_t keyMask);
 
         /*
+         * 0x11 图标上传/清除成功后调用（协议层，MainTask 同上下文）：
+         * 置 keymap_ui_pending_，下轮 5ms tick 重推当前键映射视图，
+         * DisplayTask 重新加载图标（SPIFFS + 解码）刷新各屏。
+         */
+        void notifyProfileIconChanged() { keymap_ui_pending_ = true; }
+
+        /*
          * 由 Arduino loop() 调用，约 5ms 一次。
          */
         void loop();

@@ -194,7 +194,9 @@ void ui_AudioScreenSecondary_screen_init(void)
     lv_obj_t *badge_icon = lv_label_create(icon_badge);
     lv_label_set_text(badge_icon, LV_SYMBOL_AUDIO);
     lv_obj_center(badge_icon);
-    lv_obj_set_style_text_font(badge_icon, &ui_font_BebasNeueFont36, LV_PART_MAIN | LV_STATE_DEFAULT);
+    /* 符号字形只在 montserrat 内置图标集里有（BebasNeue 仅 0x20-0x7f），
+     * 换 montserrat_24 适配 50×50 徽章 */
+    lv_obj_set_style_text_font(badge_icon, &lv_font_montserrat_24, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_color(badge_icon, lv_color_hex(0xF5F7FA), LV_PART_MAIN | LV_STATE_DEFAULT);
 
     s_playing_label = lv_label_create(s_app_card);
