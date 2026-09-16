@@ -13,6 +13,7 @@
 | 05   | [05-ui-screens.md](./05-ui-screens.md)                           | 音乐 / PC 状态 / HA / 设置屏           | 02/04 |
 | 06   | [06-network-voice-rgb-audio.md](./06-network-voice-rgb-audio.md) | WiFi / BLE / 语音 / RGB / 音频         | 04    |
 | 07   | [07-placeholder-completion.md](./07-placeholder-completion.md)   | 2.4G / 频谱 / OTA / 占位命令补齐       | 06    |
+| 09   | [09-ui-theme-system.md](./09-ui-theme-system.md)                 | UI 主题系统（调色板 + 切屏动画）       | 05    |
 
 ## 其他文档
 
