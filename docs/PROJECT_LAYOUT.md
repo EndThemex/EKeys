@@ -91,7 +91,9 @@ EKeys/
     ├── 04-protocol-config-sync.md
     ├── 05-ui-screens.md
     ├── 06-network-voice-rgb-audio.md
-    └── 07-placeholder-completion.md
+    ├── 07-placeholder-completion.md
+    ├── 09-ui-theme-system.md     # 跳转页（实际内容拆分到 theme-spec/）
+    └── theme-spec/               # 阶段 09 规格细分（索引 + 概述 + 架构 + 计划）
 ```
 
 阅读建议顺序：`README.md` → `FEATURE_DOC.md` → `ARCHITECTURE.md` → `PINOUT.md` → 阶段文档。

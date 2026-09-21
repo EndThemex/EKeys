@@ -4,25 +4,26 @@
 
 ## 阶段列表
 
-| 阶段 | 文档                                                             | 目标简述                               | 依赖  |
-| ---- | ---------------------------------------------------------------- | -------------------------------------- | ----- |
-| 01   | [01-minimal-hid.md](./01-minimal-hid.md)                         | 按键矩阵 → USB HID 键盘                | —     |
-| 02   | [02-display-lvgl-port.md](./02-display-lvgl-port.md)             | 把 NV3007 + LVGL 初始化迁出 `main.cpp` | 01    |
-| 03   | [03-config-persistence.md](./03-config-persistence.md)           | SPIFFS + SimpleIni 持久化键映射        | 01    |
-| 04   | [04-protocol-config-sync.md](./04-protocol-config-sync.md)       | 私有协议 `CMD_CONFIG_SET` 同步         | 03    |
-| 05   | [05-ui-screens.md](./05-ui-screens.md)                           | 音乐 / PC 状态 / HA / 设置屏           | 02/04 |
-| 06   | [06-network-voice-rgb-audio.md](./06-network-voice-rgb-audio.md) | WiFi / BLE / 语音 / RGB / 音频         | 04    |
-| 07   | [07-placeholder-completion.md](./07-placeholder-completion.md)   | 2.4G / 频谱 / OTA / 占位命令补齐       | 06    |
-| 09   | [09-ui-theme-system.md](./09-ui-theme-system.md)                 | UI 主题系统（调色板 + 切屏动画）       | 05    |
+| 阶段 | 文档                                                                                      | 目标简述                                 | 依赖  |
+| ---- | ----------------------------------------------------------------------------------------- | ---------------------------------------- | ----- |
+| 01   | [01-minimal-hid.md](./01-minimal-hid.md)                                                  | 按键矩阵 → USB HID 键盘                  | —     |
+| 02   | [02-display-lvgl-port.md](./02-display-lvgl-port.md)                                      | 把 NV3007 + LVGL 初始化迁出 `main.cpp`   | 01    |
+| 03   | [03-config-persistence.md](./03-config-persistence.md)                                    | SPIFFS + SimpleIni 持久化键映射          | 01    |
+| 04   | [04-protocol-config-sync.md](./04-protocol-config-sync.md)                                | 私有协议 `CMD_CONFIG_SET` 同步           | 03    |
+| 05   | [05-ui-screens.md](./05-ui-screens.md)                                                    | 音乐 / PC 状态 / HA / 设置屏             | 02/04 |
+| 06   | [06-network-voice-rgb-audio.md](./06-network-voice-rgb-audio.md)                          | WiFi / BLE / 语音 / RGB / 音频           | 04    |
+| 07   | [07-placeholder-completion.md](./07-placeholder-completion.md)                            | 2.4G / 频谱 / OTA / 占位命令补齐         | 06    |
+| 09   | [09-ui-theme-system.md](./09-ui-theme-system.md)（已拆分为 [theme-spec/](./theme-spec/)） | UI 主题系统（调色板 + 切屏动画）         | 05    |
+| 10   | [10-bluetooth-media-control.md](./10-bluetooth-media-control.md)                          | BLE HID Consumer 媒体控制 + App 状态推送 | 06    |
 
 ## 其他文档
 
-| 文档 | 说明 |
-| ---- | ---- |
-| [COMPILING.md](./COMPILING.md) | 编译、烧录、SPIFFS 上传、串口监视、擦除 Flash |
-| [PROJECT_LAYOUT.md](./PROJECT_LAYOUT.md) | 仓库目录速览 / 关键文件 / 文档体系 |
-| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) | 硬件 / 软件注意事项与常见问题速查 |
-| [desktop-app-protocol.md](./desktop-app-protocol.md) | 桌面 App 开发对接：通信协议、命令与字段约定 |
+| 文档                                                 | 说明                                          |
+| ---------------------------------------------------- | --------------------------------------------- |
+| [COMPILING.md](./COMPILING.md)                       | 编译、烧录、SPIFFS 上传、串口监视、擦除 Flash |
+| [PROJECT_LAYOUT.md](./PROJECT_LAYOUT.md)             | 仓库目录速览 / 关键文件 / 文档体系            |
+| [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)           | 硬件 / 软件注意事项与常见问题速查             |
+| [desktop-app-protocol.md](./desktop-app-protocol.md) | 桌面 App 开发对接：通信协议、命令与字段约定   |
 
 ## 使用方式
 
