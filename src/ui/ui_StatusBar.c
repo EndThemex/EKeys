@@ -22,8 +22,8 @@ static bool recording_blink_visible = false;
  *   - 图标统一 montserrat_24 字号，视觉大小一致。
  * 注意 status_bar 有 pad_all(5)，基准坐标按内容区写，实际渲染 = 设定值 + 5。
  */
-#define STATUS_BAR_FIRST_ICON_X 8
-#define STATUS_BAR_FIRST_ICON_Y 101
+#define STATUS_BAR_FIRST_ICON_X 6
+#define STATUS_BAR_FIRST_ICON_Y 109
 #define STATUS_BAR_ICON_GAP 6
 
 static void recording_blink_timer_cb(lv_timer_t *timer)
@@ -69,14 +69,7 @@ void ui_StatusBar_init(void)
     lv_style_set_text_color(&style, lv_color_white());
     lv_obj_add_style(status_bar, &style, 0);
 
-    // 基准图标：工作模式（有线 USB / 蓝牙），其余图标相对它排布
-    workmode_icon = lv_label_create(status_bar);
-    lv_label_set_text(workmode_icon, LV_SYMBOL_USB);
-    lv_obj_add_style(workmode_icon, &icon_style, 0);
-    lv_obj_set_style_text_color(workmode_icon, lv_color_hex(0x808080), 0);
-    lv_obj_align(workmode_icon, LV_ALIGN_TOP_LEFT, STATUS_BAR_FIRST_ICON_X, STATUS_BAR_FIRST_ICON_Y);
-
-    // 录音点（12x12 圆点，隐藏，录音时闪烁；垂直居中对齐基准图标）
+    // 基准图标：录音点（12x12 圆点，隐藏，录音时闪烁；其余图标相对它排布）
     recording_dot = lv_obj_create(status_bar);
     lv_obj_remove_style_all(recording_dot);
     lv_obj_set_size(recording_dot, 12, 12);
@@ -84,6 +77,13 @@ void ui_StatusBar_init(void)
     lv_obj_set_style_bg_color(recording_dot, lv_color_hex(0xFF3030), 0);
     lv_obj_set_style_bg_opa(recording_dot, LV_OPA_COVER, 0);
     lv_obj_add_flag(recording_dot, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_align(recording_dot, LV_ALIGN_TOP_LEFT, STATUS_BAR_FIRST_ICON_X, STATUS_BAR_FIRST_ICON_Y);
+
+    // 工作模式图标（有线 USB / 蓝牙），跟在录音点右侧
+    workmode_icon = lv_label_create(status_bar);
+    lv_label_set_text(workmode_icon, LV_SYMBOL_USB);
+    lv_obj_add_style(workmode_icon, &icon_style, 0);
+    lv_obj_set_style_text_color(workmode_icon, lv_color_hex(0x808080), 0);
 
     // WiFi 图标
     wifi_icon = lv_label_create(status_bar);
@@ -104,9 +104,9 @@ void ui_StatusBar_init(void)
     lv_obj_set_style_text_color(battery_icon, lv_color_hex(0x808080), 0);
 
     // 相对布局：先落定基准图标的坐标/尺寸，再依次把后续图标排到前一个右侧
-    lv_obj_update_layout(workmode_icon);
-    lv_obj_align_to(recording_dot, workmode_icon, LV_ALIGN_OUT_RIGHT_MID, STATUS_BAR_ICON_GAP, 0);
-    lv_obj_align_to(wifi_icon, recording_dot, LV_ALIGN_OUT_RIGHT_MID, STATUS_BAR_ICON_GAP, 0);
+    lv_obj_update_layout(recording_dot);
+    lv_obj_align_to(workmode_icon, recording_dot, LV_ALIGN_OUT_RIGHT_MID, STATUS_BAR_ICON_GAP, 0);
+    lv_obj_align_to(wifi_icon, workmode_icon, LV_ALIGN_OUT_RIGHT_MID, STATUS_BAR_ICON_GAP, 0);
     lv_obj_align_to(volume_icon, wifi_icon, LV_ALIGN_OUT_RIGHT_MID, STATUS_BAR_ICON_GAP, 0);
     lv_obj_align_to(battery_icon, volume_icon, LV_ALIGN_OUT_RIGHT_MID, STATUS_BAR_ICON_GAP, 0);
 }
@@ -126,6 +126,7 @@ void status_bar_set_working_mode(int mode)
     {
     case WIRED_KEYBOARD_MODE:
         lv_label_set_text(workmode_icon, LV_SYMBOL_USB);
+        lv_obj_set_style_text_color(workmode_icon, lv_color_hex(0xFFFFFF), 0);
         break;
     case BLUETOOTH_KEYBOARD_MODE:
         lv_label_set_text(workmode_icon, LV_SYMBOL_BLUETOOTH);
@@ -212,8 +213,8 @@ void status_bar_set_battery_level(uint8_t level)
     }
     else
     {
-        // lv_obj_set_style_text_color(battery_icon, lv_color_hex(0x00FF00), 0);
-        lv_obj_set_style_text_color(battery_icon, lv_color_hex(0x808080), 0);
+        // 非低电量：白色
+        lv_obj_set_style_text_color(battery_icon, lv_color_hex(0xFFFFFF), 0);
     }
 }
 
@@ -223,14 +224,17 @@ void status_bar_set_volume(uint8_t volume)
     if (volume == 0)
     {
         lv_label_set_text(volume_icon, LV_SYMBOL_MUTE);
+        lv_obj_set_style_text_color(volume_icon, lv_color_hex(0x808080), 0);
     }
     else if (volume < 66)
     {
         lv_label_set_text(volume_icon, LV_SYMBOL_VOLUME_MID);
+        lv_obj_set_style_text_color(volume_icon, lv_color_hex(0xFFFFFF), 0);
     }
     else
     {
         lv_label_set_text(volume_icon, LV_SYMBOL_VOLUME_MAX);
+        lv_obj_set_style_text_color(volume_icon, lv_color_hex(0xFFFFFF), 0);
     }
 }
 
