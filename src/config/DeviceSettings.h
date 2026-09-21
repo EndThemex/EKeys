@@ -26,7 +26,7 @@ namespace ekeys
         char wifi_ssid[33];
         char wifi_password[65];
 
-        /* 工作模式（0=USB 1=BLE 2=2.4G） */
+        /* 工作模式（0=USB 1=BLE） */
         uint8_t work_mode;
 
         /* RGB */

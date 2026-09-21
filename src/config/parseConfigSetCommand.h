@@ -22,7 +22,7 @@ namespace ekeys {
 struct ConfigSetResult {
     bool any_changed = false;
     bool work_mode_changed = false;
-    uint8_t work_mode = 0;      // 新 work_mode（0~2）
+    uint8_t work_mode = 0;      // 新 work_mode（0=USB 1=BLE）
     bool profile_changed = false;
     bool wifi_changed = false;  // wifi_switch / ssid / password / connect_host
 };

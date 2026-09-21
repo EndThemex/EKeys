@@ -270,8 +270,6 @@ static const char *setting_secondary_work_mode_text(int32_t value)
         return "有线";
     case 1:
         return "蓝牙";
-    case 2:
-        return "2.4G";
     default:
         return "有线";
     }

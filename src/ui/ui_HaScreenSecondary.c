@@ -9,18 +9,18 @@
 #include <stdio.h>
 #include <string.h>
 
-lv_obj_t * ui_HaScreenSecondary = NULL;
-lv_obj_t * ui_Label4 = NULL;
-static lv_obj_t * s_HaSecondaryTitle = NULL;
-static lv_obj_t * s_LabelWifiValue = NULL;
-static lv_obj_t * s_LabelModeValue = NULL;
-static lv_obj_t * s_LabelVoiceValue = NULL;
-static lv_obj_t * s_LabelTcpValue = NULL;
-static lv_obj_t * s_LabelModuleAValue = NULL;
-static lv_obj_t * s_LabelModuleBValue = NULL;
-static lv_obj_t * s_LabelIpValue = NULL;
-static lv_obj_t * s_LabelServerValue = NULL;
-static lv_obj_t * s_ButtonExit = NULL;
+lv_obj_t *ui_HaScreenSecondary = NULL;
+lv_obj_t *ui_Label4 = NULL;
+static lv_obj_t *s_HaSecondaryTitle = NULL;
+static lv_obj_t *s_LabelWifiValue = NULL;
+static lv_obj_t *s_LabelModeValue = NULL;
+static lv_obj_t *s_LabelVoiceValue = NULL;
+static lv_obj_t *s_LabelTcpValue = NULL;
+static lv_obj_t *s_LabelModuleAValue = NULL;
+static lv_obj_t *s_LabelModuleBValue = NULL;
+static lv_obj_t *s_LabelIpValue = NULL;
+static lv_obj_t *s_LabelServerValue = NULL;
+static lv_obj_t *s_ButtonExit = NULL;
 
 static bool s_wifi_enabled = false;
 static bool s_wifi_connected = false;
@@ -34,10 +34,10 @@ static bool s_module_b_connected = false;
 static char s_ip_address[24] = "--";
 static char s_server_endpoint[32] = "OFFLINE";
 
-enum {
+enum
+{
     UI_HA_WORK_MODE_WIRED = 0,
     UI_HA_WORK_MODE_BLUETOOTH = 1,
-    UI_HA_WORK_MODE_2_4G = 2,
 };
 
 static void ha_secondary_forward_key(uint32_t key)
@@ -45,24 +45,29 @@ static void ha_secondary_forward_key(uint32_t key)
     lv_obj_t *active_screen = lv_scr_act();
     lv_group_t *g = lv_group_get_default();
     lv_obj_t *target = g ? lv_group_get_focused(g) : active_screen;
-    if (target) {
+    if (target)
+    {
         lv_event_send(target, LV_EVENT_KEY, (void *)key);
     }
 }
 
 static const char *ha_work_mode_text(int work_mode)
 {
-    switch (work_mode) {
-        case UI_HA_WORK_MODE_WIRED: return "WIRED";
-        case UI_HA_WORK_MODE_BLUETOOTH: return "BLUETOOTH";
-        case UI_HA_WORK_MODE_2_4G: return "2.4G";
-        default: return "UNKNOWN";
+    switch (work_mode)
+    {
+    case UI_HA_WORK_MODE_WIRED:
+        return "WIRED";
+    case UI_HA_WORK_MODE_BLUETOOTH:
+        return "BLUETOOTH";
+    default:
+        return "UNKNOWN";
     }
 }
 
 static void ha_set_status_value(lv_obj_t *label, const char *text, lv_color_t color)
 {
-    if (!label) {
+    if (!label)
+    {
         return;
     }
 
@@ -73,18 +78,24 @@ static void ha_set_status_value(lv_obj_t *label, const char *text, lv_color_t co
 static void ha_refresh_wifi_status(void)
 {
     char wifiText[40] = {0};
-    if (!s_wifi_enabled) {
+    if (!s_wifi_enabled)
+    {
         snprintf(wifiText, sizeof(wifiText), "DISABLED");
         ha_set_status_value(s_LabelWifiValue, wifiText, lv_color_hex(0x94A3B8));
-    } else if (s_wifi_connected) {
+    }
+    else if (s_wifi_connected)
+    {
         snprintf(wifiText, sizeof(wifiText), "%d dBm", s_wifi_rssi);
         ha_set_status_value(s_LabelWifiValue, wifiText, lv_color_hex(0x22C55E));
-    } else {
+    }
+    else
+    {
         snprintf(wifiText, sizeof(wifiText), "CONNECTING");
         ha_set_status_value(s_LabelWifiValue, wifiText, lv_color_hex(0xF59E0B));
     }
 
-    if (s_LabelIpValue) {
+    if (s_LabelIpValue)
+    {
         lv_label_set_text_fmt(s_LabelIpValue, "IP  %s", s_ip_address);
     }
 }
@@ -94,7 +105,8 @@ static void ha_refresh_tcp_status(void)
     ha_set_status_value(s_LabelTcpValue,
                         s_tcp_connected ? "LINKED" : "WAITING",
                         s_tcp_connected ? lv_color_hex(0x22C55E) : lv_color_hex(0xF59E0B));
-    if (s_LabelServerValue) {
+    if (s_LabelServerValue)
+    {
         lv_label_set_text_fmt(s_LabelServerValue, "SERVER  %s", s_server_endpoint);
     }
 }
@@ -106,11 +118,16 @@ static void ha_refresh_mode_status(void)
 
 static void ha_refresh_voice_status(void)
 {
-    if (!s_voice_enabled) {
+    if (!s_voice_enabled)
+    {
         ha_set_status_value(s_LabelVoiceValue, "DISABLED", lv_color_hex(0x94A3B8));
-    } else if (s_voice_recording) {
+    }
+    else if (s_voice_recording)
+    {
         ha_set_status_value(s_LabelVoiceValue, "RECORDING", lv_color_hex(0xEF4444));
-    } else {
+    }
+    else
+    {
         ha_set_status_value(s_LabelVoiceValue, "READY", lv_color_hex(0x22C55E));
     }
 }
@@ -170,22 +187,25 @@ void ui_HaScreenSecondary_set_module_status(bool module_a_connected, bool module
     ha_refresh_module_status();
 }
 
-void ui_event_HaScreenSecondary(lv_event_t * e)
+void ui_event_HaScreenSecondary(lv_event_t *e)
 {
-    if (lv_event_get_code(e) != LV_EVENT_KEY) {
+    if (lv_event_get_code(e) != LV_EVENT_KEY)
+    {
         return;
     }
 
-    if ((uintptr_t)lv_event_get_param(e) == (uintptr_t)LV_KEY_ESC) {
+    if ((uintptr_t)lv_event_get_param(e) == (uintptr_t)LV_KEY_ESC)
+    {
         ui_set_active_screen_tag(UI_SCREEN_HA);
         _ui_screen_change(&ui_HaScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_HaScreen_screen_init);
         lv_refr_now(NULL);
     }
 }
 
-void ui_event_ButtonExitHaSecondary(lv_event_t * e)
+void ui_event_ButtonExitHaSecondary(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         ha_secondary_forward_key(LV_KEY_ESC);
     }
 }
@@ -304,7 +324,8 @@ void ui_HaScreenSecondary_screen_init(void)
 
 void ui_HaScreenSecondary_screen_destroy(void)
 {
-    if (ui_HaScreenSecondary) {
+    if (ui_HaScreenSecondary)
+    {
         lv_obj_del(ui_HaScreenSecondary);
     }
 

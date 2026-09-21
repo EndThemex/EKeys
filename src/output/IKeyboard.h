@@ -3,11 +3,10 @@
  *
  * 键盘输出抽象接口（FEATURE_DOC §4 / ARCHITECTURE §3.5）。
  *
- * 三种后端（阶段 01 / 06）共用同一接口：
+ * 两种后端共用同一接口：
  *
  *   - USBKeyboardImpl           （TinyUSB HID Keyboard）
  *   - BLEKeyboardImpl           （ESP32 BLE Keyboard）
- *   - Wireless24GKeyboardImpl   （占位）
  *
  * KeyResolver 通过 IKeyboard& 调用，所有权归 KeyboardFactory。
  */

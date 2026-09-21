@@ -455,7 +455,7 @@ namespace ekeys
          *
          * F10 修复：必须放在 `if (keyboard_ == nullptr) return;` 之前。
          * applyWorkMode() 在 USBKeyboardImpl::begin() 失败时会把 keyboard_ 设成 nullptr
-         * （BLE/2.4G 模式下切换回 USB，USB host 未就绪），后续循环在早期 return 处
+         * （BLE 模式下切换回 USB，USB host 未就绪），后续循环在早期 return 处
          * 一直跳出，导致 1s tick 永不再触发，主屏时间永远停留在最后一次 TIME_UPDATE
          * 的值——典型表现是"App 连接后再切回 work_mode=USB，主屏时间不再变化"。
          * HA 状态 / 电池 / 频谱也类似，但用户体验上时间最显眼。
@@ -741,7 +741,7 @@ namespace ekeys
         ui_settings_snapshot_t s = requested;
 
         /* 与 parseConfigSetCommand 相同的取值约束（FEATURE_DOC §6） */
-        s.work_mode = clampInt(s.work_mode, 0, 2);
+        s.work_mode = clampInt(s.work_mode, 0, 1);
         s.rgb_brightness = clampInt(s.rgb_brightness, 0, 100);
         s.tft_brightness = clampInt(s.tft_brightness, 5, 100);
         s.device_volume = clampInt(s.device_volume, 0, 100);

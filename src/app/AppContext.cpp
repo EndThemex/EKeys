@@ -68,7 +68,7 @@ namespace ekeys
         LOG_INFO("APP", "t=%lu ms main task ready", (unsigned long)millis());
 
         /* F1 修复：按加载后的 work_mode 选择键盘后端，
-         * 避免 BLE/2.4G 模式下重启仍为 USB。 */
+         * 避免 BLE 模式下重启仍为 USB。 */
         {
             DeviceSettings snap;
             configuration_->snapshot(snap);
@@ -76,11 +76,6 @@ namespace ekeys
             if (snap.work_mode == static_cast<uint8_t>(WorkMode::Bluetooth))
             {
                 wm = WorkMode::Bluetooth;
-            }
-            else if (snap.work_mode ==
-                     static_cast<uint8_t>(WorkMode::Wireless24G))
-            {
-                wm = WorkMode::Wireless24G;
             }
             setKeyboard(KeyboardFactory::create(wm));
             main_task_.setKeyboard(keyboard());
@@ -113,10 +108,6 @@ namespace ekeys
         if (mode == static_cast<uint8_t>(WorkMode::Bluetooth))
         {
             wm = WorkMode::Bluetooth;
-        }
-        else if (mode == static_cast<uint8_t>(WorkMode::Wireless24G))
-        {
-            wm = WorkMode::Wireless24G;
         }
 
         /*

@@ -69,7 +69,7 @@ void ui_StatusBar_init(void)
     lv_style_set_text_color(&style, lv_color_white());
     lv_obj_add_style(status_bar, &style, 0);
 
-    // 基准图标：工作模式（有线 USB / 蓝牙 / 2.4G），其余图标相对它排布
+    // 基准图标：工作模式（有线 USB / 蓝牙），其余图标相对它排布
     workmode_icon = lv_label_create(status_bar);
     lv_label_set_text(workmode_icon, LV_SYMBOL_USB);
     lv_obj_add_style(workmode_icon, &icon_style, 0);
@@ -113,7 +113,8 @@ void ui_StatusBar_init(void)
 
 /*
  * 工作模式图标更新（由 DisplayTask 推送）：
- *   有线 → USB，蓝牙 → BT，2.4G → DRIVE
+ *   有线 → USB，蓝牙 → BT
+ *   注：2.4G 已移除，未知 mode 落入 default 不改变图标
  */
 void status_bar_set_working_mode(int mode)
 {
@@ -128,9 +129,6 @@ void status_bar_set_working_mode(int mode)
         break;
     case BLUETOOTH_KEYBOARD_MODE:
         lv_label_set_text(workmode_icon, LV_SYMBOL_BLUETOOTH);
-        break;
-    case WIRELESS_2_4G_KEYBOARD_MODE:
-        lv_label_set_text(workmode_icon, LV_SYMBOL_DRIVE);
         break;
     default:
         break;

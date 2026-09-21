@@ -121,7 +121,7 @@ namespace ekeys
         /* ---- 工作模式 ---- */
         if (!cfg["work_mode"].isNull()) {
             int v = cfg["work_mode"].as<int>();
-            if (v >= 0 && v <= 2) {
+            if (v >= 0 && v <= 1) {
                 if (s.work_mode != v) {
                     LOG_INFO("CFG_SET", "work_mode: %u -> %u", s.work_mode, v);
                     s.work_mode = static_cast<uint8_t>(v);

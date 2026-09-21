@@ -69,7 +69,7 @@ namespace ekeys
         constexpr uint32_t kSpectrumRetryMs = 1000;
 
         /*
-         * DeviceSettings.work_mode（0=USB 1=BLE 2=2.4G）与
+         * DeviceSettings.work_mode（0=USB 1=BLE）与
          * ui_StatusBar 的 WORKMODE 枚举同序（状态栏图标显示，主页不再有模式文字）。
          */
 

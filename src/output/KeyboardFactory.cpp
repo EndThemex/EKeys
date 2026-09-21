@@ -35,15 +35,10 @@ namespace ekeys
             LOG_WARNING("KBD", "BLEKeyboardImpl begin() failed, fallback to USB");
             return create(WorkMode::Wired);
         }
-        case WorkMode::Wireless24G:
-            /*
-             * 2.4G 功能按用户决定暂不实现（2026-08-31）：
-             * 打印警告后回退 USB，保证选到该模式时设备仍可用。
-             */
-            LOG_WARNING("KBD", "2.4G mode not implemented, fallback to USB");
-            return create(WorkMode::Wired);
         }
-        return nullptr;
+        LOG_WARNING("KBD", "unknown WorkMode=%u, fallback to USB",
+                     static_cast<unsigned>(mode));
+        return create(WorkMode::Wired);
     }
 
     void KeyboardFactory::release()
