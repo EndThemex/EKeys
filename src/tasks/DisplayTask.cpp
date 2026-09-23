@@ -30,6 +30,7 @@
 #include "message_types.h"
 #include "rgb/ClickHighlight.h"
 #include "rgb/RGBLightControl.h"
+#include "protocol/SerialProtocol.h"
 #include "ui/ui.h"
 #include "ui/ui_AudioScreen.h"
 #include "ui/ui_FlipClock.h"
@@ -225,6 +226,21 @@ namespace ekeys
 
             /* 一级页 5s 无操作 → 自动回主页（run() 主循环每帧检查） */
             checkAutoReturn();
+
+            /*
+             * 音乐控制链路（2026-09-23 接通）：音乐二级页旋钮/触屏按钮置位的
+             * PREV/TOGGLE/NEXT 请求在此消费，以 0x0f 主动推送转给桌面 App
+             * （App 侧转系统媒体键）。请求仅在 MUSIC_SECONDARY 屏按键时置位，
+             * 每轮无条件消费即可，最多发一帧。
+             */
+            const uint8_t music_req = ui_MusicScreenSecondary_consume_control_request();
+            if (music_req != UI_MUSIC_CONTROL_NONE)
+            {
+                const char *music_action = (music_req == UI_MUSIC_CONTROL_PREV)   ? "prev"
+                                           : (music_req == UI_MUSIC_CONTROL_NEXT) ? "next"
+                                                                                  : "toggle";
+                SerialProtocol::instance().sendMusicControl(music_action);
+            }
 
             /*
              * 每轮无条件让出一个 tick：重渲染屏（切屏 init + lv_refr_now 同步整帧、
@@ -573,13 +589,14 @@ namespace ekeys
     {
         const PcStatusInfo &pc = msg.pc_status;
 
-        ui_PcStatusScreen_set_network(pc.network_connected);
+        /* 联网状态已从 UI 移除（USB 直连场景无意义），不再消费 network_connected */
         ui_PcStatusScreen_set_net_up_kbps(pc.network_up_kbps);
         ui_PcStatusScreen_set_net_down_kbps(pc.network_down_kbps);
         ui_PcStatusScreen_set_cpu_percent(pc.cpu_usage_percent);
         ui_PcStatusScreen_set_cpu_temp_c(pc.cpu_temp_c);
         ui_PcStatusScreen_set_mem_percent(pc.memory_usage_percent);
         ui_PcStatusScreen_set_disk_io_percent(pc.disk_io_percent);
+        ui_PcStatusScreen_set_disk_space_percent(pc.disk_space_percent);
     }
 
     void DisplayTask::applyHaStatus(const DisplayMessage &msg)

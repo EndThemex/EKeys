@@ -53,6 +53,7 @@ namespace ekeys
         float memory_usage_percent{-1.0f};
         float cpu_temp_c{-1.0f};
         float disk_io_percent{-1.0f};
+        float disk_space_percent{-1.0f};
         float network_up_kbps{-1.0f};
         float network_down_kbps{-1.0f};
     };

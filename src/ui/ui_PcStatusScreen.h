@@ -30,14 +30,18 @@ extern "C"
   extern lv_obj_t *ui_ButtonEnter3;
   extern lv_obj_t *ui_ButtonExit3;
   // CUSTOM VARIABLES
-/* 直接接原始字段，<0 表示"未知"，回退占位文本由 setter 内部决定 */
-extern void ui_PcStatusScreen_set_network(bool connected);
-extern void ui_PcStatusScreen_set_net_up_kbps(float kbps);
-extern void ui_PcStatusScreen_set_net_down_kbps(float kbps);
-extern void ui_PcStatusScreen_set_cpu_percent(float pct);
-extern void ui_PcStatusScreen_set_cpu_temp_c(float c);
-extern void ui_PcStatusScreen_set_mem_percent(float pct);
-extern void ui_PcStatusScreen_set_disk_io_percent(float pct);
+  /* 直接接原始字段，<0 表示"未知"，回退占位文本由 setter 内部决定。
+   * 一级页仅图标+标题不显示数据：setter 收口在本屏实现，
+   * 更新缓存后转发二级屏 setter（联网状态已移除，该槽位改为磁盘空间）。 */
+  extern void ui_PcStatusScreen_set_net_up_kbps(float kbps);
+  extern void ui_PcStatusScreen_set_net_down_kbps(float kbps);
+  extern void ui_PcStatusScreen_set_cpu_percent(float pct);
+  extern void ui_PcStatusScreen_set_cpu_temp_c(float c);
+  extern void ui_PcStatusScreen_set_mem_percent(float pct);
+  extern void ui_PcStatusScreen_set_disk_io_percent(float pct);
+  extern void ui_PcStatusScreen_set_disk_space_percent(float pct);
+  /* 用最后收到的数据回放当前屏（主/二级屏 init 末尾调用），无数据时 no-op */
+  extern void ui_PcStatusScreen_replay_cached_values(void);
 
 #ifdef __cplusplus
 } /*extern "C"*/

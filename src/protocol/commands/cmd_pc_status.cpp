@@ -70,6 +70,7 @@ namespace ekeys::protocol::commands
             p.memory_usage_percent = pc["memory_usage_percent"] | -1.0f;
             p.cpu_temp_c = pc["cpu_temp_c"] | -1.0f;
             p.disk_io_percent = pc["disk_io_percent"] | -1.0f;
+            p.disk_space_percent = pc["disk_space_percent"] | -1.0f;
             p.network_up_kbps = pc["network_up_kbps"] | -1.0f;
             p.network_down_kbps = pc["network_down_kbps"] | -1.0f;
 

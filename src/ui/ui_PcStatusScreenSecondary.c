@@ -23,14 +23,13 @@ static lv_obj_t *s_LabelPcTemp = NULL;
 static lv_obj_t *s_PanelLeft = NULL;
 static lv_obj_t *s_PanelRight = NULL;
 static lv_obj_t *s_LabelTimeValue = NULL;
-static lv_obj_t *s_LabelNetValue = NULL;
+static lv_obj_t *s_LabelSpaceValue = NULL;
 static lv_obj_t *s_LabelUpValue = NULL;
 static lv_obj_t *s_LabelDownValue = NULL;
 static lv_obj_t *s_LabelCpuValue = NULL;
 static lv_obj_t *s_LabelCpuTempValue = NULL;
 static lv_obj_t *s_LabelMemValue = NULL;
 static lv_obj_t *s_LabelDiskValue = NULL;
-static lv_obj_t *s_NetDot = NULL;
 static lv_obj_t *s_BarCpu = NULL;
 static lv_obj_t *s_BarCpuTemp = NULL;
 static lv_obj_t *s_BarMem = NULL;
@@ -41,22 +40,10 @@ static lv_obj_t *s_ButtonEnter = NULL;
 static lv_obj_t *s_ButtonExit = NULL;
 
 /*
- * 字段缓存：<0 表示"未同步"，回退占位文本由 setter 内部决定。
- * pc_status_apply_cached_values() 在二级屏 init 末尾回放，
- * 避免从主屏 ENTER 进入二级屏时空白。
+ * 字段缓存与 setter 收口在 ui_PcStatusScreen.c（s_cached），
+ * 本文件只负责二级屏控件的渲染；init 末尾调
+ * ui_PcStatusScreen_replay_cached_values() 回放缓存（经主屏 setter 转发回来）。
  */
-static struct
-{
-    bool valid;
-    bool network_connected;
-    float net_up_kbps;
-    float net_down_kbps;
-    float cpu_percent;
-    float cpu_temp_c;
-    float mem_percent;
-    float disk_io_percent;
-} s_cached = {false, false,
-              -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
 
 static void pc_status_set_bar_value(lv_obj_t *bar, float pct)
 {
@@ -76,19 +63,6 @@ static void pc_status_set_bar_value(lv_obj_t *bar, float pct)
     }
 }
 
-static void pc_status_apply_cached_values(void)
-{
-    if (!s_cached.valid)
-        return;
-    ui_PcStatusScreen_set_network(s_cached.network_connected);
-    ui_PcStatusScreen_set_net_up_kbps(s_cached.net_up_kbps);
-    ui_PcStatusScreen_set_net_down_kbps(s_cached.net_down_kbps);
-    ui_PcStatusScreen_set_cpu_percent(s_cached.cpu_percent);
-    ui_PcStatusScreen_set_cpu_temp_c(s_cached.cpu_temp_c);
-    ui_PcStatusScreen_set_mem_percent(s_cached.mem_percent);
-    ui_PcStatusScreen_set_disk_io_percent(s_cached.disk_io_percent);
-}
-
 static void pc_status_secondary_forward_key(uint32_t key)
 {
     lv_obj_t *active_screen = lv_scr_act();
@@ -104,65 +78,72 @@ static void pc_status_secondary_forward_key(uint32_t key)
  * Locks setter（已删除）：
  *   早期实现保留了 caps_lock / num_lock / scroll_lock 的协议解析与缓存，
  *   但二级屏布局无对应控件。任务 #2 决定三处一致删除。
+ *
+ * 联网状态（ONLINE/OFFLINE）已移除：USB 直连场景下无意义，
+ * 该槽位改为显示磁盘剩余空间（disk_space_percent，协议字段原本就有）。
  */
 
-void ui_PcStatusScreen_set_network(bool connected)
+void ui_PcStatusScreenSecondary_set_disk_space_percent(float pct)
 {
-    s_cached.valid = true;
-    s_cached.network_connected = connected;
-    if (!s_LabelNetValue || !s_NetDot)
+    char buf[16];
+    if (!s_LabelSpaceValue)
         return;
 
-    lv_label_set_text(s_LabelNetValue, connected ? "ONLINE" : "OFFLINE");
-    lv_obj_set_style_bg_color(s_NetDot,
-                              connected ? lv_color_hex(0x22C55E)
-                                        : lv_color_hex(0xEF4444),
-                              LV_PART_MAIN | LV_STATE_DEFAULT);
+    if (pct < 0.0f)
+    {
+        lv_label_set_text(s_LabelSpaceValue, "--");
+    }
+    else
+    {
+        snprintf(buf, sizeof(buf), "%.1f%%", pct);
+        lv_label_set_text(s_LabelSpaceValue, buf);
+    }
 }
 
-void ui_PcStatusScreen_set_net_up_kbps(float kbps)
+/* 网速自动换算单位：<1000 Kbps，>=1000 显示 Mbps，>=100万 Kbps 显示 Gbps */
+static void pc_status_secondary_format_kbps(char *buf, size_t n, float kbps)
+{
+    if (kbps < 0.0f)
+    {
+        snprintf(buf, n, "-- Kbps");
+    }
+    else if (kbps >= 1000000.0f)
+    {
+        snprintf(buf, n, "%.2f Gbps", kbps / 1000000.0f);
+    }
+    else if (kbps >= 1000.0f)
+    {
+        snprintf(buf, n, "%.2f Mbps", kbps / 1000.0f);
+    }
+    else
+    {
+        snprintf(buf, n, "%.1f Kbps", kbps);
+    }
+}
+
+void ui_PcStatusScreenSecondary_set_net_up_kbps(float kbps)
 {
     char buf[24];
-    s_cached.valid = true;
-    s_cached.net_up_kbps = kbps;
     if (!s_LabelUpValue)
         return;
 
-    if (kbps < 0.0f)
-    {
-        lv_label_set_text(s_LabelUpValue, "-- Kbps");
-    }
-    else
-    {
-        snprintf(buf, sizeof(buf), "%.1f Kbps", kbps);
-        lv_label_set_text(s_LabelUpValue, buf);
-    }
+    pc_status_secondary_format_kbps(buf, sizeof(buf), kbps);
+    lv_label_set_text(s_LabelUpValue, buf);
 }
 
-void ui_PcStatusScreen_set_net_down_kbps(float kbps)
+void ui_PcStatusScreenSecondary_set_net_down_kbps(float kbps)
 {
     char buf[24];
-    s_cached.valid = true;
-    s_cached.net_down_kbps = kbps;
     if (!s_LabelDownValue)
         return;
 
-    if (kbps < 0.0f)
-    {
-        lv_label_set_text(s_LabelDownValue, "-- Kbps");
-    }
-    else
-    {
-        snprintf(buf, sizeof(buf), "%.1f Kbps", kbps);
-        lv_label_set_text(s_LabelDownValue, buf);
-    }
+    pc_status_secondary_format_kbps(buf, sizeof(buf), kbps);
+    lv_label_set_text(s_LabelDownValue, buf);
 }
 
-void ui_PcStatusScreen_set_cpu_percent(float pct)
+void ui_PcStatusScreenSecondary_set_cpu_percent(float pct)
 {
     char buf[16];
-    s_cached.valid = true;
-    s_cached.cpu_percent = pct;
     if (!s_LabelCpuValue || !s_BarCpu)
         return;
 
@@ -178,11 +159,9 @@ void ui_PcStatusScreen_set_cpu_percent(float pct)
     pc_status_set_bar_value(s_BarCpu, pct);
 }
 
-void ui_PcStatusScreen_set_cpu_temp_c(float c)
+void ui_PcStatusScreenSecondary_set_cpu_temp_c(float c)
 {
     char buf[16];
-    s_cached.valid = true;
-    s_cached.cpu_temp_c = c;
     if (!s_LabelCpuTempValue || !s_BarCpuTemp)
         return;
 
@@ -202,11 +181,9 @@ void ui_PcStatusScreen_set_cpu_temp_c(float c)
     pc_status_set_bar_value(s_BarCpuTemp, c);
 }
 
-void ui_PcStatusScreen_set_mem_percent(float pct)
+void ui_PcStatusScreenSecondary_set_mem_percent(float pct)
 {
     char buf[16];
-    s_cached.valid = true;
-    s_cached.mem_percent = pct;
     if (!s_LabelMemValue || !s_BarMem)
         return;
 
@@ -222,11 +199,9 @@ void ui_PcStatusScreen_set_mem_percent(float pct)
     pc_status_set_bar_value(s_BarMem, pct);
 }
 
-void ui_PcStatusScreen_set_disk_io_percent(float pct)
+void ui_PcStatusScreenSecondary_set_disk_io_percent(float pct)
 {
     char buf[16];
-    s_cached.valid = true;
-    s_cached.disk_io_percent = pct;
     if (!s_LabelDiskValue || !s_BarDisk)
         return;
 
@@ -297,26 +272,19 @@ void ui_PcStatusScreenSecondary_screen_init(void)
     lv_obj_set_style_text_color(s_LabelTimeValue, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(s_LabelTimeValue, &ui_font_BebasNeueFont24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    lv_obj_t *labelNet = lv_label_create(ui_PcStatusScreenSecondary);
-    lv_obj_set_pos(labelNet, 10, 50);
-    lv_label_set_text(labelNet, "NET");
-    lv_obj_set_style_text_color(labelNet, lv_color_hex(0xFDE68A), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(labelNet, &ui_font_BebasNeueFont28, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_t *labelSpace = lv_label_create(ui_PcStatusScreenSecondary);
+    lv_obj_set_pos(labelSpace, 10, 50);
+    lv_label_set_text(labelSpace, "SPACE");
+    lv_obj_set_style_text_color(labelSpace, lv_color_hex(0xFDE68A), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(labelSpace, &ui_font_BebasNeueFont28, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    s_NetDot = lv_obj_create(ui_PcStatusScreenSecondary);
-    lv_obj_set_size(s_NetDot, 10, 10);
-    lv_obj_set_pos(s_NetDot, 56, 56);
-    lv_obj_set_style_radius(s_NetDot, LV_RADIUS_CIRCLE, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_bg_color(s_NetDot, lv_color_hex(0xEF4444), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_border_width(s_NetDot, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    s_LabelNetValue = lv_label_create(ui_PcStatusScreenSecondary);
-    lv_obj_set_pos(s_LabelNetValue, 76, 50);
-    lv_obj_set_width(s_LabelNetValue, 144);
-    lv_label_set_long_mode(s_LabelNetValue, LV_LABEL_LONG_CLIP);
-    lv_label_set_text(s_LabelNetValue, "OFFLINE");
-    lv_obj_set_style_text_color(s_LabelNetValue, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(s_LabelNetValue, &ui_font_BebasNeueFont24, LV_PART_MAIN | LV_STATE_DEFAULT);
+    s_LabelSpaceValue = lv_label_create(ui_PcStatusScreenSecondary);
+    lv_obj_set_pos(s_LabelSpaceValue, 76, 50);
+    lv_obj_set_width(s_LabelSpaceValue, 144);
+    lv_label_set_long_mode(s_LabelSpaceValue, LV_LABEL_LONG_CLIP);
+    lv_label_set_text(s_LabelSpaceValue, "--");
+    lv_obj_set_style_text_color(s_LabelSpaceValue, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(s_LabelSpaceValue, &ui_font_BebasNeueFont24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_t *labelUp = lv_label_create(ui_PcStatusScreenSecondary);
     lv_obj_set_pos(labelUp, 10, 74);
@@ -432,7 +400,7 @@ void ui_PcStatusScreenSecondary_screen_init(void)
     lv_obj_set_style_bg_color(s_BarDisk, lv_color_hex(0xF59E0B), LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
     ui_LabelPcHost = s_LabelTimeValue;
-    ui_LabelPcTime = s_LabelNetValue;
+    ui_LabelPcTime = s_LabelSpaceValue;
     ui_LabelPcLocks = s_LabelUpValue;
     ui_LabelPcNetwork = s_LabelDownValue;
     ui_LabelPcPower = s_LabelCpuValue;
@@ -470,7 +438,7 @@ void ui_PcStatusScreenSecondary_screen_init(void)
     lv_obj_add_event_cb(s_ButtonExit, ui_event_ButtonExitPcStatusSecondary, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_PcStatusScreenSecondary, ui_event_PcStatusScreenSecondary, LV_EVENT_ALL, NULL);
 
-    pc_status_apply_cached_values();
+    ui_PcStatusScreen_replay_cached_values();
 }
 
 void ui_PcStatusScreenSecondary_screen_destroy(void)
@@ -492,14 +460,13 @@ void ui_PcStatusScreenSecondary_screen_destroy(void)
     s_PanelLeft = NULL;
     s_PanelRight = NULL;
     s_LabelTimeValue = NULL;
-    s_LabelNetValue = NULL;
+    s_LabelSpaceValue = NULL;
     s_LabelUpValue = NULL;
     s_LabelDownValue = NULL;
     s_LabelCpuValue = NULL;
     s_LabelCpuTempValue = NULL;
     s_LabelMemValue = NULL;
     s_LabelDiskValue = NULL;
-    s_NetDot = NULL;
     s_BarCpu = NULL;
     s_BarCpuTemp = NULL;
     s_BarMem = NULL;

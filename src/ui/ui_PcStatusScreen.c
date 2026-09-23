@@ -6,72 +6,167 @@
 #include "ui.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
-lv_obj_t * ui_PcStatusScreen = NULL;
-lv_obj_t * ui_ButtonLeft3 = NULL;
-lv_obj_t * ui_ButtonRight3 = NULL;
-lv_obj_t * ui_ButtonEnter3 = NULL;
-lv_obj_t * ui_ButtonExit3 = NULL;
-static lv_obj_t * s_PcStatusIcon = NULL;
+lv_obj_t *ui_PcStatusScreen = NULL;
+lv_obj_t *ui_ButtonLeft3 = NULL;
+lv_obj_t *ui_ButtonRight3 = NULL;
+lv_obj_t *ui_ButtonEnter3 = NULL;
+lv_obj_t *ui_ButtonExit3 = NULL;
+static lv_obj_t *s_PcStatusIcon = NULL;
 static lv_style_t s_pc_status_icon_style;
 static bool s_pc_status_icon_style_ready = false;
 static lv_style_t s_pc_status_title_style;
 static bool s_pc_status_title_style_ready = false;
+
+/*
+ * 字段缓存：<0 表示"未同步"，占位文本由 setter 内部决定。
+ * 一级页仅图标+标题（不显示数据），setter 收口在本文件：
+ * 更新缓存 -> 转发二级屏 setter。
+ * ui_PcStatusScreen_replay_cached_values() 在二级屏 init 末尾回放，
+ * 避免屏内空白。
+ */
+static struct
+{
+    bool valid;
+    float net_up_kbps;
+    float net_down_kbps;
+    float cpu_percent;
+    float cpu_temp_c;
+    float mem_percent;
+    float disk_io_percent;
+    float disk_space_percent;
+} s_cached = {false, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
 
 static void pc_status_forward_key(uint32_t key)
 {
     lv_obj_t *active_screen = lv_scr_act();
     lv_group_t *g = lv_group_get_default();
     lv_obj_t *target = g ? lv_group_get_focused(g) : active_screen;
-    if (target) {
+    if (target)
+    {
         lv_event_send(target, LV_EVENT_KEY, (void *)key);
     }
 }
 
-void ui_event_PcStatusScreen(lv_event_t * e)
+void ui_event_PcStatusScreen(lv_event_t *e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
-    if (event_code != LV_EVENT_KEY) {
+    if (event_code != LV_EVENT_KEY)
+    {
         return;
     }
 
     uintptr_t key = (uintptr_t)lv_event_get_param(e);
-    if (key == (uintptr_t)LV_KEY_RIGHT) {
-        ui_set_active_screen_tag(UI_SCREEN_HA);
-        _ui_screen_change(&ui_HaScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_HaScreen_screen_init);
+    if (key == (uintptr_t)LV_KEY_RIGHT)
+    {
+        // 暂时移除 HA Page 入口：跳过 HA 直达设置页（恢复时改回跳转 ui_HaScreen / UI_SCREEN_HA）
+        ui_set_active_screen_tag(UI_SCREEN_SETTING);
+        _ui_screen_change(&ui_SettingScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_SettingScreen_screen_init);
         lv_refr_now(NULL);
     }
-    else if (key == (uintptr_t)LV_KEY_LEFT) {
+    else if (key == (uintptr_t)LV_KEY_LEFT)
+    {
         ui_set_active_screen_tag(UI_SCREEN_AUDIO);
         _ui_screen_change(&ui_AudioScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_AudioScreen_screen_init);
         lv_refr_now(NULL);
     }
-    else if (key == (uintptr_t)LV_KEY_ENTER) {
+    else if (key == (uintptr_t)LV_KEY_ENTER)
+    {
         ui_set_active_screen_tag(UI_SCREEN_PC_STATUS_SECONDARY);
         _ui_screen_change(&ui_PcStatusScreenSecondary, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_PcStatusScreenSecondary_screen_init);
         lv_refr_now(NULL);
     }
 }
 
-void ui_event_ButtonLeft3(lv_event_t * e)
+void ui_event_ButtonLeft3(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         pc_status_forward_key(LV_KEY_LEFT);
     }
 }
 
-void ui_event_ButtonRight3(lv_event_t * e)
+void ui_event_ButtonRight3(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         pc_status_forward_key(LV_KEY_RIGHT);
     }
 }
 
-void ui_event_ButtonEnter3(lv_event_t * e)
+void ui_event_ButtonEnter3(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         pc_status_forward_key(LV_KEY_ENTER);
     }
+}
+
+/* ---- 数据 setter（唯一收口，DisplayTask 调用点不变；一级页不显示，全部转发二级屏） ---- */
+
+void ui_PcStatusScreen_set_net_up_kbps(float kbps)
+{
+    s_cached.valid = true;
+    s_cached.net_up_kbps = kbps;
+    ui_PcStatusScreenSecondary_set_net_up_kbps(kbps);
+}
+
+void ui_PcStatusScreen_set_net_down_kbps(float kbps)
+{
+    s_cached.valid = true;
+    s_cached.net_down_kbps = kbps;
+    ui_PcStatusScreenSecondary_set_net_down_kbps(kbps);
+}
+
+void ui_PcStatusScreen_set_cpu_percent(float pct)
+{
+    s_cached.valid = true;
+    s_cached.cpu_percent = pct;
+    ui_PcStatusScreenSecondary_set_cpu_percent(pct);
+}
+
+void ui_PcStatusScreen_set_cpu_temp_c(float c)
+{
+    s_cached.valid = true;
+    s_cached.cpu_temp_c = c;
+    ui_PcStatusScreenSecondary_set_cpu_temp_c(c);
+}
+
+void ui_PcStatusScreen_set_mem_percent(float pct)
+{
+    s_cached.valid = true;
+    s_cached.mem_percent = pct;
+    ui_PcStatusScreenSecondary_set_mem_percent(pct);
+}
+
+void ui_PcStatusScreen_set_disk_io_percent(float pct)
+{
+    s_cached.valid = true;
+    s_cached.disk_io_percent = pct;
+    ui_PcStatusScreenSecondary_set_disk_io_percent(pct);
+}
+
+void ui_PcStatusScreen_set_disk_space_percent(float pct)
+{
+    s_cached.valid = true;
+    s_cached.disk_space_percent = pct;
+    ui_PcStatusScreenSecondary_set_disk_space_percent(pct);
+}
+
+void ui_PcStatusScreen_replay_cached_values(void)
+{
+    if (!s_cached.valid)
+    {
+        return;
+    }
+    ui_PcStatusScreen_set_net_up_kbps(s_cached.net_up_kbps);
+    ui_PcStatusScreen_set_net_down_kbps(s_cached.net_down_kbps);
+    ui_PcStatusScreen_set_cpu_percent(s_cached.cpu_percent);
+    ui_PcStatusScreen_set_cpu_temp_c(s_cached.cpu_temp_c);
+    ui_PcStatusScreen_set_mem_percent(s_cached.mem_percent);
+    ui_PcStatusScreen_set_disk_io_percent(s_cached.disk_io_percent);
+    ui_PcStatusScreen_set_disk_space_percent(s_cached.disk_space_percent);
 }
 
 void ui_PcStatusScreen_screen_init(void)
@@ -79,13 +174,15 @@ void ui_PcStatusScreen_screen_init(void)
     ui_PcStatusScreen = lv_obj_create(NULL);
     lv_obj_clear_flag(ui_PcStatusScreen, LV_OBJ_FLAG_SCROLLABLE);
 
-    if (!s_pc_status_icon_style_ready) {
+    if (!s_pc_status_icon_style_ready)
+    {
         lv_style_init(&s_pc_status_icon_style);
         lv_style_set_text_font(&s_pc_status_icon_style, &lv_font_montserrat_48);
         s_pc_status_icon_style_ready = true;
     }
 
-    if (!s_pc_status_title_style_ready) {
+    if (!s_pc_status_title_style_ready)
+    {
         lv_style_init(&s_pc_status_title_style);
         lv_style_set_text_font(&s_pc_status_title_style, &ui_font_FontCKJGT28);
         lv_style_set_text_letter_space(&s_pc_status_title_style, 1);
@@ -138,25 +235,23 @@ void ui_PcStatusScreen_screen_init(void)
     lv_obj_set_style_bg_color(ui_ButtonExit3, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_ButtonExit3, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+    /*
+     * 一级页布局（428x142）：仅图标 + 标题，数据统一在二级页展示。
+     */
     s_PcStatusIcon = lv_img_create(ui_PcStatusScreen);
     lv_img_set_src(s_PcStatusIcon, LV_SYMBOL_VIDEO);
     lv_obj_add_style(s_PcStatusIcon, &s_pc_status_icon_style, 0);
-    lv_obj_set_width(s_PcStatusIcon, 80);
-    lv_obj_set_height(s_PcStatusIcon, 80);
-    lv_obj_set_x(s_PcStatusIcon, 20);
-    lv_obj_set_y(s_PcStatusIcon, -2);
-    lv_obj_set_align(s_PcStatusIcon, LV_ALIGN_CENTER);
+    lv_obj_set_size(s_PcStatusIcon, 64, 64);
+    lv_obj_set_pos(s_PcStatusIcon, 22, 16);
     lv_obj_add_flag(s_PcStatusIcon, LV_OBJ_FLAG_ADV_HITTEST);
     lv_obj_clear_flag(s_PcStatusIcon, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t *pc_status_title = lv_label_create(ui_PcStatusScreen);
     lv_label_set_recolor(pc_status_title, true);
     lv_label_set_text(pc_status_title, "PC STATUS");
-    lv_obj_set_width(pc_status_title, 300);
-    lv_label_set_long_mode(pc_status_title, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_align(pc_status_title, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width(pc_status_title, LV_SIZE_CONTENT);
     lv_obj_add_style(pc_status_title, &s_pc_status_title_style, 0);
-    lv_obj_align_to(pc_status_title, s_PcStatusIcon, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
+    lv_obj_set_pos(pc_status_title, 12, 88);
 
     lv_obj_add_event_cb(ui_ButtonLeft3, ui_event_ButtonLeft3, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_ButtonRight3, ui_event_ButtonRight3, LV_EVENT_ALL, NULL);
@@ -166,7 +261,8 @@ void ui_PcStatusScreen_screen_init(void)
 
 void ui_PcStatusScreen_screen_destroy(void)
 {
-    if (ui_PcStatusScreen) {
+    if (ui_PcStatusScreen)
+    {
         lv_obj_del(ui_PcStatusScreen);
     }
 

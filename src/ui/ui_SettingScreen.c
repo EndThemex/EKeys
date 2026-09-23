@@ -26,9 +26,10 @@ void ui_event_SettingScreen(lv_event_t * e)
         lv_refr_now(NULL);
     }
     else if(event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_LEFT) {
-        ui_set_active_screen_tag(UI_SCREEN_HA);
-        _ui_screen_change(&ui_HaScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_HaScreen_screen_init);
-        lv_refr_now(NULL); 
+        // 暂时移除 HA Page 入口：跳过 HA 直达 PC 状态页（恢复时改回跳转 ui_HaScreen / UI_SCREEN_HA）
+        ui_set_active_screen_tag(UI_SCREEN_PC_STATUS);
+        _ui_screen_change(&ui_PcStatusScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_PcStatusScreen_screen_init);
+        lv_refr_now(NULL);
     } 
     else if(event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_ENTER) {
         LV_LOG_USER("ui_event_ButtonEnter5 LV_EVENT_CLICKED");
