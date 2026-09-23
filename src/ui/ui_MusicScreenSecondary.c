@@ -13,31 +13,31 @@
 #define MUSIC_SECONDARY_META_WIDTH 304
 #define MUSIC_SECONDARY_META_HEIGHT 92
 
-lv_obj_t * ui_MusicScreenSecondary = NULL;
-static lv_obj_t * ui_MusicSecondaryButtonLeft = NULL;
-static lv_obj_t * ui_MusicSecondaryButtonRight = NULL;
-static lv_obj_t * ui_MusicSecondaryButtonEnter = NULL;
-static lv_obj_t * ui_MusicSecondaryButtonExit = NULL;
-static lv_obj_t * ui_MusicSecondaryVisualHost = NULL;
-static lv_obj_t * ui_MusicSecondaryShell = NULL;
-static lv_obj_t * ui_MusicSecondaryAlbumCard = NULL;
-static lv_obj_t * ui_MusicSecondaryMetaCard = NULL;
-static lv_obj_t * ui_MusicSecondaryRecord = NULL;
-static lv_obj_t * ui_MusicSecondaryRecordLabel = NULL;
-static lv_obj_t * ui_MusicSecondaryRecordHalo = NULL;
-static lv_obj_t * ui_MusicSecondaryRecordGlint = NULL;
-static lv_obj_t * ui_MusicSecondaryTonearm = NULL;
-static lv_obj_t * ui_MusicSecondaryTonearmHead = NULL;
-static lv_obj_t * ui_MusicSecondaryTonearmPivot = NULL;
-static lv_obj_t * ui_MusicSecondaryTitle = NULL;
-static lv_obj_t * ui_MusicSecondarySubtitle = NULL;
-static lv_obj_t * ui_MusicSecondaryProgress = NULL;
-static lv_obj_t * ui_MusicSecondaryCurrentTime = NULL;
-static lv_obj_t * ui_MusicSecondaryTotalTime = NULL;
-static lv_obj_t * ui_MusicSecondaryHintLeft = NULL;
-static lv_obj_t * ui_MusicSecondaryHintCenter = NULL;
-static lv_obj_t * ui_MusicSecondaryHintRight = NULL;
-static lv_timer_t * ui_MusicSecondaryRecordTimer = NULL;
+lv_obj_t *ui_MusicScreenSecondary = NULL;               /* 音乐二级页屏幕根对象 */
+static lv_obj_t *ui_MusicSecondaryButtonLeft = NULL;    /* 兜底触屏按钮：上一曲（本硬件无触屏，永不触发） */
+static lv_obj_t *ui_MusicSecondaryButtonRight = NULL;   /* 兜底触屏按钮：下一曲 */
+static lv_obj_t *ui_MusicSecondaryButtonEnter = NULL;   /* 兜底触屏按钮：播放/暂停 */
+static lv_obj_t *ui_MusicSecondaryButtonExit = NULL;    /* 兜底触屏按钮：返回音乐主页 */
+static lv_obj_t *ui_MusicSecondaryVisualHost = NULL;    /* 顶部频谱宿主容器（交给音乐主页的频谱渲染） */
+static lv_obj_t *ui_MusicSecondaryShell = NULL;         /* 底部信息面板壳（内含专辑卡 + 元信息卡） */
+static lv_obj_t *ui_MusicSecondaryAlbumCard = NULL;     /* 左侧专辑卡（唱片机造型容器） */
+static lv_obj_t *ui_MusicSecondaryMetaCard = NULL;      /* 右侧元信息卡（标题/进度/时间容器） */
+static lv_obj_t *ui_MusicSecondaryRecord = NULL;        /* 黑胶唱片主体（随播放旋转） */
+static lv_obj_t *ui_MusicSecondaryRecordLabel = NULL;   /* 唱片中心状态图标（断连/播放/暂停/待机） */
+static lv_obj_t *ui_MusicSecondaryRecordHalo = NULL;    /* 唱片外圈红色光环（描边实现，垫底渲染） */
+static lv_obj_t *ui_MusicSecondaryRecordGlint = NULL;   /* 唱片高光点（随旋转角度在 12 个扇区间跳动） */
+static lv_obj_t *ui_MusicSecondaryTonearm = NULL;       /* 唱臂（绕左端点旋转，角度随播放状态变化） */
+static lv_obj_t *ui_MusicSecondaryTonearmHead = NULL;   /* 唱臂末端唱头 */
+static lv_obj_t *ui_MusicSecondaryTonearmPivot = NULL;  /* 唱臂轴心装饰圆点 */
+static lv_obj_t *ui_MusicSecondaryTitle = NULL;         /* 歌曲标题（超长跑马灯滚动） */
+static lv_obj_t *ui_MusicSecondarySubtitle = NULL;      /* 副标题（歌手 | 播放器名） */
+static lv_obj_t *ui_MusicSecondaryProgress = NULL;      /* 播放进度条 */
+static lv_obj_t *ui_MusicSecondaryCurrentTime = NULL;   /* 当前播放时间 */
+static lv_obj_t *ui_MusicSecondaryTotalTime = NULL;     /* 歌曲总时长 */
+static lv_obj_t *ui_MusicSecondaryHintLeft = NULL;      /* 底部左提示（PREV/WAIT） */
+static lv_obj_t *ui_MusicSecondaryHintCenter = NULL;    /* 底部中提示（PLAY/PAUSE） */
+static lv_obj_t *ui_MusicSecondaryHintRight = NULL;     /* 底部右提示（NEXT/QUEUE） */
+static lv_timer_t *ui_MusicSecondaryRecordTimer = NULL; /* 唱片旋转动画定时器 */
 static int16_t s_music_record_angle = 0;
 
 static volatile uint8_t s_music_control_request = UI_MUSIC_CONTROL_NONE;
@@ -412,6 +412,7 @@ void ui_MusicScreenSecondary_screen_init(void)
     lv_obj_set_style_radius(ui_MusicScreenSecondary, 0, 0);
     ui_set_active_screen_tag(UI_SCREEN_MUSIC_SECONDARY);
 
+    /* ============ 顶部频谱宿主：428x26 贴顶居中，渲染由音乐主页的频谱逻辑接管 ============ */
     ui_MusicSecondaryVisualHost = lv_obj_create(ui_MusicScreenSecondary);
     lv_obj_set_size(ui_MusicSecondaryVisualHost, MUSIC_SECONDARY_VISUAL_WIDTH, MUSIC_SECONDARY_VISUAL_HEIGHT);
     lv_obj_align(ui_MusicSecondaryVisualHost, LV_ALIGN_TOP_MID, 0, 0);
@@ -422,6 +423,7 @@ void ui_MusicScreenSecondary_screen_init(void)
     lv_obj_set_style_pad_all(ui_MusicSecondaryVisualHost, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     ui_MusicScreen_set_visual_host(ui_MusicSecondaryVisualHost);
 
+    /* ============ 底部面板壳：428x116 贴底居中，页面主体内容都在里面 ============ */
     ui_MusicSecondaryShell = lv_obj_create(ui_MusicScreenSecondary);
     lv_obj_set_size(ui_MusicSecondaryShell, MUSIC_SECONDARY_SHELL_WIDTH, MUSIC_SECONDARY_SHELL_HEIGHT);
     lv_obj_align(ui_MusicSecondaryShell, LV_ALIGN_BOTTOM_MID, 0, 0);
@@ -432,16 +434,19 @@ void ui_MusicScreenSecondary_screen_init(void)
     lv_obj_set_style_radius(ui_MusicSecondaryShell, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_all(ui_MusicSecondaryShell, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+    /* ---------- 左侧专辑卡：104x92，距壳左上角 (8,4)，唱片机造型容器 ---------- */
     ui_MusicSecondaryAlbumCard = lv_obj_create(ui_MusicSecondaryShell);
     lv_obj_set_size(ui_MusicSecondaryAlbumCard, MUSIC_SECONDARY_ALBUM_WIDTH, MUSIC_SECONDARY_ALBUM_HEIGHT);
-    lv_obj_align(ui_MusicSecondaryAlbumCard, LV_ALIGN_TOP_LEFT, 8, 8);
+    lv_obj_align(ui_MusicSecondaryAlbumCard, LV_ALIGN_TOP_LEFT, 8, 4);
     music_secondary_style_card(ui_MusicSecondaryAlbumCard, lv_color_hex(0x161C25), lv_color_hex(0x2E3947), 18);
 
+    /* ---------- 右侧元信息卡：304x92，贴壳右上角 (向内 8,4)，歌曲信息容器 ---------- */
     ui_MusicSecondaryMetaCard = lv_obj_create(ui_MusicSecondaryShell);
     lv_obj_set_size(ui_MusicSecondaryMetaCard, MUSIC_SECONDARY_META_WIDTH, MUSIC_SECONDARY_META_HEIGHT);
-    lv_obj_align(ui_MusicSecondaryMetaCard, LV_ALIGN_TOP_RIGHT, -8, 8);
+    lv_obj_align(ui_MusicSecondaryMetaCard, LV_ALIGN_TOP_RIGHT, -8, 4);
     music_secondary_style_card(ui_MusicSecondaryMetaCard, lv_color_hex(0x121820), lv_color_hex(0x273242), 18);
 
+    /* 黑胶唱片主体：62x62 圆形，居专辑卡上部，旋转轴心为中心 (31,31) */
     ui_MusicSecondaryRecord = lv_obj_create(ui_MusicSecondaryAlbumCard);
     lv_obj_set_size(ui_MusicSecondaryRecord, 62, 62);
     lv_obj_align(ui_MusicSecondaryRecord, LV_ALIGN_TOP_MID, 0, 10);
@@ -456,6 +461,7 @@ void ui_MusicScreenSecondary_screen_init(void)
     lv_obj_set_style_transform_pivot_y(ui_MusicSecondaryRecord, 31, 0);
     lv_obj_set_style_pad_all(ui_MusicSecondaryRecord, 0, 0);
 
+    /* 唱片红色光环：70x70，与唱片同中心（相对兄弟组件对齐），垫到唱片底层，播放时描边更亮 */
     ui_MusicSecondaryRecordHalo = lv_obj_create(ui_MusicSecondaryAlbumCard);
     lv_obj_set_size(ui_MusicSecondaryRecordHalo, 70, 70);
     lv_obj_align_to(ui_MusicSecondaryRecordHalo, ui_MusicSecondaryRecord, LV_ALIGN_CENTER, 0, 0);
@@ -469,6 +475,7 @@ void ui_MusicScreenSecondary_screen_init(void)
     lv_obj_set_style_outline_opa(ui_MusicSecondaryRecordHalo, 30, 0);
     lv_obj_set_style_pad_all(ui_MusicSecondaryRecordHalo, 0, 0);
 
+    /* 唱片纹路装饰：3 圈同心圆（48/36/24），透明底仅描边 */
     for (int groove_index = 0; groove_index < 3; ++groove_index) {
         lv_obj_t *groove = lv_obj_create(ui_MusicSecondaryRecord);
         const lv_coord_t groove_size = (lv_coord_t)(48 - groove_index * 12);
@@ -482,6 +489,7 @@ void ui_MusicScreenSecondary_screen_init(void)
         lv_obj_set_style_pad_all(groove, 0, 0);
     }
 
+    /* 唱片中心红色标签盘（22x22）+ 其上的银色轴心（6x6） */
     lv_obj_t *record_label_disc = lv_obj_create(ui_MusicSecondaryRecord);
     lv_obj_set_size(record_label_disc, 22, 22);
     lv_obj_center(record_label_disc);
@@ -500,6 +508,7 @@ void ui_MusicScreenSecondary_screen_init(void)
     lv_obj_set_style_border_width(record_spindle, 0, 0);
     lv_obj_set_style_pad_all(record_spindle, 0, 0);
 
+    /* 唱片高光点：9x9 白点，位置由旋转定时器按 12 扇区表驱动，营造旋转反光感 */
     ui_MusicSecondaryRecordGlint = lv_obj_create(ui_MusicSecondaryRecord);
     lv_obj_set_size(ui_MusicSecondaryRecordGlint, 9, 9);
     lv_obj_clear_flag(ui_MusicSecondaryRecordGlint, LV_OBJ_FLAG_SCROLLABLE);
@@ -509,12 +518,14 @@ void ui_MusicScreenSecondary_screen_init(void)
     lv_obj_set_style_border_width(ui_MusicSecondaryRecordGlint, 0, 0);
     lv_obj_set_style_pad_all(ui_MusicSecondaryRecordGlint, 0, 0);
 
+    /* 唱片中心状态图标：显示断连(X)/播放(PLAY)/暂停(PAUSE)/待机(AUDIO) */
     ui_MusicSecondaryRecordLabel = lv_label_create(record_label_disc);
     lv_obj_set_width(ui_MusicSecondaryRecordLabel, 18);
     lv_obj_center(ui_MusicSecondaryRecordLabel);
     lv_obj_set_style_text_align(ui_MusicSecondaryRecordLabel, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(ui_MusicSecondaryRecordLabel, &lv_font_montserrat_14, 0);
 
+    /* 唱臂：28x4 细长条，贴专辑卡右上，绕左端点 (0,2) 旋转，角度随播放状态变化（断连220/播放330/暂停280/待机260） */
     ui_MusicSecondaryTonearm = lv_obj_create(ui_MusicSecondaryAlbumCard);
     lv_obj_set_size(ui_MusicSecondaryTonearm, 28, 4);
     lv_obj_align(ui_MusicSecondaryTonearm, LV_ALIGN_TOP_RIGHT, -7, 15);
@@ -527,6 +538,7 @@ void ui_MusicScreenSecondary_screen_init(void)
     lv_obj_set_style_transform_pivot_y(ui_MusicSecondaryTonearm, 2, 0);
     lv_obj_set_style_pad_all(ui_MusicSecondaryTonearm, 0, 0);
 
+    /* 唱臂末端唱头：8x8 圆点，贴唱臂右端（随唱臂一起旋转） */
     ui_MusicSecondaryTonearmHead = lv_obj_create(ui_MusicSecondaryTonearm);
     lv_obj_set_size(ui_MusicSecondaryTonearmHead, 8, 8);
     lv_obj_align(ui_MusicSecondaryTonearmHead, LV_ALIGN_RIGHT_MID, 1, 0);
@@ -536,6 +548,7 @@ void ui_MusicScreenSecondary_screen_init(void)
     lv_obj_set_style_border_width(ui_MusicSecondaryTonearmHead, 0, 0);
     lv_obj_set_style_pad_all(ui_MusicSecondaryTonearmHead, 0, 0);
 
+    /* 唱臂轴心装饰：10x10 圆点，即唱臂旋转的视觉支点 */
     ui_MusicSecondaryTonearmPivot = lv_obj_create(ui_MusicSecondaryAlbumCard);
     lv_obj_set_size(ui_MusicSecondaryTonearmPivot, 10, 10);
     lv_obj_align(ui_MusicSecondaryTonearmPivot, LV_ALIGN_TOP_RIGHT, -5, 12);
@@ -545,46 +558,51 @@ void ui_MusicScreenSecondary_screen_init(void)
     lv_obj_set_style_border_width(ui_MusicSecondaryTonearmPivot, 0, 0);
     lv_obj_set_style_pad_all(ui_MusicSecondaryTonearmPivot, 0, 0);
 
+    /* 歌曲标题：宽 282，超长时跑马灯循环滚动 */
     ui_MusicSecondaryTitle = lv_label_create(ui_MusicSecondaryMetaCard);
     lv_obj_set_width(ui_MusicSecondaryTitle, 282);
-    lv_obj_align(ui_MusicSecondaryTitle, LV_ALIGN_TOP_LEFT, 12, 8);
+    lv_obj_align(ui_MusicSecondaryTitle, LV_ALIGN_TOP_LEFT, 12, 4);
     lv_label_set_long_mode(ui_MusicSecondaryTitle, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_obj_set_style_text_font(ui_MusicSecondaryTitle, &ui_font_FontCKJGT24, 0);
     lv_obj_set_style_text_color(ui_MusicSecondaryTitle, lv_color_hex(0xF5F7FA), 0);
 
+    /* 副标题：歌手 | 播放器名，超长时跑马灯滚动 */
     ui_MusicSecondarySubtitle = lv_label_create(ui_MusicSecondaryMetaCard);
     lv_obj_set_width(ui_MusicSecondarySubtitle, 282);
-    lv_obj_align(ui_MusicSecondarySubtitle, LV_ALIGN_TOP_LEFT, 12, 34);
+    lv_obj_align(ui_MusicSecondarySubtitle, LV_ALIGN_TOP_LEFT, 12, 30);
     lv_label_set_long_mode(ui_MusicSecondarySubtitle, LV_LABEL_LONG_SCROLL_CIRCULAR);
     lv_obj_set_style_text_font(ui_MusicSecondarySubtitle, &ui_font_FontCKJGT16, 0);
     lv_obj_set_style_text_color(ui_MusicSecondarySubtitle, lv_color_hex(0x8FA0B5), 0);
 
+    /* 播放进度条：280x8，量程 0~1000，红色指示条 */
     ui_MusicSecondaryProgress = lv_bar_create(ui_MusicSecondaryMetaCard);
     lv_obj_set_size(ui_MusicSecondaryProgress, 280, 8);
-    lv_obj_align(ui_MusicSecondaryProgress, LV_ALIGN_TOP_LEFT, 12, 58);
+    lv_obj_align(ui_MusicSecondaryProgress, LV_ALIGN_TOP_LEFT, 12, 54);
     lv_bar_set_range(ui_MusicSecondaryProgress, 0, 1000);
     lv_obj_set_style_radius(ui_MusicSecondaryProgress, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_border_width(ui_MusicSecondaryProgress, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_color(ui_MusicSecondaryProgress, lv_color_hex(0x283241), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_color(ui_MusicSecondaryProgress, lv_color_hex(0xD33A31), LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
+    /* 时间标签：当前播放时间（左对齐）/ 歌曲总时长（右对齐），分列进度条两端下方 */
     ui_MusicSecondaryCurrentTime = lv_label_create(ui_MusicSecondaryMetaCard);
     lv_obj_set_width(ui_MusicSecondaryCurrentTime, 60);
-    lv_obj_align(ui_MusicSecondaryCurrentTime, LV_ALIGN_TOP_LEFT, 12, 70);
+    lv_obj_align(ui_MusicSecondaryCurrentTime, LV_ALIGN_TOP_LEFT, 12, 66);
     lv_obj_set_style_text_align(ui_MusicSecondaryCurrentTime, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_style_text_font(ui_MusicSecondaryCurrentTime, &ui_font_BebasNeueFont14, 0);
     lv_obj_set_style_text_color(ui_MusicSecondaryCurrentTime, lv_color_hex(0x91A0B2), 0);
 
     ui_MusicSecondaryTotalTime = lv_label_create(ui_MusicSecondaryMetaCard);
     lv_obj_set_width(ui_MusicSecondaryTotalTime, 60);
-    lv_obj_align(ui_MusicSecondaryTotalTime, LV_ALIGN_TOP_RIGHT, -12, 70);
+    lv_obj_align(ui_MusicSecondaryTotalTime, LV_ALIGN_TOP_RIGHT, -12, 66);
     lv_obj_set_style_text_align(ui_MusicSecondaryTotalTime, LV_TEXT_ALIGN_RIGHT, 0);
     lv_obj_set_style_text_font(ui_MusicSecondaryTotalTime, &ui_font_BebasNeueFont14, 0);
     lv_obj_set_style_text_color(ui_MusicSecondaryTotalTime, lv_color_hex(0x91A0B2), 0);
 
+    /* ============ 底部操作提示标签：左(PREV) 中(PLAY/PAUSE) 右(NEXT)，贴屏底 ============ */
     ui_MusicSecondaryHintLeft = lv_label_create(ui_MusicScreenSecondary);
     lv_obj_set_width(ui_MusicSecondaryHintLeft, 120);
-    lv_obj_align(ui_MusicSecondaryHintLeft, LV_ALIGN_BOTTOM_LEFT, 10, -7);
+    lv_obj_align(ui_MusicSecondaryHintLeft, LV_ALIGN_BOTTOM_LEFT, 10, -8);
     lv_obj_set_style_text_align(ui_MusicSecondaryHintLeft, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(ui_MusicSecondaryHintLeft, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(ui_MusicSecondaryHintLeft, lv_color_hex(0xBAC5D3), 0);
@@ -593,7 +611,7 @@ void ui_MusicScreenSecondary_screen_init(void)
 
     ui_MusicSecondaryHintCenter = lv_label_create(ui_MusicScreenSecondary);
     lv_obj_set_width(ui_MusicSecondaryHintCenter, 160);
-    lv_obj_align(ui_MusicSecondaryHintCenter, LV_ALIGN_BOTTOM_MID, 0, -7);
+    lv_obj_align(ui_MusicSecondaryHintCenter, LV_ALIGN_BOTTOM_MID, 0, -8);
     lv_obj_set_style_text_align(ui_MusicSecondaryHintCenter, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(ui_MusicSecondaryHintCenter, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(ui_MusicSecondaryHintCenter, lv_color_hex(0xFFFFFF), 0);
@@ -602,13 +620,14 @@ void ui_MusicScreenSecondary_screen_init(void)
 
     ui_MusicSecondaryHintRight = lv_label_create(ui_MusicScreenSecondary);
     lv_obj_set_width(ui_MusicSecondaryHintRight, 120);
-    lv_obj_align(ui_MusicSecondaryHintRight, LV_ALIGN_BOTTOM_RIGHT, -10, -7);
+    lv_obj_align(ui_MusicSecondaryHintRight, LV_ALIGN_BOTTOM_RIGHT, -10, -8);
     lv_obj_set_style_text_align(ui_MusicSecondaryHintRight, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(ui_MusicSecondaryHintRight, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(ui_MusicSecondaryHintRight, lv_color_hex(0xBAC5D3), 0);
     lv_obj_set_style_bg_opa(ui_MusicSecondaryHintRight, LV_OPA_TRANSP, 0);
     lv_obj_set_style_pad_all(ui_MusicSecondaryHintRight, 0, 0);
 
+    /* ============ 兜底触屏按钮：透明背景铺在提示区，本硬件无触屏，仅保留供未来扩展 ============ */
     ui_MusicSecondaryButtonLeft = lv_btn_create(ui_MusicScreenSecondary);
     lv_obj_set_size(ui_MusicSecondaryButtonLeft, 142, 32);
     lv_obj_align(ui_MusicSecondaryButtonLeft, LV_ALIGN_BOTTOM_LEFT, 0, 0);
@@ -637,12 +656,14 @@ void ui_MusicScreenSecondary_screen_init(void)
     lv_obj_set_style_border_width(ui_MusicSecondaryButtonExit, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_clear_flag(ui_MusicSecondaryButtonExit, LV_OBJ_FLAG_SCROLLABLE);
 
+    /* 注册事件回调：三个控制按钮 + 退出按钮 + 屏幕级按键处理（旋钮/矩阵键） */
     lv_obj_add_event_cb(ui_MusicSecondaryButtonLeft, ui_event_ButtonLeftMusicSecondary, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_MusicSecondaryButtonEnter, ui_event_ButtonEnterMusicSecondary, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_MusicSecondaryButtonRight, ui_event_ButtonRightMusicSecondary, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_MusicSecondaryButtonExit, ui_event_ButtonExitMusicSecondary, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_MusicScreenSecondary, ui_event_MusicScreenSecondary, LV_EVENT_ALL, NULL);
 
+    /* 唱片旋转定时器：60ms 一步、每步 3°（10s/圈），仅在连接且播放时走动 */
     ui_MusicSecondaryRecordTimer = lv_timer_create(music_secondary_record_timer_cb, 60, NULL);
     music_secondary_set_record_angle(0);
 

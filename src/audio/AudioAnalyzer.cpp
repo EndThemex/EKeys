@@ -159,7 +159,11 @@ namespace ekeys
      * 把环境底噪放大成满量程（初值按 ICS43434 -26dBFS@94dB SPL 估算，
      * 普通室内底噪帧峰值约 300~3000，正常说话/音乐 3 万+）。
      */
-    constexpr double kPeakTrackRise = 0.99;  /* 上升系数（几乎瞬时跟上） */
+    /* 上升系数：约 3~5 帧（60~100ms）跟上。原 0.99 瞬时跟上会把鼓点瞬态
+     * 当帧归一化掉（最强频段永远 ≈1.0），动态在源头被压平、灯效无跳动；
+     * 放缓后瞬态先冲满再被归一化压回，节拍起伏回到 0~1 区间。
+     * 回落系数（≈100 帧 ≈ 3s）保持不变。 */
+    constexpr double kPeakTrackRise = 0.25;
     constexpr double kPeakTrackDecay = 0.01; /* 回落系数（≈100 帧 ≈ 3s） */
     constexpr double kAbsNoiseFloor = 8000.0;
     const double track_k = (frame_peak > peak_track_) ? kPeakTrackRise

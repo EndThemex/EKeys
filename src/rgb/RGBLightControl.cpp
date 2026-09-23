@@ -45,8 +45,14 @@ namespace ekeys
          * 满量程 4 行 = 3 行灯位 + 2 行色带宽，即满音量时暖色推过顶行。
          * 波偏高（颜色容易红透）就加大 kGradientWaveSpan，偏低就减小。 */
         constexpr float kGradientWaveSpan = 4.0f;   /* 前沿最大推进行数 */
-        constexpr float kGradientWaveAttack = 0.25f; /* 推进速度（越大越跟手） */
-        constexpr float kGradientWaveDecay = 0.06f;  /* 回落速度（越小越拖尾） */
+        constexpr float kGradientWaveAttack = 0.45f; /* 推进速度（越大越跟手） */
+        constexpr float kGradientWaveDecay = 0.08f;  /* 回落速度（越小越拖尾） */
+
+        /* 频率渐变柱体起落（与矩阵律动的 kMatrix* 分开调，互不影响）：
+         * 起跳快（~2 帧到顶）、回落跟拍（一个节拍内基本落完），
+         * 让柱高随节拍明显起伏。 */
+        constexpr float kGradientAttack = 0.60f;
+        constexpr float kGradientDecay = 0.15f;
 
         /* 频率渐变列分组（近似对数）：16 段等带宽（各 ~469Hz）按低频细分、
          * 高频粗分归并成 4 列，避免上半段 3 列（3k~7.5kHz）各只占 1 段能量 */
@@ -61,6 +67,10 @@ namespace ekeys
         /* 频率渐变峰值点（peak-hold）：每帧定速下落（行/帧），
          * 0.08 ≈ 1 行/375ms，满 3 行约 1.1s 落底；调大落得更快 */
         constexpr float kGradientPeakDecay = 0.08f;
+
+        /* 峰值点高亮强度：0 = 纯行色，1 = 纯白；取中间值保持色相
+         * 的同时明显亮于柱身，避免纯白点在暗背景上刺眼闪现 */
+        constexpr float kPeakHighlight = 0.55f;
 
         /* 灯柱高度（行单位 0~3）→ 柱顶行号（0~2）；无灯返回 0xFF */
         uint8_t topRowOf(float height_rows)
@@ -355,10 +365,11 @@ namespace ekeys
              *
              *   高度：每列按自身音量自下而上点亮 0~3 行（顶部行含小数亮度过渡），
              *         并叠加 peak-hold 峰值点（白光，回落时独自下落到柱顶之下）
-             *   颜色：全局色波——4 列音量均值驱动同一条"热浪前沿"，同一行永远
-             *         同色；行色相由 age = 前沿 - 行号 线性决定（170 蓝 → 0 红），
-             *         前沿随音量自底向上推进，满音量时推过顶行（全场渐暖），
-             *         安静后缓慢回落，避免各列各自变色导致的"杂色"观感。
+             *   颜色：全局色波——4 列"平滑前"的原始电平均值驱动同一条
+             *         "热浪前沿"，同一行永远同色；行色相由 age = 前沿 - 行号
+             *         线性决定（170 蓝 → 0 红），前沿随音量自底向上推进，
+             *         满音量时推过顶行（全场渐暖），安静后缓慢回落。
+             *         取平滑前电平是为了让颜色跟节拍一起跳，不被列平滑拖慢。
              */
             float sum = 0.0f;
             for (uint8_t col = 0; col < 4; ++col)
@@ -383,9 +394,12 @@ namespace ekeys
                 {
                     target = 0.0f;
                 }
+                /* 色波用平滑前的原始电平累积，节拍一到颜色立刻跟随 */
+                sum += target;
 
                 float level = audio_col_[col];
-                const float k = (target > level) ? kMatrixAttack : kMatrixDecay;
+                const float k = (target > level) ? kGradientAttack
+                                                 : kGradientDecay;
                 level += (target - level) * k;
                 if (level < kMatrixEpsilon)
                 {
@@ -396,7 +410,6 @@ namespace ekeys
                     level = 1.0f;
                 }
                 audio_col_[col] = level;
-                sum += level;
 
                 /* 峰值水位（peak-hold）：瞬间抬高、每帧定速下落 */
                 const float h = level * 3.0f;
@@ -409,7 +422,8 @@ namespace ekeys
                 audio_peak_[col] = pk;
             }
 
-            /* 热浪前沿（行）：起跳快、回落缓，颜色比高度略带滞后，
+            /* 热浪前沿（行）：输入是各列平滑前的原始电平（节拍一响
+             * 颜色立刻跳动），自身再做一层起快落缓的平滑防止频闪，
              * 形成"波上推"的拖尾感 */
             const float wave_target = sum * 0.25f;
             const float wave_k = (wave_target > audio_wave_) ? kGradientWaveAttack
@@ -463,8 +477,9 @@ namespace ekeys
                 }
 
                 /* 峰值点（peak-hold，取自 WLED 2DGEQ 的 Peaks 做法）：
-                 * 水位高于柱顶时以白光标记；柱已熄灭后峰值点仍继续独自
-                 * 落回底部，让 3 行矩阵也能看出"刚才到过多高" */
+                 * 水位高于柱顶时以所在行色相的高亮变体标记；柱已熄灭后
+                 * 峰值点仍继续独自落回底部，让 3 行矩阵也能看出
+                 * "刚才到过多高" */
                 const uint8_t bar_top = topRowOf(level * 3.0f);
                 const uint8_t peak_row = topRowOf(audio_peak_[col]);
                 const bool above_bar = (peak_row != 0xFF) &&
@@ -472,7 +487,24 @@ namespace ekeys
                 /* 顶行（ROW0）COL3 无灯，标记同样不能落到 LED 3 上 */
                 if (above_bar && !(peak_row == 2 && col == 3))
                 {
-                    led.setPixel(kRowLedBase[2 - peak_row] + col, 255, 255, 255);
+                    /* 与柱身同一套变龄模型：age = 前沿 - 峰值行号 */
+                    float age = front - peak_row;
+                    if (age < 0.0f)
+                    {
+                        age = 0.0f;
+                    }
+                    else if (age > 2.0f)
+                    {
+                        age = 2.0f;
+                    }
+                    uint8_t r, g, b;
+                    hueToRgb(hueWheel(static_cast<uint8_t>(170.0f - age * 85.0f)),
+                             r, g, b);
+                    /* 高亮：各通道向白推 kPeakHighlight，保持色相 */
+                    led.setPixel(kRowLedBase[2 - peak_row] + col,
+                                 static_cast<uint8_t>(r + (255 - r) * kPeakHighlight),
+                                 static_cast<uint8_t>(g + (255 - g) * kPeakHighlight),
+                                 static_cast<uint8_t>(b + (255 - b) * kPeakHighlight));
                 }
             }
             break;
