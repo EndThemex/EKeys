@@ -28,8 +28,10 @@ namespace ekeys
         /* 矩阵律动滤波：
          * AudioAnalyzer 每帧按帧内峰值自适应归一化，底噪/帧间波动会被放大成
          * 高频微闪。门限以下视为 0；起跳/回落改用指数平滑（非对称：
-         * 起跳快而不过冲、回落缓），消掉帧间抖动。 */
-        constexpr float kMatrixNoiseGate = 0.07f; /* 静噪门限（归一化 0~1） */
+         * 起跳快而不过冲、回落缓），消掉帧间抖动。
+         * 2026-09-23：触发阈值调高 0.07 → 0.15（弱信号/底噪不点亮，
+         * 需更响的声音才触发灯效；配合 AudioAnalyzer 的 kAbsNoiseFloor 生效）。 */
+        constexpr float kMatrixNoiseGate = 0.15f; /* 静噪门限（归一化 0~1） */
         constexpr float kMatrixAttack = 0.50f;    /* 起跳平滑系数（越大越跟手） */
         constexpr float kMatrixDecay = 0.10f;     /* 回落平滑系数（越小越缓） */
         constexpr float kMatrixEpsilon = 0.004f;  /* 残留截断，避免半亮像素长亮 */
@@ -299,6 +301,80 @@ namespace ekeys
                              static_cast<uint8_t>(r * scale),
                              static_cast<uint8_t>(g * scale),
                              static_cast<uint8_t>(b * scale));
+            }
+            break;
+        }
+
+        case RGB_GRADIENT_MODE:
+        {
+            /*
+             * 频率渐变：与矩阵律动同布局（3 行 × 4 列，4 列对应 4 组频段，
+             * 自下而上按音量点亮），区别在配色——颜色波从底部向上推进：
+             * 新点亮的行永远是蓝色；某行满亮后随音量继续上升开始"变龄"，
+             * 从底部起依次 蓝→绿→红（色相 170→85→0），色变位置随音量上移。
+             */
+            for (uint8_t col = 0; col < 4; ++col)
+            {
+                const uint8_t start = static_cast<uint8_t>(col * 4);
+                float target = 0.0f;
+                for (uint8_t b = start; b < start + 4; ++b)
+                {
+                    if (audio_bands_[b] > target)
+                    {
+                        target = audio_bands_[b];
+                    }
+                }
+                if (target < kMatrixNoiseGate)
+                {
+                    target = 0.0f;
+                }
+
+                float level = audio_col_[col];
+                const float k = (target > level) ? kMatrixAttack : kMatrixDecay;
+                level += (target - level) * k;
+                if (level < kMatrixEpsilon)
+                {
+                    level = 0.0f;
+                }
+                else if (level > 1.0f)
+                {
+                    level = 1.0f;
+                }
+                audio_col_[col] = level;
+
+                static const uint8_t kRowLedBase[3] = {0, 3, 7};
+                for (uint8_t row = 0; row < 3; ++row)
+                {
+                    const float lit = level * 3.0f - row;
+                    const uint8_t led_idx = kRowLedBase[2 - row] + col;
+                    if (lit <= 0.0f)
+                    {
+                        led.setPixel(led_idx, 0, 0, 0);
+                        continue;
+                    }
+                    const float inten = (lit > 1.0f) ? 1.0f : lit;
+                    /*
+                     * 变龄模型：age = 满亮行数 - 该行行号（0~2）。
+                     * 刚点亮（age<0）→ 纯蓝；满亮后随音量上升逐渐变暖。
+                     * age 0→2 线性映射色相 170(蓝)→85(绿)→0(红)。
+                     */
+                    float age = level * 3.0f - (row + 1);
+                    if (age < 0.0f)
+                    {
+                        age = 0.0f;
+                    }
+                    else if (age > 2.0f)
+                    {
+                        age = 2.0f;
+                    }
+                    uint8_t r, g, b;
+                    hueToRgb(hueWheel(static_cast<uint8_t>(170.0f - age * 85.0f)),
+                             r, g, b);
+                    led.setPixel(led_idx,
+                                 static_cast<uint8_t>(r * inten),
+                                 static_cast<uint8_t>(g * inten),
+                                 static_cast<uint8_t>(b * inten));
+                }
             }
             break;
         }

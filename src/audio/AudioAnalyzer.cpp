@@ -134,10 +134,16 @@ namespace ekeys
     }
     /*
      * 自适应归一化：以本帧最大 bin 的 1/4 作为分母。
-     * - floor=1.0 防止静默帧除零
-     * - 每段都按 frame_peak 归一化并裁到 0~1
+     * - 静音门限 kAbsNoiseFloor（绝对 raw FFT 峰值）：帧峰值低于它视为
+     *   环境底噪，按门限值缩放而不是自适应拉满。否则任何微弱底噪都会把
+     *   峰值频段归一化到 1.0（denom=frame_peak*0.25 时峰值频段恒为 4.0），
+     *   下游 RGB 静噪门限（kMatrixNoiseGate）对峰值频段永远失效。
+     *   初值按 ICS43434（-26dBFS@94dB SPL）估算：普通室内底噪帧峰值
+     *   约 300~3000，正常说话/音乐 3 万+；需上机按实际环境微调。
      */
-    const double denom = (frame_peak > 4.0) ? (frame_peak * 0.25) : 1.0;
+    constexpr double kAbsNoiseFloor = 8000.0;
+    const double denom = (frame_peak > kAbsNoiseFloor) ? (frame_peak * 0.25)
+                                                       : kAbsNoiseFloor;
     for (size_t b = 0; b < kBandCount; ++b)
     {
       float v = static_cast<float>(peaks[b] / denom);

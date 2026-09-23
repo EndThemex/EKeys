@@ -31,6 +31,7 @@ namespace ekeys
         RGB_PULSE_MODE = 7,
         RGB_SOUND_MODE = 8,
         RGB_MATRIX_MODE = 9,
+        RGB_GRADIENT_MODE = 10,
     };
 
     /* 24 色调色板（FEATURE_DOC §9 单色模式索引） */
@@ -87,7 +88,11 @@ namespace ekeys
         void setAudioBands(const float *bands, uint8_t count);
 
         /* 当前是否为拾音模式（DisplayTask 据此决定是否接管 Mic） */
-        bool wantsMic() const { return mode_ == RGB_SOUND_MODE || mode_ == RGB_MATRIX_MODE; }
+        bool wantsMic() const
+        {
+            return mode_ == RGB_SOUND_MODE || mode_ == RGB_MATRIX_MODE ||
+                   mode_ == RGB_GRADIENT_MODE;
+        }
 
     private:
         RGBLightControl() = default;

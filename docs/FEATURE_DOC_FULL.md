@@ -395,7 +395,7 @@ virtual void send() = 0;
 - **电源使能**：IO21（kPinRgbPowerCtrl，**低电平有效**，MOSFET 高边开关）
 - **11 颗灯珠**与 **11 个应用键 ID 一一对应**
 
-### 9.2 模式（RGB_MODE，9 种）
+### 9.2 模式（RGB_MODE，11 种）
 
 | 模式               | 枚举值       | 说明                               |
 | ------------------ | ------------ | ---------------------------------- |
@@ -409,6 +409,7 @@ virtual void send() = 0;
 | `RGB_PULSE_MODE`   | 7            | 呼吸                                |
 | `RGB_SOUND_MODE`   | 8            | 拾音波形                            |
 | `RGB_MATRIX_MODE`  | 9            | 拾音矩阵律动                        |
+| `RGB_GRADIENT_MODE` | 10          | 拾音频率渐变（新灯蓝色，底部随音量变暖并上推） |
 
 ### 9.3 点击高亮（RGB_CLICK_MODE，ClickHighlight）
 
@@ -418,9 +419,9 @@ virtual void send() = 0;
 | `CLICK_SINGLE_COLOR_MODE` | 1      | 按下点亮对应键 LED、抬起熄灭             |
 | `CLICK_WARE_COLOR_MODE`   | 2      | 保留（同 SINGLE，含相邻 LED 微亮）       |
 
-### 9.4 拾音模式（Sound/Matrix）
+### 9.4 拾音模式（Sound/Matrix/Gradient）
 
-- **触发条件**：`RGB_SOUND_MODE` 或 `RGB_MATRIX_MODE` 启用时，`wantsMic()` 返回 true
+- **触发条件**：`RGB_SOUND_MODE`、`RGB_MATRIX_MODE` 或 `RGB_GRADIENT_MODE` 启用时，`wantsMic()` 返回 true
 - **数据源**：`DisplayTask` 从 `Mic → AudioAnalyzer → setAudioBands(16 bands)` 喂入
 - **频谱**：FFT_SIZE=512，BANDS=16，DC 去除 + 汉宁窗
 - **互斥**：与 `VoiceRecognizer` 共享 Mic，使用 `Speaker::Stop()` 兜底（I2S BCLK 共用）
