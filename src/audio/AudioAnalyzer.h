@@ -57,6 +57,9 @@ namespace ekeys
         double *v_real_ = nullptr; // kFftSize（arduinoFFT 2.0.4 模板 T=double）
         double *v_imag_ = nullptr; // kFftSize
         bool inited_ = false;
+        /* 长时峰值跟踪（归一化分母）：粉噪补偿后的帧峰值，
+         * 瞬时跟上、极慢回落（≈3s），替代逐帧峰值归一化 */
+        double peak_track_ = 0.0;
     };
 
 } // namespace ekeys

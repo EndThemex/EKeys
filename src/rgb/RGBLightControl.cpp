@@ -26,15 +26,52 @@ namespace ekeys
         constexpr float kSoundIdleFloor = 0.12f;
 
         /* 矩阵律动滤波：
-         * AudioAnalyzer 每帧按帧内峰值自适应归一化，底噪/帧间波动会被放大成
-         * 高频微闪。门限以下视为 0；起跳/回落改用指数平滑（非对称：
-         * 起跳快而不过冲、回落缓），消掉帧间抖动。
-         * 2026-09-23：触发阈值调高 0.07 → 0.15（弱信号/底噪不点亮，
-         * 需更响的声音才触发灯效；配合 AudioAnalyzer 的 kAbsNoiseFloor 生效）。 */
-        constexpr float kMatrixNoiseGate = 0.15f; /* 静噪门限（归一化 0~1） */
+         * 底噪/帧间波动会被归一化放大成高频微闪。门限以下视为 0；
+         * 起跳/回落改用指数平滑（非对称：起跳快而不过冲、回落缓），
+         * 消掉帧间抖动。2026-09-23：触发阈值调高 0.07 → 0.15
+         * （弱信号/底噪不点亮，需更响的声音才触发灯效）。
+         *
+         * 2026-09-23 二次修订：AudioAnalyzer 归一化去掉了"帧峰值 ×0.25"的
+         * 增益（改为长时峰值相除），同一段能量算出的电平平均小 ~4 倍，
+         * 旧值 0.15 在新尺度下等价于 0.6 —— 高频列几乎点不亮。故按
+         * 0.15 / 4 ≈ 0.04 换算回原先调好的触发灵敏度。
+         * 该门限 MATRIX 模式共用，一并跟随新尺度。 */
+        constexpr float kMatrixNoiseGate = 0.04f; /* 静噪门限（归一化 0~1） */
         constexpr float kMatrixAttack = 0.50f;    /* 起跳平滑系数（越大越跟手） */
         constexpr float kMatrixDecay = 0.10f;     /* 回落平滑系数（越小越缓） */
         constexpr float kMatrixEpsilon = 0.004f;  /* 残留截断，避免半亮像素长亮 */
+
+        /* 频率渐变（GRADIENT）全局色波：热浪前沿以"行"为单位推进，
+         * 满量程 4 行 = 3 行灯位 + 2 行色带宽，即满音量时暖色推过顶行。
+         * 波偏高（颜色容易红透）就加大 kGradientWaveSpan，偏低就减小。 */
+        constexpr float kGradientWaveSpan = 4.0f;   /* 前沿最大推进行数 */
+        constexpr float kGradientWaveAttack = 0.25f; /* 推进速度（越大越跟手） */
+        constexpr float kGradientWaveDecay = 0.06f;  /* 回落速度（越小越拖尾） */
+
+        /* 频率渐变列分组（近似对数）：16 段等带宽（各 ~469Hz）按低频细分、
+         * 高频粗分归并成 4 列，避免上半段 3 列（3k~7.5kHz）各只占 1 段能量 */
+        constexpr uint8_t kGradientColBandStart[5] = {0, 6, 10, 13, 16};
+
+        /* 频率渐变列灵敏度：作用在静噪门限之前，系数越大越容易点亮、柱越高。
+         * 粉噪补偿表量化后仍不够（段 13~15 在 6.1~7.5kHz，能量远低于低频），
+         * 高列依旧常暗，故再按列补一段灵敏度。
+         * 上机收口：某列"点不亮/柱太矮"就加大，某列"没声音也亮"就调小。 */
+        constexpr float kGradientColGain[4] = {1.0f, 1.2f, 1.6f, 2.2f};
+
+        /* 频率渐变峰值点（peak-hold）：每帧定速下落（行/帧），
+         * 0.08 ≈ 1 行/375ms，满 3 行约 1.1s 落底；调大落得更快 */
+        constexpr float kGradientPeakDecay = 0.08f;
+
+        /* 灯柱高度（行单位 0~3）→ 柱顶行号（0~2）；无灯返回 0xFF */
+        uint8_t topRowOf(float height_rows)
+        {
+            if (height_rows <= 0.0f)
+            {
+                return 0xFF;
+            }
+            const uint8_t r = static_cast<uint8_t>(ceilf(height_rows));
+            return (r == 0) ? 0 : static_cast<uint8_t>(r - 1);
+        }
 
         /* 0~255 色相 → RGB（简化色环，256 步一循环） */
         void hueToRgb(uint8_t hue, uint8_t &r, uint8_t &g, uint8_t &b)
@@ -94,6 +131,11 @@ namespace ekeys
 
         RGBDriver::instance().begin();
         RGBDriver::instance().SetBrightness(brightness_);
+        if (mode_changed)
+        {
+            /* 切模式时清空峰值水位，避免残留峰值点凭空出现在渐变模式里 */
+            audio_peak_[0] = audio_peak_[1] = audio_peak_[2] = audio_peak_[3] = 0.0f;
+        }
         if (mode_changed && mode_ == RGB_NONE_MODE)
         {
             /* 强制 NONE 分支首帧重绘，避免切回后高亮掩码恰好相同被跳过 */
@@ -309,20 +351,33 @@ namespace ekeys
         {
             /*
              * 频率渐变：与矩阵律动同布局（3 行 × 4 列，4 列对应 4 组频段，
-             * 自下而上按音量点亮），区别在配色——颜色波从底部向上推进：
-             * 新点亮的行永远是蓝色；某行满亮后随音量继续上升开始"变龄"，
-             * 从底部起依次 蓝→绿→红（色相 170→85→0），色变位置随音量上移。
+             * 近似对数分组，左低右高），颜色与高度解耦：
+             *
+             *   高度：每列按自身音量自下而上点亮 0~3 行（顶部行含小数亮度过渡），
+             *         并叠加 peak-hold 峰值点（白光，回落时独自下落到柱顶之下）
+             *   颜色：全局色波——4 列音量均值驱动同一条"热浪前沿"，同一行永远
+             *         同色；行色相由 age = 前沿 - 行号 线性决定（170 蓝 → 0 红），
+             *         前沿随音量自底向上推进，满音量时推过顶行（全场渐暖），
+             *         安静后缓慢回落，避免各列各自变色导致的"杂色"观感。
              */
+            float sum = 0.0f;
             for (uint8_t col = 0; col < 4; ++col)
             {
-                const uint8_t start = static_cast<uint8_t>(col * 4);
+                const uint8_t start = kGradientColBandStart[col];
+                const uint8_t stop = kGradientColBandStart[col + 1];
                 float target = 0.0f;
-                for (uint8_t b = start; b < start + 4; ++b)
+                for (uint8_t b = start; b < stop; ++b)
                 {
                     if (audio_bands_[b] > target)
                     {
                         target = audio_bands_[b];
                     }
+                }
+                /* 列灵敏度补偿（高频列更容易点亮、柱更高），再进门限 */
+                target *= kGradientColGain[col];
+                if (target > 1.0f)
+                {
+                    target = 1.0f;
                 }
                 if (target < kMatrixNoiseGate)
                 {
@@ -341,12 +396,43 @@ namespace ekeys
                     level = 1.0f;
                 }
                 audio_col_[col] = level;
+                sum += level;
 
-                static const uint8_t kRowLedBase[3] = {0, 3, 7};
+                /* 峰值水位（peak-hold）：瞬间抬高、每帧定速下落 */
+                const float h = level * 3.0f;
+                float pk = audio_peak_[col];
+                pk = (h > pk) ? h : pk - kGradientPeakDecay;
+                if (pk < 0.0f)
+                {
+                    pk = 0.0f;
+                }
+                audio_peak_[col] = pk;
+            }
+
+            /* 热浪前沿（行）：起跳快、回落缓，颜色比高度略带滞后，
+             * 形成"波上推"的拖尾感 */
+            const float wave_target = sum * 0.25f;
+            const float wave_k = (wave_target > audio_wave_) ? kGradientWaveAttack
+                                                             : kGradientWaveDecay;
+            audio_wave_ += (wave_target - audio_wave_) * wave_k;
+            const float front = audio_wave_ * kGradientWaveSpan;
+
+            /* 行下标 → LED 下标（与 MatrixScanner::keyIdToRowCol 同布局，
+             * ROW0 只有 COL0~2，故行基址 0/3/7；row=0 为底行） */
+            static const uint8_t kRowLedBase[3] = {0, 3, 7};
+            for (uint8_t col = 0; col < 4; ++col)
+            {
+                const float level = audio_col_[col];
                 for (uint8_t row = 0; row < 3; ++row)
                 {
-                    const float lit = level * 3.0f - row;
+                    /* 顶行（ROW0）只有 COL0~2：COL3 位置空置，必须跳过，
+                     * 否则 kRowLedBase[0]+3 会落到 LED 3（中排最左键）并覆盖它 */
+                    if (row == 2 && col == 3)
+                    {
+                        continue;
+                    }
                     const uint8_t led_idx = kRowLedBase[2 - row] + col;
+                    const float lit = level * 3.0f - row;
                     if (lit <= 0.0f)
                     {
                         led.setPixel(led_idx, 0, 0, 0);
@@ -354,11 +440,11 @@ namespace ekeys
                     }
                     const float inten = (lit > 1.0f) ? 1.0f : lit;
                     /*
-                     * 变龄模型：age = 满亮行数 - 该行行号（0~2）。
-                     * 刚点亮（age<0）→ 纯蓝；满亮后随音量上升逐渐变暖。
+                     * 变龄模型：age = 热浪前沿 - 行号（0~2）。
+                     * 前沿之下（age 大）偏暖，前沿之上（age=0）纯蓝，
                      * age 0→2 线性映射色相 170(蓝)→85(绿)→0(红)。
                      */
-                    float age = level * 3.0f - (row + 1);
+                    float age = front - row;
                     if (age < 0.0f)
                     {
                         age = 0.0f;
@@ -374,6 +460,19 @@ namespace ekeys
                                  static_cast<uint8_t>(r * inten),
                                  static_cast<uint8_t>(g * inten),
                                  static_cast<uint8_t>(b * inten));
+                }
+
+                /* 峰值点（peak-hold，取自 WLED 2DGEQ 的 Peaks 做法）：
+                 * 水位高于柱顶时以白光标记；柱已熄灭后峰值点仍继续独自
+                 * 落回底部，让 3 行矩阵也能看出"刚才到过多高" */
+                const uint8_t bar_top = topRowOf(level * 3.0f);
+                const uint8_t peak_row = topRowOf(audio_peak_[col]);
+                const bool above_bar = (peak_row != 0xFF) &&
+                                       (bar_top == 0xFF || peak_row > bar_top);
+                /* 顶行（ROW0）COL3 无灯，标记同样不能落到 LED 3 上 */
+                if (above_bar && !(peak_row == 2 && col == 3))
+                {
+                    led.setPixel(kRowLedBase[2 - peak_row] + col, 255, 255, 255);
                 }
             }
             break;

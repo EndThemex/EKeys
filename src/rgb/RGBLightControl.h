@@ -113,6 +113,10 @@ namespace ekeys
         float audio_level_[11] = {0};
         /* 矩阵律动：4 列电平（含回落），列 = 频段组，行高 = 音量 */
         float audio_col_[4] = {0};
+        /* 频率渐变：全局热浪前沿（0~1，乘 kGradientWaveSpan 得到"行"单位） */
+        float audio_wave_ = 0.0f;
+        /* 频率渐变：4 列峰值水位（行单位 0~3，peak-hold，每帧定速下落） */
+        float audio_peak_[4] = {0};
         /* NONE 模式下上帧渲染的高亮掩码（位 i = highlight_[i]）。
          * 11 颗 LED 需 11 位，必须 uint16_t（uint8_t 会截断 LED 8~10） */
         uint16_t last_none_mask_ = 0xFFFF;
