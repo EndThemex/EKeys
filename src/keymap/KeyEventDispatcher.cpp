@@ -12,6 +12,7 @@
 #include "keymap/KeyResolver.h"
 #include "logging/LogManager.h"
 #include "rgb/ClickHighlight.h"
+#include "utils/keymap_types.h"
 #include "voice/VoiceRecognizer.h"
 
 namespace ekeys
@@ -19,9 +20,6 @@ namespace ekeys
 
     namespace
     {
-
-        constexpr const char *kAsrFunctionKey = "KEY_FUNCTION_ASR";
-
         const KeyResolver *g_resolver = nullptr;
 
         bool isVoiceTriggerKey(uint8_t key_id)
@@ -35,7 +33,7 @@ namespace ekeys
             /* function_key 命中 KEY_FUNCTION_ASR 同样触发（FEATURE_DOC §11.2） */
             if (g_resolver != nullptr)
             {
-                return g_resolver->get(key_id).function_key == kAsrFunctionKey;
+                return g_resolver->get(key_id).function_key == kFunctionKeyAsr;
             }
             return false;
         }

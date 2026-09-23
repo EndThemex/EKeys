@@ -236,22 +236,27 @@ void ui_PcStatusScreen_screen_init(void)
     lv_obj_set_style_bg_opa(ui_ButtonExit3, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     /*
-     * 一级页布局（428x142）：仅图标 + 标题，数据统一在二级页展示。
+     * 一级页布局（428x142）：与 KeyMapped / MusicScreen / AudioScreen 一致——
+     * 大图标 + 标题，数据统一在二级页展示。
      */
     s_PcStatusIcon = lv_img_create(ui_PcStatusScreen);
     lv_img_set_src(s_PcStatusIcon, LV_SYMBOL_VIDEO);
     lv_obj_add_style(s_PcStatusIcon, &s_pc_status_icon_style, 0);
-    lv_obj_set_size(s_PcStatusIcon, 64, 64);
-    lv_obj_set_pos(s_PcStatusIcon, 22, 16);
+    lv_obj_set_size(s_PcStatusIcon, 80, 80);
+    lv_obj_set_x(s_PcStatusIcon, 20);
+    lv_obj_set_y(s_PcStatusIcon, -2);
+    lv_obj_set_align(s_PcStatusIcon, LV_ALIGN_CENTER);
     lv_obj_add_flag(s_PcStatusIcon, LV_OBJ_FLAG_ADV_HITTEST);
     lv_obj_clear_flag(s_PcStatusIcon, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t *pc_status_title = lv_label_create(ui_PcStatusScreen);
     lv_label_set_recolor(pc_status_title, true);
     lv_label_set_text(pc_status_title, "PC STATUS");
-    lv_obj_set_width(pc_status_title, LV_SIZE_CONTENT);
+    lv_obj_set_width(pc_status_title, 300);
+    lv_label_set_long_mode(pc_status_title, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_align(pc_status_title, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_add_style(pc_status_title, &s_pc_status_title_style, 0);
-    lv_obj_set_pos(pc_status_title, 12, 88);
+    lv_obj_align_to(pc_status_title, s_PcStatusIcon, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
 
     lv_obj_add_event_cb(ui_ButtonLeft3, ui_event_ButtonLeft3, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_ButtonRight3, ui_event_ButtonRight3, LV_EVENT_ALL, NULL);

@@ -343,6 +343,56 @@ namespace ekeys
         keymap_ui_pending_ = true;
     }
 
+    namespace
+    {
+        /*
+         * KEY_FUNCTION_PAGE_XXX 页面跳转功能串解析（App 端下拉同名列表）：
+         * 命中返回 true 并输出目标二级页 tag；未命中返回 false 走正常 HID 派发。
+         * 按 FUN 预扫描后的活动层取对应 function 通道（FUN1 按住时功能串
+         * 存在 combo1_function_key，单击层为 function_key）。
+         */
+        bool functionKeyJumpTarget(const KeyResolver &resolver, uint8_t key_id,
+                                   ui_screen_tag_t &out)
+        {
+            const KeyMapping &km = resolver.get(key_id);
+            const uint8_t layer = resolver.activeFunLayer();
+            const String &fk = (layer == 1)   ? km.combo1_function_key
+                               : (layer == 2) ? km.combo2_function_key
+                                              : km.function_key;
+            if (fk == "KEY_FUNCTION_PAGE_PC")
+            {
+                out = UI_SCREEN_PC_STATUS_SECONDARY;
+            }
+            else if (fk == "KEY_FUNCTION_PAGE_MUSIC")
+            {
+                out = UI_SCREEN_MUSIC_SECONDARY;
+            }
+            else if (fk == "KEY_FUNCTION_PAGE_AUDIO")
+            {
+                out = UI_SCREEN_AUDIO_SECONDARY;
+            }
+            else if (fk == "KEY_FUNCTION_PAGE_KEYMAP")
+            {
+                out = UI_SCREEN_KEYMAPPED_SECONDARY;
+            }
+            else if (fk == "KEY_FUNCTION_PAGE_SETTING")
+            {
+                out = UI_SCREEN_SETTING_SECONDARY;
+            }
+            /* 暂时隐藏 HA 页面入口（恢复时取消注释）：
+             * else if (fk == "KEY_FUNCTION_PAGE_HA")
+             * {
+             *     out = UI_SCREEN_HA_SECONDARY;
+             * }
+             */
+            else
+            {
+                return false;
+            }
+            return true;
+        }
+    } // namespace
+
     void MainTask::loop()
     {
         /* 协议层轮询（CDC JSON 行收发），不依赖 keyboard_ 注入 */
@@ -566,7 +616,25 @@ namespace ekeys
                 if (!suppress_hid)
                 {
                     KeyEventDispatcher::onKeyEdge(pressed[i], true);
-                    resolver_.press(pressed[i], *keyboard_);
+                    /*
+                     * 内置固件功能优先于 HID：当前活动层（单击/FUN1/FUN2）的
+                     * function 通道命中 KEY_FUNCTION_PAGE_XXX 时按键直接跳转
+                     * 对应二级页，不向主机派发 HID（release 路径未知功能串解析为
+                     * 空键，无副作用）。
+                     */
+                    ui_screen_tag_t jump_target = UI_SCREEN_MAIN;
+                    if (functionKeyJumpTarget(resolver_, pressed[i], jump_target))
+                    {
+                        DisplayMessage jump_msg{};
+                        jump_msg.type = DisplayMessageType::Navigate;
+                        jump_msg.navigate_target =
+                            static_cast<uint8_t>(jump_target);
+                        postMessage(jump_msg);
+                    }
+                    else
+                    {
+                        resolver_.press(pressed[i], *keyboard_);
+                    }
                 }
                 /*
                  * A1 修复：应用键 1~11 在 KEYMAPPED 屏被解释为"进入二级页并聚焦该键"。

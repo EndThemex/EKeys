@@ -60,6 +60,15 @@ namespace ekeys
   };
 
   /*
+   * 内置固件功能串（function_key 通道可配置，MainTask 在 HID 派发前拦截）：
+   *   KEY_FUNCTION_ASR        语音识别（KeyEventDispatcher 处理）
+   *   KEY_FUNCTION_PAGE_XXX   按键直接跳转指定二级页（不发 HID）：
+   *     PAGE_PC / PAGE_MUSIC / PAGE_AUDIO / PAGE_KEYMAP /
+   *     PAGE_SETTING（PAGE_HA 暂时隐藏，解析表见 MainTask.cpp functionKeyJumpTarget）
+   */
+  inline constexpr const char *kFunctionKeyAsr = "KEY_FUNCTION_ASR";
+
+  /*
    * 默认映射表（FEATURE_DOC §3.1）：Key ID 1~11 → "a"~"k"。
    * 运行时回退 / 协议 0x05 上报 / 存储层补段共用，唯一事实源。
    */
