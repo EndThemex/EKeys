@@ -85,9 +85,14 @@ namespace ekeys
                 return 0;
             }
 
-            /* 内容长度 = 类型 varint + 载荷（与 ESPHome 官方帧格式一致） */
-            const uint32_t content_len =
-                static_cast<uint32_t>(type_len + payload_len);
+            /*
+             * size varint = protobuf 载荷字节数，不含类型 varint。
+             * （官方 api_frame_helper_plaintext.cpp write_plaintext_header 与
+             * aioesphomeapi 解析端同语义；2026-10-09 修复：原实现误把类型
+             * varint 计入 size，HA 按 size 读载荷永远差 1 字节，hello 等满
+             * 超时后报"无法连接到 ESPHome 设备"）
+             */
+            const uint32_t content_len = static_cast<uint32_t>(payload_len);
 
             uint8_t len_varint[kMaxVarintBytes];
             const size_t len_bytes = haVarintEncode(content_len, len_varint,
@@ -141,6 +146,18 @@ namespace ekeys
                 len_ += n;
                 memcpy(buf_ + len_, value, slen);
                 len_ += slen;
+            }
+        }
+
+        void HaProtoWriter::addVarintField(uint32_t field_no, uint32_t value)
+        {
+            addTag(field_no, kWireVarint);
+            uint8_t tmp[kMaxVarintBytes];
+            const size_t n = haVarintEncode(value, tmp, sizeof(tmp));
+            if (n > 0 && len_ + n <= sizeof(buf_))
+            {
+                memcpy(buf_ + len_, tmp, n);
+                len_ += n;
             }
         }
 
@@ -224,18 +241,20 @@ namespace ekeys
                     return;
                 }
 
-                /* 2. 长度 varint（起始于 1），内容区 = 类型 varint + 载荷 */
+                /* 2. 载荷长度 varint（起始于 1）：只含 protobuf 载荷字节数，
+                 *    类型 varint 与载荷依次排在其后 */
                 size_t pos = 1;
                 uint32_t content_len = 0;
                 if (!haVarintDecode(buf_, fill_, pos, content_len))
                 {
                     return; /* 数据不足，等下轮 feed */
                 }
-                /* 内容区起点 = 长度 varint 之后（长度 varint 可能占 2 字节） */
+                /* 类型 varint 起点 = 载荷长度 varint 之后（可能占 2 字节） */
                 const size_t content_start = pos;
 
-                /* 3. 超长帧：丢弃本指示字节，继续扫描（防坏帧卡死解析） */
-                if (content_len < 1 || content_len > kHaMaxPayloadSize)
+                /* 3. 超长载荷：丢弃本指示字节，继续扫描（防坏帧卡死解析）。
+                 *    长度 0 合法（PingRequest/DisconnectRequest 等空载荷帧） */
+                if (content_len > kHaMaxPayloadSize)
                 {
                     memmove(buf_, buf_ + 1, fill_ - 1);
                     fill_ -= 1;
@@ -250,25 +269,24 @@ namespace ekeys
                 }
                 if (type > 0xFFU)
                 {
-                    /* 类型号超出本实现范围：丢弃整个内容区后继续扫描 */
-                    const size_t skip = content_start + content_len;
+                    /* 类型号超出本实现范围：丢弃整个帧后继续扫描 */
+                    const size_t type_len = pos - content_start;
+                    const size_t skip = content_start + type_len + content_len;
                     const size_t drop = (fill_ < skip) ? fill_ : skip;
                     memmove(buf_, buf_ + drop, fill_ - drop);
                     fill_ -= drop;
                     continue;
                 }
 
-                /* 5. 载荷长度 = 内容区长度 - 类型 varint 字节数 */
-                const size_t type_len = pos - content_start;
-                const size_t payload_len = content_len - type_len;
-                if (fill_ - pos < payload_len)
+                /* 5. 载荷 = content_len 字节（size 语义不含类型 varint） */
+                if (fill_ - pos < content_len)
                 {
                     return; /* 载荷未收全，等下轮 feed */
                 }
 
                 msg_type_ = static_cast<uint8_t>(type);
                 payload_offset_ = pos;
-                payload_size_ = payload_len;
+                payload_size_ = content_len;
                 frame_ready_ = true;
                 return;
             }

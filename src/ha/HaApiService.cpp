@@ -260,9 +260,9 @@ namespace ekeys
     void HaApiService::sendHelloResponse()
     {
         ha::HaProtoWriter w;
-        /* api_version 为 fixed32（官方 api.proto），声明 1.7 */
-        w.addFixed32Field(1, 1); /* api_version_major */
-        w.addFixed32Field(2, 7); /* api_version_minor */
+        /* api_version 为 uint32 varint（官方 api.proto，非 fixed32），声明 1.7 */
+        w.addVarintField(1, 1); /* api_version_major */
+        w.addVarintField(2, 7); /* api_version_minor */
         w.addStringField(3, kHaServerInfo);
         w.addStringField(4, kHaDeviceName);
         sendMessage(ha::HaMsgType::HelloResponse, w.data(), w.size());
@@ -298,7 +298,7 @@ namespace ekeys
             w.addStringField(1, e.object_id);
             w.addFixed32Field(2, e.key_id);
             w.addStringField(3, e.name);
-            w.addStringField(4, e.unique_id);
+            /* unique_id（field 4）自 ESPHome 2025.10 起为 reserved，不再发送 */
             sendMessage(ha::HaMsgType::ListEntitiesBinarySensorResponse,
                         w.data(), w.size());
             if (!hasClientTcp())

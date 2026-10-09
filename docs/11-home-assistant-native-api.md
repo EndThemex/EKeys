@@ -1,8 +1,7 @@
 # EKeys 接入 Home Assistant（ESPHome Native API）实施方案
 
-> 状态：方案已评审，待实施。本文档描述如何在不引入 MQTT 的前提下，
-> 以"类 ESPHome"方式（ESPHome Native API 明文协议 v1 子集）把 EKeys
-> 作为输入设备接入 Home Assistant。
+> 状态：已实施。2026-10-09 联调修复两处协议编码错误（帧 size 语义、
+> api_version wire type，见 §2 末尾修复记录），修复后 HA 可正常添加。
 
 ## 1. 总体设计
 
@@ -70,7 +69,7 @@ HA 侧：设备 "EKeys" + 11 个按键实体 → 自动化触发
 | 消息                             | 类型号 | 方向    | 用到的 protobuf 字段                                                                                                                                                           |
 | -------------------------------- | ------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | HelloRequest                     | 1      | HA→设备 | `client_info=1`（string，忽略内容）                                                                                                                                            |
-| HelloResponse                    | 2      | 设备→HA | `api_version_major=1`、`api_version_minor=2`（固定 1/7）、`server_info=3`（"ekeys native api"）、`name=4`（"ekeys"）                                                           |
+| HelloResponse                    | 2      | 设备→HA | `api_version_major=1`、`api_version_minor=2`（uint32 varint，固定 1/7）、`server_info=3`（"ekeys native api"）、`name=4`（"ekeys"）                                                  |
 | ConnectRequest                   | 3      | HA→设备 | `password=1`（string；未配置密码时任意值通过）                                                                                                                                 |
 | ConnectResponse                  | 4      | 设备→HA | `invalid_password=1`（false）                                                                                                                                                  |
 | DisconnectRequest                | 5      | 双向    | 空                                                                                                                                                                             |
@@ -80,7 +79,7 @@ HA 侧：设备 "EKeys" + 11 个按键实体 → 自动化触发
 | DeviceInfoRequest                | 9      | HA→设备 | 空                                                                                                                                                                             |
 | DeviceInfoResponse               | 10     | 设备→HA | `uses_password=1`(false)、`name=2`("ekeys")、`mac_address=3`、`esphome_version=4`("1.7.0-ekeys")、`compilation_time=5`、`model=6`("EKeys ESP32-S3")、`has_deep_sleep=7`(false) |
 | ListEntitiesRequest              | 11     | HA→设备 | 空                                                                                                                                                                             |
-| ListEntitiesBinarySensorResponse | 12     | 设备→HA | `object_id=1`("key_1"~"key_11")、`key=2`(fixed32，1~11)、`name=3`("Key 1"~"Key 11")、`unique_id=4`("ekeys-key-1"…)                                                             |
+| ListEntitiesBinarySensorResponse | 12     | 设备→HA | `object_id=1`("key_1"~"key_11")、`key=2`(fixed32，1~11)、`name=3`("Key 1"~"Key 11")（原 `unique_id=4` 自 ESPHome 2025.10 起为 reserved，不再发送）                             |
 | ListEntitiesDoneResponse         | 19     | 设备→HA | 空                                                                                                                                                                             |
 | SubscribeStatesRequest           | 20     | HA→设备 | 空（置"已订阅"标志）                                                                                                                                                           |
 | BinarySensorStateResponse        | 21     | 设备→HA | `key=1`(fixed32)、`state=2`(bool)、`missing_state=3`(false)                                                                                                                    |
@@ -88,8 +87,26 @@ HA 侧：设备 "EKeys" + 11 个按键实体 → 自动化触发
 - protobuf 编解码手写（proto3：字段号 + wire type；string 用
   `0x0A + varint长度 + 字节`，bool/int 用 varint，fixed32 用
   `0x0D + 4字节LE`），**不引入 nanopb**。实体的 key 直接用 key_id 1~11。
-- 实体命名注意：`object_id`/`unique_id` 固定为 `key_N`，**不随当前键映射
-  内容变**（映射可变，实体身份必须稳定；HA 侧显示名可在 HA 里改）。
+- 实体命名注意：`object_id` 固定为 `key_N`，**不随当前键映射内容变**
+  （映射可变，实体身份必须稳定；HA 侧显示名可在 HA 里改）。
+
+#### 帧格式与联调修复记录（2026-10-09）
+
+对照官方源码（`api_frame_helper_plaintext.cpp` / aioesphomeapi
+`_frame_helper/plain_text.py`）核实的明文帧语义：
+
+```
+0x00 | varint(载荷长度) | varint(消息类型) | protobuf 载荷
+```
+
+- **载荷长度只含 protobuf 载荷字节数，不含类型 varint**（与 Noise 协议
+  的"含头长度"不同）。修复前误把类型 varint 计入长度，HA 按 size 读载荷
+  永远差 1 字节，hello 等满 30s 超时 → 配置流程报"无法连接到 ESPHome
+  设备，请确保 YAML 包含 api 部分"。
+- **`api_version_major/minor` 是 uint32（varint）**，非 fixed32；fixed32
+  编码会被 HA 的 protobuf 解析器当未知字段跳过，版本号丢失。
+- 载荷长度 0 合法（PingRequest/DisconnectRequest 为空载荷帧），解析端
+  不得把 0 长度当坏帧丢弃。
 
 mDNS 声明（ESPmDNS，Arduino 核心自带）：
 
@@ -163,8 +180,10 @@ public:
      功能串跳转 / `resolver_.press`，改调
      `HaApiService::instance().sendKeyState(pressed[i], true)`
      （连 HA 与否都这样走，未连接时丢弃——与"其它屏矩阵键丢弃"规则一致）
-   - release 循环**保持原样**（沿用设置二级页的既有结论：被屏蔽 press
-     对应的 release 派发无副作用，离开 HA 屏后 release 正常派发避免卡键）
+   - release 循环：HA 屏激活时先 `sendKeyState(released[i], false)` 上报
+     熄灭（2026-10-09 修复：原实现 release 不上报 HA，按过的键在 HA 中
+     永远卡 on）；HID release 派发保持原样——被屏蔽 press 对应的 release
+     派发无副作用，离开 HA 屏后 release 正常派发避免卡键
 3. **恢复 PAGE_HA 功能串**（约 L382-L387）：取消注释。
 4. **HA 状态快照**（约 L981-L1000）：`HaStatusInfo` 新增
    `ha_api_connected` 字段（`src/message_types.h`），赋值

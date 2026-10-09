@@ -4,8 +4,10 @@
  * ESPHome Native API 明文协议 v1 子集——纯编解码层（docs/11 §2/§3）。
  *
  *   - 无状态、无 IO：帧封装/解析 + varint + 各消息字段编码
- *   - 帧格式：0x00 指示字节 + varint(内容长度) + varint(消息类型) + protobuf 载荷
- *     （内容长度 = 类型 varint 字节数 + 载荷字节数，与 ESPHome 官方实现一致）
+ *   - 帧格式：0x00 指示字节 + varint(载荷长度) + varint(消息类型) + protobuf 载荷
+ *     （载荷长度只含 protobuf 载荷字节数、不含类型 varint，与官方
+ *      api_frame_helper_plaintext.cpp / aioesphomeapi 解析端一致；
+ *      载荷长度 0 合法——PingRequest/DisconnectRequest 为空载荷帧）
  *   - protobuf 手写编解码（proto3：字段号 + wire type），不引入 nanopb
  *   - 请求类消息（HelloRequest/ConnectRequest 等）载荷内容全部忽略：
  *     帧本身是长度分界的，跳过载荷不会失步；未配置密码时 ConnectRequest
@@ -82,6 +84,7 @@ namespace ekeys
             void reset() { len_ = 0; }
 
             void addStringField(uint32_t field_no, const char *value);
+            void addVarintField(uint32_t field_no, uint32_t value);
             void addBoolField(uint32_t field_no, bool value);
             void addFixed32Field(uint32_t field_no, uint32_t value);
 

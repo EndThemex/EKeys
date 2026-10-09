@@ -586,10 +586,11 @@ namespace ekeys
 
             const ui_screen_tag_t tick_screen = ui_get_active_screen_tag();
             /*
-             * HA 屏（docs/11）：矩阵键全部截胡进 HA（press → sendKeyState，
-             * 未连上 HA 时丢弃），不发 HID；FUN 预扫描/功能串跳转一并跳过
-             * （同设置二级页先例）。release 循环保持原样：被屏蔽 press 对应
-             * 的 release 派发到 HID 无副作用，离开 HA 屏后正常派发避免卡键。
+             * HA 屏（docs/11）：矩阵键全部截胡进 HA（press/release →
+             * sendKeyState true/false，未连上 HA 时丢弃），不发 HID；
+             * FUN 预扫描/功能串跳转一并跳过（同设置二级页先例）。
+             * HID release 派发保持原样：被屏蔽 press 对应的 release 派发
+             * 到 HID 无副作用，离开 HA 屏后正常派发避免卡键。
              */
             const bool ha_routing =
                 tick_screen == UI_SCREEN_HA ||
@@ -670,6 +671,14 @@ namespace ekeys
             }
             for (uint8_t i = 0; i < rc; ++i)
             {
+                if (ha_routing)
+                {
+                    /* HA 屏：release → binary_sensor 熄灭（2026-10-09 修复：
+                     * 原 release 只派发 HID，按过的键在 HA 中永远卡 on）。
+                     * 非 HA 屏按下、HA 屏松开的键多发一帧 off 无副作用；
+                     * HA 屏按下、离开后松开时连接已断，HA 侧自动转 unavailable */
+                    HaApiService::instance().sendKeyState(released[i], false);
+                }
                 KeyEventDispatcher::onKeyEdge(released[i], false);
                 resolver_.release(released[i], *keyboard_);
             }
