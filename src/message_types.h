@@ -65,6 +65,7 @@ namespace ekeys
         bool wifi_connected{false};
         int wifi_rssi{-100};
         bool tcp_connected{false};
+        bool ha_api_connected{false}; /* HA Native API 客户端已连接（docs/11） */
         int work_mode{0};
         bool kb_connected{false}; /* 键盘主机连接（BLE/USB HID），主页连接图标 */
         bool voice_enabled{false};

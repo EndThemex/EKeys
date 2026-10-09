@@ -64,7 +64,7 @@ namespace ekeys
    *   KEY_FUNCTION_ASR        语音识别（KeyEventDispatcher 处理）
    *   KEY_FUNCTION_PAGE_XXX   按键直接跳转指定二级页（不发 HID）：
    *     PAGE_PC / PAGE_MUSIC / PAGE_AUDIO / PAGE_KEYMAP /
-   *     PAGE_SETTING（PAGE_HA 暂时隐藏，解析表见 MainTask.cpp functionKeyJumpTarget）
+   *     PAGE_SETTING / PAGE_HA（解析表见 MainTask.cpp functionKeyJumpTarget）
    */
   inline constexpr const char *kFunctionKeyAsr = "KEY_FUNCTION_ASR";
 

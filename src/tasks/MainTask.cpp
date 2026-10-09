@@ -27,6 +27,7 @@
 #include "audio/AudioPad.h"
 #include "audio/Speaker.h"
 #include "config/Configuration.h"
+#include "ha/HaApiService.h"
 #include "hardware/BatteryMonitor.h"
 #include "keymap/KeyEventDispatcher.h"
 #include "keymap/KeyNameTable.h"
@@ -306,7 +307,8 @@ namespace ekeys
         WiFiManager::instance().setOnConnected([]()
                                                {
             NtpSync::instance().requestSync();
-            DiscoveryService::instance().start(); });
+            DiscoveryService::instance().start();
+            HaApiService::instance().start(); });
         DiscoveryService::instance().setOnDiscovered(
             [](const char *ip)
             { TcpChannel::instance().connectTo(ip); });
@@ -379,12 +381,10 @@ namespace ekeys
             {
                 out = UI_SCREEN_SETTING_SECONDARY;
             }
-            /* 暂时隐藏 HA 页面入口（恢复时取消注释）：
-             * else if (fk == "KEY_FUNCTION_PAGE_HA")
-             * {
-             *     out = UI_SCREEN_HA_SECONDARY;
-             * }
-             */
+            else if (fk == "KEY_FUNCTION_PAGE_HA")
+            {
+                out = UI_SCREEN_HA_SECONDARY;
+            }
             else
             {
                 return false;
@@ -584,9 +584,20 @@ namespace ekeys
             scanner_.getPressedKeys(pressed, pc);
             scanner_.getReleasedKeys(released, rc);
 
+            const ui_screen_tag_t tick_screen = ui_get_active_screen_tag();
+            /*
+             * HA 屏（docs/11）：矩阵键全部截胡进 HA（press → sendKeyState，
+             * 未连上 HA 时丢弃），不发 HID；FUN 预扫描/功能串跳转一并跳过
+             * （同设置二级页先例）。release 循环保持原样：被屏蔽 press 对应
+             * 的 release 派发到 HID 无副作用，离开 HA 屏后正常派发避免卡键。
+             */
+            const bool ha_routing =
+                tick_screen == UI_SCREEN_HA ||
+                tick_screen == UI_SCREEN_HA_SECONDARY;
             const bool suppress_hid =
-                ui_get_active_screen_tag() == UI_SCREEN_SETTING_SECONDARY ||
-                ui_get_active_screen_tag() == UI_SCREEN_AUDIO_SECONDARY;
+                ha_routing ||
+                tick_screen == UI_SCREEN_SETTING_SECONDARY ||
+                tick_screen == UI_SCREEN_AUDIO_SECONDARY;
             if (!suppress_hid)
             {
                 /*
@@ -613,7 +624,13 @@ namespace ekeys
                  * 切焦点等），不向主机发送 HID。离开该屏后 release 仍正常派发，
                  * 避免卡键。
                  */
-                if (!suppress_hid)
+                if (ha_routing)
+                {
+                    /* HA 屏：矩阵键 press → HA binary_sensor（连 HA 与否都
+                     * 这样走，未连接时 sendKeyState 内部丢弃，docs/11 §4.1） */
+                    HaApiService::instance().sendKeyState(pressed[i], true);
+                }
+                else if (!suppress_hid)
                 {
                     KeyEventDispatcher::onKeyEdge(pressed[i], true);
                     /*
@@ -976,6 +993,29 @@ namespace ekeys
         AudioPad::instance().loop();
         VoiceRecognizer::instance().feedCapture();
 
+        /*
+         * HA Native API（docs/11）：
+         *   - WiFi 断开 → 整体 stop（关监听/客户端 + MDNS.end，幂等）；
+         *   - WiFi 连上 → mDNS 声明（幂等）+ 仅 HA 屏激活时监听 6053
+         *     （setListening 幂等：进入时未连 WiFi 只是不监听，连上后
+         *     本分支自动补开，无需额外边沿记忆）；
+         *   - process()：accept / 逐帧解析 / 保活超时，全程非阻塞。
+         */
+        if (!WiFiManager::instance().isConnected())
+        {
+            HaApiService::instance().stop();
+        }
+        else
+        {
+            HaApiService::instance().start();
+            const ui_screen_tag_t ha_screen = ui_get_active_screen_tag();
+            const bool ha_active =
+                (ha_screen == UI_SCREEN_HA ||
+                 ha_screen == UI_SCREEN_HA_SECONDARY);
+            HaApiService::instance().setListening(ha_active);
+        }
+        HaApiService::instance().process();
+
         /* HA 状态聚合 → HA 屏 / 状态条（2.5s 节流，与参考工程一致） */
         const uint32_t now = millis();
         if ((now - last_ha_status_ms_) >= kHaStatusPeriodMs)
@@ -993,6 +1033,8 @@ namespace ekeys
             ha.work_mode = snap.work_mode;
             ha.voice_enabled = (snap.voice_enable != 0) && (snap.work_mode == 0);
             ha.voice_recording = VoiceRecognizer::instance().isCapturing();
+            /* HA Native API 客户端连接状态 → HA 二级页显示（docs/11） */
+            ha.ha_api_connected = HaApiService::instance().isClientConnected();
 
             DisplayMessage msg;
             msg.type = DisplayMessageType::HaStatus;

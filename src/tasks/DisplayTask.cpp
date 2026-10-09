@@ -618,6 +618,7 @@ namespace ekeys
                                               ha.voice_recording);
         ui_HaScreenSecondary_set_module_status(ha.module_a_connected,
                                                ha.module_b_connected);
+        ui_HaScreenSecondary_set_ha_status(ha.ha_api_connected);
     }
 
     void DisplayTask::applyMusicPlayer(const DisplayMessage &msg)

@@ -20,6 +20,7 @@ static lv_obj_t *s_LabelModuleAValue = NULL;
 static lv_obj_t *s_LabelModuleBValue = NULL;
 static lv_obj_t *s_LabelIpValue = NULL;
 static lv_obj_t *s_LabelServerValue = NULL;
+static lv_obj_t *s_LabelHaValue = NULL;
 static lv_obj_t *s_ButtonExit = NULL;
 
 static bool s_wifi_enabled = false;
@@ -31,6 +32,7 @@ static bool s_voice_enabled = false;
 static bool s_voice_recording = false;
 static bool s_module_a_connected = false;
 static bool s_module_b_connected = false;
+static bool s_ha_api_connected = false; /* HA Native API 客户端连接（docs/11） */
 static char s_ip_address[24] = "--";
 static char s_server_endpoint[32] = "OFFLINE";
 
@@ -142,6 +144,14 @@ static void ha_refresh_module_status(void)
                         s_module_b_connected ? lv_color_hex(0x22C55E) : lv_color_hex(0x94A3B8));
 }
 
+/* HA Native API 连接状态：右上角徽标（docs/11 §4.2） */
+static void ha_refresh_ha_status(void)
+{
+    ha_set_status_value(s_LabelHaValue,
+                        s_ha_api_connected ? "HA: CONNECTED" : "HA: ---",
+                        s_ha_api_connected ? lv_color_hex(0x22C55E) : lv_color_hex(0x94A3B8));
+}
+
 static void ha_apply_cached_snapshot(void)
 {
     ha_refresh_wifi_status();
@@ -149,6 +159,7 @@ static void ha_apply_cached_snapshot(void)
     ha_refresh_mode_status();
     ha_refresh_voice_status();
     ha_refresh_module_status();
+    ha_refresh_ha_status();
 }
 
 void ui_HaScreenSecondary_set_wifi_status(bool enabled, bool connected, int rssi, const char *ip_address)
@@ -185,6 +196,12 @@ void ui_HaScreenSecondary_set_module_status(bool module_a_connected, bool module
     s_module_a_connected = module_a_connected;
     s_module_b_connected = module_b_connected;
     ha_refresh_module_status();
+}
+
+void ui_HaScreenSecondary_set_ha_status(bool connected)
+{
+    s_ha_api_connected = connected;
+    ha_refresh_ha_status();
 }
 
 void ui_event_HaScreenSecondary(lv_event_t *e)
@@ -309,6 +326,13 @@ void ui_HaScreenSecondary_screen_init(void)
     lv_obj_set_style_text_color(s_LabelServerValue, lv_color_hex(0x94A3B8), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(s_LabelServerValue, &ui_font_BebasNeueFont16, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+    /* HA Native API 连接徽标：标题右侧（标题 TOP_MID 居中，右上角空闲） */
+    s_LabelHaValue = lv_label_create(ui_HaScreenSecondary);
+    lv_obj_align(s_LabelHaValue, LV_ALIGN_TOP_RIGHT, -8, 8);
+    lv_label_set_text(s_LabelHaValue, "HA: ---");
+    lv_obj_set_style_text_color(s_LabelHaValue, lv_color_hex(0x94A3B8), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(s_LabelHaValue, &ui_font_BebasNeueFont16, LV_PART_MAIN | LV_STATE_DEFAULT);
+
     s_ButtonExit = lv_btn_create(ui_HaScreenSecondary);
     lv_obj_set_size(s_ButtonExit, 40, 20);
     lv_obj_set_align(s_ButtonExit, LV_ALIGN_CENTER);
@@ -340,5 +364,6 @@ void ui_HaScreenSecondary_screen_destroy(void)
     s_LabelModuleBValue = NULL;
     s_LabelIpValue = NULL;
     s_LabelServerValue = NULL;
+    s_LabelHaValue = NULL;
     s_ButtonExit = NULL;
 }
