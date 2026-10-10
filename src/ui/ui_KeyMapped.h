@@ -39,6 +39,8 @@ typedef enum {
 
 void ui_KeyMapped_screen_init(void);
 void ui_KeyMapped_screen_destroy(void);
+/* 按系统语言刷新标题（0=中文 1=English），由 ui_lang 模块统一调用 */
+void ui_KeyMapped_apply_language(uint8_t lang);
 void ui_event_KeyMappedScreen(lv_event_t * e);
 void ui_event_ButtonLeftKeyMapped(lv_event_t * e);
 void ui_event_ButtonRightKeyMapped(lv_event_t * e);

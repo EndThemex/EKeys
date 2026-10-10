@@ -11,11 +11,13 @@ extern "C" {
 #endif
 
 // SCREEN: ui_MusicScreen
-extern void ui_MusicScreen_drawAudioBandsCool(const float* bands); 
-extern void ui_MusicScreen_drawAudioBands(const float* bands); 
+extern void ui_MusicScreen_drawAudioBandsCool(const float* bands);
+extern void ui_MusicScreen_drawAudioBands(const float* bands);
 extern void ui_MusicScreen_set_visual_host(lv_obj_t *host);
 extern void ui_MusicScreen_screen_init(void);
 extern void ui_MusicScreen_screen_destroy(void);
+/* 按系统语言刷新标题（0=中文 1=English），由 ui_lang 模块统一调用 */
+extern void ui_MusicScreen_apply_language(uint8_t lang);
 extern void ui_event_MusicScreen(lv_event_t * e);
 extern void ui_event_ButtonEnter2(lv_event_t * e);
 extern lv_obj_t * ui_MusicScreen;

@@ -14,6 +14,7 @@ lv_obj_t *ui_ButtonRight3 = NULL;
 lv_obj_t *ui_ButtonEnter3 = NULL;
 lv_obj_t *ui_ButtonExit3 = NULL;
 static lv_obj_t *s_PcStatusIcon = NULL;
+static lv_obj_t *s_PcStatusTitle = NULL;
 static lv_style_t s_pc_status_icon_style;
 static bool s_pc_status_icon_style_ready = false;
 static lv_style_t s_pc_status_title_style;
@@ -248,19 +249,31 @@ void ui_PcStatusScreen_screen_init(void)
     lv_obj_add_flag(s_PcStatusIcon, LV_OBJ_FLAG_ADV_HITTEST);
     lv_obj_clear_flag(s_PcStatusIcon, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t *pc_status_title = lv_label_create(ui_PcStatusScreen);
-    lv_label_set_recolor(pc_status_title, true);
-    lv_label_set_text(pc_status_title, "PC STATUS");
-    lv_obj_set_width(pc_status_title, 300);
-    lv_label_set_long_mode(pc_status_title, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_align(pc_status_title, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_add_style(pc_status_title, &s_pc_status_title_style, 0);
-    lv_obj_align_to(pc_status_title, s_PcStatusIcon, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
+    s_PcStatusTitle = lv_label_create(ui_PcStatusScreen);
+    lv_label_set_recolor(s_PcStatusTitle, true);
+    lv_label_set_text(s_PcStatusTitle, "PC STATUS");
+    lv_obj_set_width(s_PcStatusTitle, 300);
+    lv_label_set_long_mode(s_PcStatusTitle, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_align(s_PcStatusTitle, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_add_style(s_PcStatusTitle, &s_pc_status_title_style, 0);
+    lv_obj_align_to(s_PcStatusTitle, s_PcStatusIcon, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
 
     lv_obj_add_event_cb(ui_ButtonLeft3, ui_event_ButtonLeft3, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_ButtonRight3, ui_event_ButtonRight3, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_ButtonEnter3, ui_event_ButtonEnter3, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_PcStatusScreen, ui_event_PcStatusScreen, LV_EVENT_ALL, NULL);
+}
+
+void ui_PcStatusScreen_apply_language(uint8_t lang)
+{
+    if (!s_PcStatusTitle)
+    {
+        return;
+    }
+    /* 标题样式字体 FontCKJGT28 仅 ASCII，中文需逐对象覆盖为 FontCKJGT24 */
+    lv_label_set_text(s_PcStatusTitle, lang == 0 ? "电脑状态" : "PC STATUS");
+    lv_obj_set_style_text_font(s_PcStatusTitle,
+                               lang == 0 ? &ui_font_FontCKJGT24 : &ui_font_FontCKJGT28, 0);
 }
 
 void ui_PcStatusScreen_screen_destroy(void)
@@ -276,4 +289,5 @@ void ui_PcStatusScreen_screen_destroy(void)
     ui_ButtonEnter3 = NULL;
     ui_ButtonExit3 = NULL;
     s_PcStatusIcon = NULL;
+    s_PcStatusTitle = NULL;
 }

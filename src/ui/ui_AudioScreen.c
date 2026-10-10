@@ -15,6 +15,7 @@ lv_obj_t *ui_AudioScreenButtonRight = NULL;
 lv_obj_t *ui_AudioScreenButtonEnter = NULL;
 lv_obj_t *ui_AudioScreenButtonExit = NULL;
 static lv_obj_t *s_AudioScreenIcon = NULL;
+static lv_obj_t *s_AudioScreenTitle = NULL;
 static lv_style_t s_audio_screen_icon_style;
 static bool s_audio_screen_icon_style_ready = false;
 static lv_style_t s_audio_screen_title_style;
@@ -25,7 +26,8 @@ static void audio_screen_forward_key(uint32_t key)
     lv_obj_t *active_screen = lv_scr_act();
     lv_group_t *g = lv_group_get_default();
     lv_obj_t *target = g ? lv_group_get_focused(g) : active_screen;
-    if (target) {
+    if (target)
+    {
         lv_event_send(target, LV_EVENT_KEY, (void *)key);
     }
 }
@@ -33,24 +35,32 @@ static void audio_screen_forward_key(uint32_t key)
 void ui_event_AudioScreen(lv_event_t *e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
-    if (event_code != LV_EVENT_KEY) {
+    if (event_code != LV_EVENT_KEY)
+    {
         return;
     }
 
     uintptr_t key = (uintptr_t)lv_event_get_param(e);
-    if (key == (uintptr_t)LV_KEY_RIGHT) {
+    if (key == (uintptr_t)LV_KEY_RIGHT)
+    {
         ui_set_active_screen_tag(UI_SCREEN_PC_STATUS);
         _ui_screen_change(&ui_PcStatusScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_PcStatusScreen_screen_init);
         lv_refr_now(NULL);
-    } else if (key == (uintptr_t)LV_KEY_LEFT) {
+    }
+    else if (key == (uintptr_t)LV_KEY_LEFT)
+    {
         ui_set_active_screen_tag(UI_SCREEN_MUSIC);
         _ui_screen_change(&ui_MusicScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_MusicScreen_screen_init);
         lv_refr_now(NULL);
-    } else if (key == (uintptr_t)LV_KEY_ENTER) {
+    }
+    else if (key == (uintptr_t)LV_KEY_ENTER)
+    {
         ui_set_active_screen_tag(UI_SCREEN_AUDIO_SECONDARY);
         _ui_screen_change(&ui_AudioScreenSecondary, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_AudioScreenSecondary_screen_init);
         lv_refr_now(NULL);
-    } else if (key == (uintptr_t)LV_KEY_ESC) {
+    }
+    else if (key == (uintptr_t)LV_KEY_ESC)
+    {
         ui_set_active_screen_tag(UI_SCREEN_MAIN);
         _ui_screen_change(&ui_MainScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_MainScreen_screen_init);
         lv_refr_now(NULL);
@@ -59,21 +69,24 @@ void ui_event_AudioScreen(lv_event_t *e)
 
 void ui_event_AudioScreenButtonLeft(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         audio_screen_forward_key(LV_KEY_LEFT);
     }
 }
 
 void ui_event_AudioScreenButtonRight(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         audio_screen_forward_key(LV_KEY_RIGHT);
     }
 }
 
 void ui_event_AudioScreenButtonEnter(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         audio_screen_forward_key(LV_KEY_ENTER);
     }
 }
@@ -84,13 +97,15 @@ void ui_AudioScreen_screen_init(void)
     lv_obj_clear_flag(ui_AudioScreen, LV_OBJ_FLAG_SCROLLABLE);
     ui_set_active_screen_tag(UI_SCREEN_AUDIO);
 
-    if (!s_audio_screen_icon_style_ready) {
+    if (!s_audio_screen_icon_style_ready)
+    {
         lv_style_init(&s_audio_screen_icon_style);
         lv_style_set_text_font(&s_audio_screen_icon_style, &lv_font_montserrat_48);
         s_audio_screen_icon_style_ready = true;
     }
 
-    if (!s_audio_screen_title_style_ready) {
+    if (!s_audio_screen_title_style_ready)
+    {
         lv_style_init(&s_audio_screen_title_style);
         lv_style_set_text_font(&s_audio_screen_title_style, &ui_font_FontCKJGT28);
         lv_style_set_text_letter_space(&s_audio_screen_title_style, 1);
@@ -137,14 +152,14 @@ void ui_AudioScreen_screen_init(void)
     lv_obj_add_flag(s_AudioScreenIcon, LV_OBJ_FLAG_ADV_HITTEST);
     lv_obj_clear_flag(s_AudioScreenIcon, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t *audio_screen_title = lv_label_create(ui_AudioScreen);
-    lv_label_set_recolor(audio_screen_title, true);
-    lv_label_set_text(audio_screen_title, "SOUND PAD");
-    lv_obj_set_width(audio_screen_title, 300);
-    lv_label_set_long_mode(audio_screen_title, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_align(audio_screen_title, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_add_style(audio_screen_title, &s_audio_screen_title_style, 0);
-    lv_obj_align_to(audio_screen_title, s_AudioScreenIcon, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
+    s_AudioScreenTitle = lv_label_create(ui_AudioScreen);
+    lv_label_set_recolor(s_AudioScreenTitle, true);
+    lv_label_set_text(s_AudioScreenTitle, "SOUND PAD");
+    lv_obj_set_width(s_AudioScreenTitle, 300);
+    lv_label_set_long_mode(s_AudioScreenTitle, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_align(s_AudioScreenTitle, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_add_style(s_AudioScreenTitle, &s_audio_screen_title_style, 0);
+    lv_obj_align_to(s_AudioScreenTitle, s_AudioScreenIcon, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
 
     lv_obj_add_event_cb(ui_AudioScreenButtonLeft, ui_event_AudioScreenButtonLeft, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_AudioScreenButtonRight, ui_event_AudioScreenButtonRight, LV_EVENT_ALL, NULL);
@@ -152,9 +167,22 @@ void ui_AudioScreen_screen_init(void)
     lv_obj_add_event_cb(ui_AudioScreen, ui_event_AudioScreen, LV_EVENT_ALL, NULL);
 }
 
+void ui_AudioScreen_apply_language(uint8_t lang)
+{
+    if (!s_AudioScreenTitle)
+    {
+        return;
+    }
+    /* 标题样式字体 FontCKJGT28 仅 ASCII，中文需逐对象覆盖为 FontCKJGT24 */
+    lv_label_set_text(s_AudioScreenTitle, lang == 0 ? "音效面板" : "SOUND PAD");
+    lv_obj_set_style_text_font(s_AudioScreenTitle,
+                               lang == 0 ? &ui_font_FontCKJGT24 : &ui_font_FontCKJGT28, 0);
+}
+
 void ui_AudioScreen_screen_destroy(void)
 {
-    if (ui_AudioScreen) {
+    if (ui_AudioScreen)
+    {
         lv_obj_del(ui_AudioScreen);
     }
     ui_AudioScreen = NULL;
@@ -163,4 +191,5 @@ void ui_AudioScreen_screen_destroy(void)
     ui_AudioScreenButtonEnter = NULL;
     ui_AudioScreenButtonExit = NULL;
     s_AudioScreenIcon = NULL;
+    s_AudioScreenTitle = NULL;
 }

@@ -36,6 +36,7 @@
 #include "ui/ui_FlipClock.h"
 #include "ui/ui_HaScreenSecondary.h"
 #include "ui/ui_KeyMapped.h"
+#include "ui/ui_lang.h"
 #include "ui/ui_KeyMappedSecondary.h"
 #include "ui/ui_MainScreen.h"
 #include "ui/ui_MusicScreen.h"
@@ -390,6 +391,10 @@ namespace ekeys
     void DisplayTask::applySetting(const DisplayMessage &msg)
     {
         const ui_settings_snapshot_t &s = msg.setting;
+
+        /* 标题等 UI 文本按系统语言刷新（0=中文 1=English，默认中文）。
+         * 开机快照与运行时变更都走这里，ui_init 之后调用时屏幕已存在。 */
+        ui_lang_set(s.ui_lang);
 
         /* 背光即时生效 */
         Backlight::instance().setDuty(

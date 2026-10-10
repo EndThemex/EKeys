@@ -11,6 +11,7 @@ static lv_obj_t *ui_KeyMappedButtonRight = NULL;
 static lv_obj_t *ui_KeyMappedButtonEnter = NULL;
 static lv_obj_t *ui_KeyMappedButtonExit = NULL;
 static lv_obj_t *ui_KeyMappedIcon = NULL;
+static lv_obj_t *s_KeyMappedTitle = NULL;
 static lv_style_t s_keymapped_title_style;
 static lv_style_t s_keymapped_icon_style;
 static bool s_keymapped_title_style_ready = false;
@@ -248,14 +249,14 @@ void ui_KeyMapped_screen_init(void)
     lv_obj_add_flag(ui_KeyMappedIcon, LV_OBJ_FLAG_ADV_HITTEST);
     lv_obj_clear_flag(ui_KeyMappedIcon, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t *keymapped_title = lv_label_create(ui_KeyMapped);
-    lv_label_set_recolor(keymapped_title, true);
-    lv_label_set_text(keymapped_title, "KEYBOARD SETTING");
-    lv_obj_set_width(keymapped_title, 300);
-    lv_label_set_long_mode(keymapped_title, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_align(keymapped_title, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_add_style(keymapped_title, &s_keymapped_title_style, 0);
-    lv_obj_align_to(keymapped_title, ui_KeyMappedIcon, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
+    s_KeyMappedTitle = lv_label_create(ui_KeyMapped);
+    lv_label_set_recolor(s_KeyMappedTitle, true);
+    lv_label_set_text(s_KeyMappedTitle, "KEYBOARD SETTING");
+    lv_obj_set_width(s_KeyMappedTitle, 300);
+    lv_label_set_long_mode(s_KeyMappedTitle, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_align(s_KeyMappedTitle, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_add_style(s_KeyMappedTitle, &s_keymapped_title_style, 0);
+    lv_obj_align_to(s_KeyMappedTitle, ui_KeyMappedIcon, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
 
     if (s_keymapped_icon_image_data != NULL && s_keymapped_icon_image_size > 0)
     {
@@ -278,6 +279,16 @@ void ui_KeyMapped_screen_init(void)
     lv_obj_add_event_cb(ui_KeyMapped, ui_event_KeyMappedScreen, LV_EVENT_ALL, NULL);
 }
 
+void ui_KeyMapped_apply_language(uint8_t lang)
+{
+    if (!s_KeyMappedTitle)
+        return;
+    /* 标题样式字体 FontCKJGT28 仅 ASCII，中文需逐对象覆盖为 FontCKJGT24 */
+    lv_label_set_text(s_KeyMappedTitle, lang == 0 ? "键盘设置" : "KEYBOARD SETTING");
+    lv_obj_set_style_text_font(s_KeyMappedTitle,
+                               lang == 0 ? &ui_font_FontCKJGT24 : &ui_font_FontCKJGT28, 0);
+}
+
 void ui_KeyMapped_screen_destroy(void)
 {
     if (ui_KeyMapped)
@@ -290,4 +301,5 @@ void ui_KeyMapped_screen_destroy(void)
     ui_KeyMappedButtonEnter = NULL;
     ui_KeyMappedButtonExit = NULL;
     ui_KeyMappedIcon = NULL;
+    s_KeyMappedTitle = NULL;
 }

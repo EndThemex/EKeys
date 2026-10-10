@@ -7,12 +7,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-lv_obj_t * ui_HaScreen = NULL;
-lv_obj_t * ui_ButtonLeft4 = NULL;
-lv_obj_t * ui_ButtonRight4 = NULL;
-lv_obj_t * ui_ButtonEnter4 = NULL;
-lv_obj_t * ui_ButtonExit4 = NULL;
-static lv_obj_t * s_HaIcon = NULL;
+lv_obj_t *ui_HaScreen = NULL;
+lv_obj_t *ui_ButtonLeft4 = NULL;
+lv_obj_t *ui_ButtonRight4 = NULL;
+lv_obj_t *ui_ButtonEnter4 = NULL;
+lv_obj_t *ui_ButtonExit4 = NULL;
+static lv_obj_t *s_HaIcon = NULL;
+static lv_obj_t *s_HaTitle = NULL;
 static lv_style_t s_ha_icon_style;
 static bool s_ha_icon_style_ready = false;
 static lv_style_t s_ha_title_style;
@@ -23,53 +24,61 @@ static void ha_forward_key(uint32_t key)
     lv_obj_t *active_screen = lv_scr_act();
     lv_group_t *g = lv_group_get_default();
     lv_obj_t *target = g ? lv_group_get_focused(g) : active_screen;
-    if (target) {
+    if (target)
+    {
         lv_event_send(target, LV_EVENT_KEY, (void *)key);
     }
 }
 
-void ui_event_HaScreen(lv_event_t * e)
+void ui_event_HaScreen(lv_event_t *e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
-    if (event_code != LV_EVENT_KEY) {
+    if (event_code != LV_EVENT_KEY)
+    {
         return;
     }
 
     uintptr_t key = (uintptr_t)lv_event_get_param(e);
-    if (key == (uintptr_t)LV_KEY_RIGHT) {
+    if (key == (uintptr_t)LV_KEY_RIGHT)
+    {
         ui_set_active_screen_tag(UI_SCREEN_SETTING);
         _ui_screen_change(&ui_SettingScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_SettingScreen_screen_init);
         lv_refr_now(NULL);
     }
-    else if (key == (uintptr_t)LV_KEY_LEFT) {
+    else if (key == (uintptr_t)LV_KEY_LEFT)
+    {
         ui_set_active_screen_tag(UI_SCREEN_PC_STATUS);
         _ui_screen_change(&ui_PcStatusScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_PcStatusScreen_screen_init);
         lv_refr_now(NULL);
     }
-    else if (key == (uintptr_t)LV_KEY_ENTER) {
+    else if (key == (uintptr_t)LV_KEY_ENTER)
+    {
         ui_set_active_screen_tag(UI_SCREEN_HA_SECONDARY);
         _ui_screen_change(&ui_HaScreenSecondary, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_HaScreenSecondary_screen_init);
         lv_refr_now(NULL);
     }
 }
 
-void ui_event_ButtonLeft4(lv_event_t * e)
+void ui_event_ButtonLeft4(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         ha_forward_key(LV_KEY_LEFT);
     }
 }
 
-void ui_event_ButtonRight4(lv_event_t * e)
+void ui_event_ButtonRight4(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         ha_forward_key(LV_KEY_RIGHT);
     }
 }
 
-void ui_event_ButtonEnter4(lv_event_t * e)
+void ui_event_ButtonEnter4(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         ha_forward_key(LV_KEY_ENTER);
     }
 }
@@ -81,13 +90,15 @@ void ui_HaScreen_screen_init(void)
     lv_obj_clear_flag(ui_HaScreen, LV_OBJ_FLAG_SCROLLABLE);
     ui_set_active_screen_tag(UI_SCREEN_HA);
 
-    if (!s_ha_icon_style_ready) {
+    if (!s_ha_icon_style_ready)
+    {
         lv_style_init(&s_ha_icon_style);
         lv_style_set_text_font(&s_ha_icon_style, &lv_font_montserrat_48);
         s_ha_icon_style_ready = true;
     }
 
-    if (!s_ha_title_style_ready) {
+    if (!s_ha_title_style_ready)
+    {
         lv_style_init(&s_ha_title_style);
         lv_style_set_text_font(&s_ha_title_style, &ui_font_FontCKJGT28);
         lv_style_set_text_letter_space(&s_ha_title_style, 1);
@@ -151,14 +162,14 @@ void ui_HaScreen_screen_init(void)
     lv_obj_add_flag(s_HaIcon, LV_OBJ_FLAG_ADV_HITTEST);
     lv_obj_clear_flag(s_HaIcon, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t *ha_title = lv_label_create(ui_HaScreen);
-    lv_label_set_recolor(ha_title, true);
-    lv_label_set_text(ha_title, "HOME ASSISTANT");
-    lv_obj_set_width(ha_title, 300);
-    lv_label_set_long_mode(ha_title, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_align(ha_title, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_add_style(ha_title, &s_ha_title_style, 0);
-    lv_obj_align_to(ha_title, s_HaIcon, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
+    s_HaTitle = lv_label_create(ui_HaScreen);
+    lv_label_set_recolor(s_HaTitle, true);
+    lv_label_set_text(s_HaTitle, "HOME ASSISTANT");
+    lv_obj_set_width(s_HaTitle, 300);
+    lv_label_set_long_mode(s_HaTitle, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_align(s_HaTitle, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_add_style(s_HaTitle, &s_ha_title_style, 0);
+    lv_obj_align_to(s_HaTitle, s_HaIcon, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
 
     lv_obj_add_event_cb(ui_ButtonLeft4, ui_event_ButtonLeft4, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_ButtonRight4, ui_event_ButtonRight4, LV_EVENT_ALL, NULL);
@@ -166,9 +177,22 @@ void ui_HaScreen_screen_init(void)
     lv_obj_add_event_cb(ui_HaScreen, ui_event_HaScreen, LV_EVENT_ALL, NULL);
 }
 
+void ui_HaScreen_apply_language(uint8_t lang)
+{
+    if (!s_HaTitle)
+    {
+        return;
+    }
+    /* 标题样式字体 FontCKJGT28 仅 ASCII，中文需逐对象覆盖为 FontCKJGT24 */
+    lv_label_set_text(s_HaTitle, lang == 0 ? "智能家居" : "HOME ASSISTANT");
+    lv_obj_set_style_text_font(s_HaTitle,
+                               lang == 0 ? &ui_font_FontCKJGT24 : &ui_font_FontCKJGT28, 0);
+}
+
 void ui_HaScreen_screen_destroy(void)
 {
-    if (ui_HaScreen) {
+    if (ui_HaScreen)
+    {
         lv_obj_del(ui_HaScreen);
     }
 
@@ -178,4 +202,5 @@ void ui_HaScreen_screen_destroy(void)
     ui_ButtonEnter4 = NULL;
     ui_ButtonExit4 = NULL;
     s_HaIcon = NULL;
+    s_HaTitle = NULL;
 }

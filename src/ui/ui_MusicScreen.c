@@ -13,6 +13,7 @@ lv_obj_t *ui_ButtonExit2 = NULL;
 lv_obj_t *ui_Label7 = NULL;
 static lv_obj_t *ui_MusicIcon = NULL;
 static lv_obj_t *s_music_visual_host = NULL;
+static lv_obj_t *s_MusicTitle = NULL;
 static lv_style_t s_music_icon_style;
 static bool s_music_icon_style_ready = false;
 static lv_style_t s_music_title_style;
@@ -495,14 +496,14 @@ void ui_MusicScreen_screen_init(void)
     lv_obj_add_flag(ui_MusicIcon, LV_OBJ_FLAG_ADV_HITTEST);
     lv_obj_clear_flag(ui_MusicIcon, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t *music_title = lv_label_create(ui_MusicScreen);
-    lv_label_set_recolor(music_title, true);
-    lv_label_set_text(music_title, "MUSIC CONTROLER");
-    lv_obj_set_width(music_title, 300);
-    lv_label_set_long_mode(music_title, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_align(music_title, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_add_style(music_title, &s_music_title_style, 0);
-    lv_obj_align_to(music_title, ui_MusicIcon, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
+    s_MusicTitle = lv_label_create(ui_MusicScreen);
+    lv_label_set_recolor(s_MusicTitle, true);
+    lv_label_set_text(s_MusicTitle, "MUSIC CONTROLER");
+    lv_obj_set_width(s_MusicTitle, 300);
+    lv_label_set_long_mode(s_MusicTitle, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_align(s_MusicTitle, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_add_style(s_MusicTitle, &s_music_title_style, 0);
+    lv_obj_align_to(s_MusicTitle, ui_MusicIcon, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
 
     ui_Label7 = lv_label_create(ui_MusicScreen);
     lv_obj_set_width(ui_Label7, LV_SIZE_CONTENT);  /// 1
@@ -519,6 +520,16 @@ void ui_MusicScreen_screen_init(void)
     lv_obj_add_event_cb(ui_MusicScreen, ui_event_MusicScreen, LV_EVENT_ALL, NULL);
 }
 
+void ui_MusicScreen_apply_language(uint8_t lang)
+{
+    if (!s_MusicTitle)
+        return;
+    /* 标题样式字体 FontCKJGT28 仅 ASCII，中文需逐对象覆盖为 FontCKJGT24 */
+    lv_label_set_text(s_MusicTitle, lang == 0 ? "音乐控制" : "MUSIC CONTROLER");
+    lv_obj_set_style_text_font(s_MusicTitle,
+                               lang == 0 ? &ui_font_FontCKJGT24 : &ui_font_FontCKJGT28, 0);
+}
+
 void ui_MusicScreen_screen_destroy(void)
 {
     if (ui_MusicScreen)
@@ -532,4 +543,5 @@ void ui_MusicScreen_screen_destroy(void)
     ui_ButtonExit2 = NULL;
     ui_Label7 = NULL;
     ui_MusicIcon = NULL;
+    s_MusicTitle = NULL;
 }

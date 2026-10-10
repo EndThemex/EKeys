@@ -6,74 +6,81 @@
 #include "ui.h"
 #include <stdint.h>
 
-lv_obj_t * ui_SettingScreen = NULL;
-lv_obj_t * ui_ButtonLeft5 = NULL;
-lv_obj_t * ui_ButtonRight5 = NULL;
-lv_obj_t * ui_ButtonEnter5 = NULL;
-lv_obj_t * ui_ButtonExit5 = NULL;
-lv_obj_t * ui_Image3 = NULL;
+lv_obj_t *ui_SettingScreen = NULL;
+lv_obj_t *ui_ButtonLeft5 = NULL;
+lv_obj_t *ui_ButtonRight5 = NULL;
+lv_obj_t *ui_ButtonEnter5 = NULL;
+lv_obj_t *ui_ButtonExit5 = NULL;
+lv_obj_t *ui_Image3 = NULL;
 static lv_style_t s_setting_title_style;
 static bool s_setting_title_style_ready = false;
+static lv_obj_t *s_SettingTitle = NULL;
 // event funtions
-void ui_event_SettingScreen(lv_event_t * e)
+void ui_event_SettingScreen(lv_event_t *e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
     uintptr_t key = (uintptr_t)lv_event_get_param(e);
 
-    if(event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_RIGHT) {
+    if (event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_RIGHT)
+    {
         ui_set_active_screen_tag(UI_SCREEN_MAIN);
         _ui_screen_change(&ui_MainScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_MainScreen_screen_init);
         lv_refr_now(NULL);
     }
-    else if(event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_LEFT) {
+    else if (event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_LEFT)
+    {
         ui_set_active_screen_tag(UI_SCREEN_HA);
         _ui_screen_change(&ui_HaScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_HaScreen_screen_init);
         lv_refr_now(NULL);
     }
-    else if(event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_ENTER) {
+    else if (event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_ENTER)
+    {
         LV_LOG_USER("ui_event_ButtonEnter5 LV_EVENT_CLICKED");
         ui_set_active_screen_tag(UI_SCREEN_SETTING_SECONDARY);
-        _ui_screen_change(&ui_SettingScreenSecondary,  LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_SettingScreenSecondary_screen_init);
-        lv_refr_now(NULL); 
+        _ui_screen_change(&ui_SettingScreenSecondary, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_SettingScreenSecondary_screen_init);
+        lv_refr_now(NULL);
     }
-
 }
 
-void ui_event_ButtonLeft5(lv_event_t * e)
+void ui_event_ButtonLeft5(lv_event_t *e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
 
-    if(event_code == LV_EVENT_CLICKED) {
+    if (event_code == LV_EVENT_CLICKED)
+    {
         // 获取当前屏幕及其聚焦对象
         lv_obj_t *active_screen = lv_scr_act();
         lv_group_t *g = lv_group_get_default();
         lv_obj_t *target = g ? lv_group_get_focused(g) : active_screen;
 
         // 发送按键事件
-        if (target) {
+        if (target)
+        {
             lv_event_send(target, LV_EVENT_KEY, (void *)LV_KEY_LEFT);
         }
     }
 }
 
-void ui_event_ButtonRight5(lv_event_t * e)
+void ui_event_ButtonRight5(lv_event_t *e)
 {
     lv_event_code_t event_code = lv_event_get_code(e);
 
-    if(event_code == LV_EVENT_CLICKED) {
+    if (event_code == LV_EVENT_CLICKED)
+    {
         // 获取当前屏幕及其聚焦对象
         lv_obj_t *active_screen = lv_scr_act();
         lv_group_t *g = lv_group_get_default();
         lv_obj_t *target = g ? lv_group_get_focused(g) : active_screen;
 
         // 发送按键事件
-        if (target) {
+        if (target)
+        {
             lv_event_send(target, LV_EVENT_KEY, (void *)LV_KEY_RIGHT);
         }
     }
 }
 
-void ui_event_ButtonEnter5(lv_event_t * e)
+void ui_event_ButtonEnter5(lv_event_t *e)
 {
     // lv_event_code_t event_code = lv_event_get_code(e);
 
@@ -90,9 +97,10 @@ void ui_SettingScreen_screen_init(void)
 {
     ui_set_active_screen_tag(UI_SCREEN_SETTING);
     ui_SettingScreen = lv_obj_create(NULL);
-    lv_obj_clear_flag(ui_SettingScreen, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    lv_obj_clear_flag(ui_SettingScreen, LV_OBJ_FLAG_SCROLLABLE); /// Flags
 
-    if (!s_setting_title_style_ready) {
+    if (!s_setting_title_style_ready)
+    {
         lv_style_init(&s_setting_title_style);
         lv_style_set_text_font(&s_setting_title_style, &ui_font_FontCKJGT28);
         lv_style_set_text_letter_space(&s_setting_title_style, 1);
@@ -107,8 +115,8 @@ void ui_SettingScreen_screen_init(void)
     lv_obj_set_x(ui_ButtonLeft5, -178);
     lv_obj_set_y(ui_ButtonLeft5, -9);
     lv_obj_set_align(ui_ButtonLeft5, LV_ALIGN_CENTER);
-    lv_obj_add_flag(ui_ButtonLeft5, LV_OBJ_FLAG_SCROLL_ON_FOCUS);     /// Flags
-    lv_obj_clear_flag(ui_ButtonLeft5, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    lv_obj_add_flag(ui_ButtonLeft5, LV_OBJ_FLAG_SCROLL_ON_FOCUS); /// Flags
+    lv_obj_clear_flag(ui_ButtonLeft5, LV_OBJ_FLAG_SCROLLABLE);    /// Flags
     lv_obj_set_style_bg_color(ui_ButtonLeft5, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_ButtonLeft5, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -118,8 +126,8 @@ void ui_SettingScreen_screen_init(void)
     lv_obj_set_x(ui_ButtonRight5, 181);
     lv_obj_set_y(ui_ButtonRight5, -10);
     lv_obj_set_align(ui_ButtonRight5, LV_ALIGN_CENTER);
-    lv_obj_add_flag(ui_ButtonRight5, LV_OBJ_FLAG_SCROLL_ON_FOCUS);     /// Flags
-    lv_obj_clear_flag(ui_ButtonRight5, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    lv_obj_add_flag(ui_ButtonRight5, LV_OBJ_FLAG_SCROLL_ON_FOCUS); /// Flags
+    lv_obj_clear_flag(ui_ButtonRight5, LV_OBJ_FLAG_SCROLLABLE);    /// Flags
     lv_obj_set_style_bg_color(ui_ButtonRight5, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_ButtonRight5, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -129,8 +137,8 @@ void ui_SettingScreen_screen_init(void)
     lv_obj_set_x(ui_ButtonEnter5, 2);
     lv_obj_set_y(ui_ButtonEnter5, 38);
     lv_obj_set_align(ui_ButtonEnter5, LV_ALIGN_CENTER);
-    lv_obj_add_flag(ui_ButtonEnter5, LV_OBJ_FLAG_SCROLL_ON_FOCUS);     /// Flags
-    lv_obj_clear_flag(ui_ButtonEnter5, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    lv_obj_add_flag(ui_ButtonEnter5, LV_OBJ_FLAG_SCROLL_ON_FOCUS); /// Flags
+    lv_obj_clear_flag(ui_ButtonEnter5, LV_OBJ_FLAG_SCROLLABLE);    /// Flags
     lv_obj_set_style_bg_color(ui_ButtonEnter5, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_ButtonEnter5, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -140,15 +148,14 @@ void ui_SettingScreen_screen_init(void)
     lv_obj_set_x(ui_ButtonExit5, -181);
     lv_obj_set_y(ui_ButtonExit5, -54);
     lv_obj_set_align(ui_ButtonExit5, LV_ALIGN_CENTER);
-    lv_obj_add_flag(ui_ButtonExit5, LV_OBJ_FLAG_SCROLL_ON_FOCUS);     /// Flags
-    lv_obj_clear_flag(ui_ButtonExit5, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    lv_obj_add_flag(ui_ButtonExit5, LV_OBJ_FLAG_SCROLL_ON_FOCUS); /// Flags
+    lv_obj_clear_flag(ui_ButtonExit5, LV_OBJ_FLAG_SCROLLABLE);    /// Flags
     lv_obj_set_style_bg_color(ui_ButtonExit5, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_bg_opa(ui_ButtonExit5, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-
     // 添加图标
     ui_Image3 = lv_img_create(ui_SettingScreen);
-    lv_img_set_src(ui_Image3,LV_SYMBOL_SETTINGS);
+    lv_img_set_src(ui_Image3, LV_SYMBOL_SETTINGS);
     static lv_style_t icon_large_style;
     lv_style_init(&icon_large_style);
     lv_style_set_text_font(&icon_large_style, &lv_font_montserrat_48);
@@ -158,29 +165,38 @@ void ui_SettingScreen_screen_init(void)
     lv_obj_set_x(ui_Image3, 20);
     lv_obj_set_y(ui_Image3, -2);
     lv_obj_set_align(ui_Image3, LV_ALIGN_CENTER);
-    lv_obj_add_flag(ui_Image3, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
-    lv_obj_clear_flag(ui_Image3, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
+    lv_obj_add_flag(ui_Image3, LV_OBJ_FLAG_ADV_HITTEST);  /// Flags
+    lv_obj_clear_flag(ui_Image3, LV_OBJ_FLAG_SCROLLABLE); /// Flags
 
-    lv_obj_t *setting_title = lv_label_create(ui_SettingScreen);
-    lv_label_set_recolor(setting_title, true);
-    lv_label_set_text(setting_title, "SYSTEM SETTING");
-    lv_obj_set_width(setting_title, 300);
-    lv_label_set_long_mode(setting_title, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_align(setting_title, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_add_style(setting_title, &s_setting_title_style, 0);
-    lv_obj_align_to(setting_title, ui_Image3, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
-
+    s_SettingTitle = lv_label_create(ui_SettingScreen);
+    lv_label_set_recolor(s_SettingTitle, true);
+    lv_label_set_text(s_SettingTitle, "SYSTEM SETTING");
+    lv_obj_set_width(s_SettingTitle, 300);
+    lv_label_set_long_mode(s_SettingTitle, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_align(s_SettingTitle, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_add_style(s_SettingTitle, &s_setting_title_style, 0);
+    lv_obj_align_to(s_SettingTitle, ui_Image3, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
 
     lv_obj_add_event_cb(ui_ButtonLeft5, ui_event_ButtonLeft5, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_ButtonRight5, ui_event_ButtonRight5, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_ButtonEnter5, ui_event_ButtonEnter5, LV_EVENT_ALL, NULL);
     lv_obj_add_event_cb(ui_SettingScreen, ui_event_SettingScreen, LV_EVENT_ALL, NULL);
+}
 
+void ui_SettingScreen_apply_language(uint8_t lang)
+{
+    if (!s_SettingTitle)
+        return;
+    /* 标题样式字体 FontCKJGT28 仅 ASCII，中文需逐对象覆盖为 FontCKJGT24 */
+    lv_label_set_text(s_SettingTitle, lang == 0 ? "系统设置" : "SYSTEM SETTING");
+    lv_obj_set_style_text_font(s_SettingTitle,
+                               lang == 0 ? &ui_font_FontCKJGT24 : &ui_font_FontCKJGT28, 0);
 }
 
 void ui_SettingScreen_screen_destroy(void)
 {
-    if(ui_SettingScreen) lv_obj_del(ui_SettingScreen);
+    if (ui_SettingScreen)
+        lv_obj_del(ui_SettingScreen);
 
     // NULL screen variables
     ui_SettingScreen = NULL;
@@ -189,5 +205,5 @@ void ui_SettingScreen_screen_destroy(void)
     ui_ButtonEnter5 = NULL;
     ui_ButtonExit5 = NULL;
     ui_Image3 = NULL;
-
+    s_SettingTitle = NULL;
 }

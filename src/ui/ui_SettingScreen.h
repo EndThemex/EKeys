@@ -13,6 +13,8 @@ extern "C" {
 // SCREEN: ui_SettingScreen
 extern void ui_SettingScreen_screen_init(void);
 extern void ui_SettingScreen_screen_destroy(void);
+/* 按系统语言刷新标题（0=中文 1=English），由 ui_lang 模块统一调用 */
+extern void ui_SettingScreen_apply_language(uint8_t lang);
 extern void ui_event_SettingScreen(lv_event_t * e);
 extern lv_obj_t * ui_SettingScreen;
 extern void ui_event_ButtonLeft5(lv_event_t * e);

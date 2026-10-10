@@ -42,6 +42,8 @@ extern "C"
   extern void ui_PcStatusScreen_set_disk_space_percent(float pct);
   /* 用最后收到的数据回放当前屏（主/二级屏 init 末尾调用），无数据时 no-op */
   extern void ui_PcStatusScreen_replay_cached_values(void);
+  /* 按系统语言刷新标题（0=中文 1=English），由 ui_lang 模块统一调用 */
+  extern void ui_PcStatusScreen_apply_language(uint8_t lang);
 
 #ifdef __cplusplus
 } /*extern "C"*/

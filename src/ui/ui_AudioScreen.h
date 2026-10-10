@@ -22,6 +22,8 @@ extern "C" {
 void ui_AudioScreen_screen_init(void);
 void ui_AudioScreen_screen_destroy(void);
 void ui_event_AudioScreen(lv_event_t *e);
+/* 按系统语言刷新标题（0=中文 1=English），由 ui_lang 模块统一调用 */
+void ui_AudioScreen_apply_language(uint8_t lang);
 
 extern lv_obj_t *ui_AudioScreen;
 
