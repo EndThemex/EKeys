@@ -16,7 +16,6 @@ extern "C"
   extern void ui_HaScreenSecondary_set_tcp_status(bool connected, const char *server_endpoint);
   extern void ui_HaScreenSecondary_set_mode_status(int work_mode);
   extern void ui_HaScreenSecondary_set_voice_status(bool enabled, bool recording);
-  extern void ui_HaScreenSecondary_set_module_status(bool module_a_connected, bool module_b_connected);
   extern void ui_HaScreenSecondary_set_ha_status(bool connected);
 
   extern lv_obj_t *ui_HaScreenSecondary;

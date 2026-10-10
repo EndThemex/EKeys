@@ -4,7 +4,7 @@
  * MainTask → DisplayTask 消息定义（FEATURE_DOC §8.3）。
  *
  * 阶段 05：补齐 11 屏 UI 所需载荷（PC 状态 / HA 状态 / 音乐 / 录音 /
- * 模块状态 / 键映射 Profile / 旋钮动作）。各数据源随阶段 06/07 逐步接入，
+ * 键映射 Profile / 旋钮动作）。各数据源随阶段 06/07 逐步接入，
  * 当前仅 cmd_config（SettingUpdate）、旋钮（ActionInput）与
  * 设置屏反向同步（SettingUpdate）会实际投递。
  *
@@ -34,7 +34,6 @@ namespace ekeys
         TimeUpdate = 1,
         ActionInput = 2,
         KeyInput = 3,
-        ModuleStatus = 4,
         AsrRecording = 5,
         PcStatus = 6,
         HaStatus = 7,
@@ -70,8 +69,6 @@ namespace ekeys
         bool kb_connected{false}; /* 键盘主机连接（BLE/USB HID），主页连接图标 */
         bool voice_enabled{false};
         bool voice_recording{false};
-        bool module_a_connected{false};
-        bool module_b_connected{false};
         char ip_address[24]{0};
         char server_endpoint[32]{0};
     };
@@ -91,12 +88,6 @@ namespace ekeys
         char player_name[32]{0};
         char lyric_current[160]{0};
         char lyric_next[160]{0};
-    };
-
-    struct ModuleStatusInfo
-    {
-        uint8_t mod_type{0}; /* UI_MODA / UI_MODB */
-        bool status{false};
     };
 
     /*
@@ -157,7 +148,6 @@ namespace ekeys
         PcStatusInfo pc_status{};
         HaStatusInfo ha_status{};
         MusicPlayerInfo music_player{};
-        ModuleStatusInfo module{};
         KeymapProfileInfo keymap_profile{};
         AudioPadInfo audio_pad{};
     };

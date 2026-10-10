@@ -6,7 +6,7 @@
  *   - run() 入口调用 ui_init()（所有屏幕一次性创建）；
  *   - 启动时从 Configuration 拉取快照刷新状态条 / 主屏；
  *   - 队列消息分发：SettingUpdate / TimeUpdate / ActionInput /
- *     KeymapProfile / ModuleStatus / AsrRecording / PcStatus /
+ *     KeymapProfile / AsrRecording / PcStatus /
  *     HaStatus / MusicPlayer / Navigate。
  *
  * 数据源尚未接入的消息（Pc/Ha/Music 等）处理路径已就绪，
@@ -188,8 +188,6 @@ namespace ekeys
         status_bar_set_volume(0);
         /* 电量由 MainTask 5s 节流后投递 BatteryStatus 更新，避免此处硬编码 100 */
         status_bar_set_wifi_status(false, false, -100);
-        status_bar_set_module_status(UI_MODA, false);
-        status_bar_set_module_status(UI_MODB, false);
 
         /* 启动快照：把当前配置刷到主屏 / 设置屏（背光 / 模式 / 音量） */
         {
@@ -347,11 +345,6 @@ namespace ekeys
             /* 主动导航也是用户操作；navigateNow 内部会按目标屏决定是否禁用计时 */
             navigateNow(static_cast<ui_screen_tag_t>(msg.navigate_target));
             bumpActivity();
-            break;
-
-        case DisplayMessageType::ModuleStatus:
-            status_bar_set_module_status(msg.module.mod_type,
-                                         msg.module.status);
             break;
 
         case DisplayMessageType::AsrRecording:
@@ -616,8 +609,6 @@ namespace ekeys
         ui_HaScreenSecondary_set_mode_status(ha.work_mode);
         ui_HaScreenSecondary_set_voice_status(ha.voice_enabled,
                                               ha.voice_recording);
-        ui_HaScreenSecondary_set_module_status(ha.module_a_connected,
-                                               ha.module_b_connected);
         ui_HaScreenSecondary_set_ha_status(ha.ha_api_connected);
     }
 

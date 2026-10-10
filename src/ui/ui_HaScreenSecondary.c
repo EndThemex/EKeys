@@ -16,8 +16,6 @@ static lv_obj_t *s_LabelWifiValue = NULL;
 static lv_obj_t *s_LabelModeValue = NULL;
 static lv_obj_t *s_LabelVoiceValue = NULL;
 static lv_obj_t *s_LabelTcpValue = NULL;
-static lv_obj_t *s_LabelModuleAValue = NULL;
-static lv_obj_t *s_LabelModuleBValue = NULL;
 static lv_obj_t *s_LabelIpValue = NULL;
 static lv_obj_t *s_LabelServerValue = NULL;
 static lv_obj_t *s_LabelHaValue = NULL;
@@ -30,8 +28,6 @@ static bool s_tcp_connected = false;
 static int s_work_mode = 0;
 static bool s_voice_enabled = false;
 static bool s_voice_recording = false;
-static bool s_module_a_connected = false;
-static bool s_module_b_connected = false;
 static bool s_ha_api_connected = false; /* HA Native API 客户端连接（docs/11） */
 static char s_ip_address[24] = "--";
 static char s_server_endpoint[32] = "OFFLINE";
@@ -134,16 +130,6 @@ static void ha_refresh_voice_status(void)
     }
 }
 
-static void ha_refresh_module_status(void)
-{
-    ha_set_status_value(s_LabelModuleAValue,
-                        s_module_a_connected ? "ONLINE" : "OFFLINE",
-                        s_module_a_connected ? lv_color_hex(0x22C55E) : lv_color_hex(0x94A3B8));
-    ha_set_status_value(s_LabelModuleBValue,
-                        s_module_b_connected ? "ONLINE" : "OFFLINE",
-                        s_module_b_connected ? lv_color_hex(0x22C55E) : lv_color_hex(0x94A3B8));
-}
-
 /* HA Native API 连接状态：右上角徽标（docs/11 §4.2） */
 static void ha_refresh_ha_status(void)
 {
@@ -158,7 +144,6 @@ static void ha_apply_cached_snapshot(void)
     ha_refresh_tcp_status();
     ha_refresh_mode_status();
     ha_refresh_voice_status();
-    ha_refresh_module_status();
     ha_refresh_ha_status();
 }
 
@@ -189,13 +174,6 @@ void ui_HaScreenSecondary_set_voice_status(bool enabled, bool recording)
     s_voice_enabled = enabled;
     s_voice_recording = recording;
     ha_refresh_voice_status();
-}
-
-void ui_HaScreenSecondary_set_module_status(bool module_a_connected, bool module_b_connected)
-{
-    s_module_a_connected = module_a_connected;
-    s_module_b_connected = module_b_connected;
-    ha_refresh_module_status();
 }
 
 void ui_HaScreenSecondary_set_ha_status(bool connected)
@@ -288,30 +266,6 @@ void ui_HaScreenSecondary_screen_init(void)
     lv_label_set_long_mode(s_LabelTcpValue, LV_LABEL_LONG_CLIP);
     lv_obj_set_style_text_font(s_LabelTcpValue, &ui_font_BebasNeueFont24, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    lv_obj_t *labelModuleA = lv_label_create(ui_HaScreenSecondary);
-    lv_obj_set_pos(labelModuleA, 224, 58);
-    lv_label_set_text(labelModuleA, "MODA");
-    lv_obj_set_style_text_color(labelModuleA, lv_color_hex(0xFDE68A), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(labelModuleA, &ui_font_BebasNeueFont28, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    s_LabelModuleAValue = lv_label_create(ui_HaScreenSecondary);
-    lv_obj_set_pos(s_LabelModuleAValue, 284, 58);
-    lv_obj_set_width(s_LabelModuleAValue, 126);
-    lv_label_set_long_mode(s_LabelModuleAValue, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_font(s_LabelModuleAValue, &ui_font_BebasNeueFont24, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    lv_obj_t *labelModuleB = lv_label_create(ui_HaScreenSecondary);
-    lv_obj_set_pos(labelModuleB, 224, 86);
-    lv_label_set_text(labelModuleB, "MODB");
-    lv_obj_set_style_text_color(labelModuleB, lv_color_hex(0xFDE68A), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(labelModuleB, &ui_font_BebasNeueFont28, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-    s_LabelModuleBValue = lv_label_create(ui_HaScreenSecondary);
-    lv_obj_set_pos(s_LabelModuleBValue, 284, 86);
-    lv_obj_set_width(s_LabelModuleBValue, 126);
-    lv_label_set_long_mode(s_LabelModuleBValue, LV_LABEL_LONG_CLIP);
-    lv_obj_set_style_text_font(s_LabelModuleBValue, &ui_font_BebasNeueFont24, LV_PART_MAIN | LV_STATE_DEFAULT);
-
     s_LabelIpValue = lv_label_create(ui_HaScreenSecondary);
     lv_obj_set_pos(s_LabelIpValue, 10, 118);
     lv_obj_set_width(s_LabelIpValue, 188);
@@ -360,8 +314,6 @@ void ui_HaScreenSecondary_screen_destroy(void)
     s_LabelModeValue = NULL;
     s_LabelVoiceValue = NULL;
     s_LabelTcpValue = NULL;
-    s_LabelModuleAValue = NULL;
-    s_LabelModuleBValue = NULL;
     s_LabelIpValue = NULL;
     s_LabelServerValue = NULL;
     s_LabelHaValue = NULL;

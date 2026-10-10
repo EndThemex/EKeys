@@ -268,11 +268,3 @@ void status_bar_set_recording_state(bool is_recording)
         lv_obj_add_flag(recording_dot, LV_OBJ_FLAG_HIDDEN);
     }
 }
-
-// 更新模块插入状态
-void status_bar_set_module_status(int mode, bool status)
-{
-    LV_UNUSED(mode);
-    LV_UNUSED(status);
-    // MODA / MODB 状态显示已移除，仅保留接口以避免破坏调用方
-}
