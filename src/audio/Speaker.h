@@ -9,7 +9,8 @@
  *   - PlayRemoteAudio(url) / PlayLocalAudio(path) / Pause / Resume / Stop
  *   - loop() 由 MainTask 周期喂（解码驱动）
  *
- * 底层库：ESP32-audioI2S@3.0.11（与 arduino-esp32 2.0.11 / IDF4.4 兼容）。
+ * 底层库：ESP32-audioI2S（esphome fork 2.3.0），源码内置在 lib/ESP32-audioI2S
+ * 一起维护（原 lib_deps 依赖已移除），库内 playI2Sremains 越界爆音缺陷已就地修复。
  */
 
 #ifndef EKEYS_AUDIO_SPEAKER_H
