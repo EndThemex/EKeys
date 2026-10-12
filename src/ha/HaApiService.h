@@ -5,8 +5,8 @@
  *
  *   - mDNS 声明：WiFi 已连接即声明一次（_esphomelib._tcp 端口 6053），
  *     仅广播"设备存在"，不随屏幕切换反复 begin/end
- *   - TCP 监听 + 连接：仅在活动屏为 HA 屏（UI_SCREEN_HA / HA_SECONDARY）
- *     且 WiFi 已连时监听 6053 并接受 HA 连接；离开 HA 屏立即断开并停监听
+ *   - TCP 监听 + 连接：WiFi 已连即常开 6053 监听并接受 HA 连接
+ *     （HA 保持长连接，进 HA 屏无需等其重试回连）；WiFi 断开立即断开并停监听
  *   - 协议：ESPHome 明文协议 v1 子集，对外声明 api_version 1.7
  *   - 按键路由：MainTask 5ms tick 调 sendKeyState(key_id, pressed)
  *
@@ -42,8 +42,8 @@ namespace ekeys
         void stop();
 
         /*
-         * HA 屏进入/离开边沿：listen 6053 / 断开连接并停监听。
-         * 重复传入相同值无副作用；两条路径都做完整清理（client.stop +
+         * WiFi 侧开关：连上后保持监听（幂等）/ 断开时关监听。
+         * 重复传入相同值无副作用；关闭路径做完整清理（client.stop +
          * server.end）防 socket 泄漏，状态机统一回 Idle。
          */
         void setListening(bool enable);

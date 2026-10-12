@@ -21,19 +21,17 @@ HA 侧：设备 "EKeys" + 11 个按键实体 → 自动化触发
 
 三条生命周期独立管理（关键设计决策）：
 
-| 层面            | 生命周期                                                                                                                                | 理由                                                       |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| mDNS 声明       | WiFi 已连接即声明一次                                                                                                                   | 仅广播"设备存在"，不建立通信；避免随屏幕切换反复 begin/end |
-| TCP 监听 + 连接 | **仅在活动屏为 HA 屏（`UI_SCREEN_HA` / `UI_SCREEN_HA_SECONDARY`）且 WiFi 已连时**监听 6053 并接受 HA 连接；离开 HA 屏立即断开并停止监听 | 需求：只在 HA 页面中才连接 HA 进行通信                     |
-| 按键路由        | **活动屏为 HA 屏时**，矩阵键进 HA、不发 HID（未连上 HA 时丢弃）                                                                         | 与"屏幕决定路由"的现有模式一致                             |
+| 层面            | 生命周期                                                                 | 理由                                                                                                           |
+| --------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| mDNS 声明       | WiFi 已连接即声明一次                                                    | 仅广播"设备存在"，不建立通信；避免随屏幕切换反复 begin/end                                                     |
+| TCP 监听 + 连接 | **WiFi 已连即常开** 6053 监听并接受 HA 连接；WiFi 断开立即断开并停止监听 | HA 保持长连接，消除"重进 HA 屏等 HA 退避重试回连"的等待窗口（方案 A，2026-10-12 改；原"仅 HA 屏监听"模型废弃） |
+| 按键路由        | **活动屏为 HA 屏时**，矩阵键进 HA、不发 HID（未连上 HA 时丢弃）          | 与"屏幕决定路由"的现有模式一致                                                                                 |
 
-- **屏幕边沿检测**：MainTask 5ms tick 里用缓存的上一拍屏幕 tag 检测
-  进入/离开 HA 屏的边沿，触发 `setListening(true/false)`；屏幕 tag 为
-  DisplayTask 单写 / MainTask 单读的 uint8_t（既有约定，无锁安全）。
-- **重连延迟预期**：进入 HA 屏后 HA 客户端按自身重试周期回连（秒级到
-  几十秒不等），期间实体在 HA 侧显示 unavailable、按键事件不上报——
-  这是"仅页面内连接"模型的固有行为，联调时以此解释现象。
-- 不新增持久化配置项：服务开关隐含于 WiFi + 当前屏幕。
+- **监听由 WiFi 状态驱动**：MainTask 5ms tick 里 `isConnected()` 为真即
+  `setListening(true)`（幂等），断开走 `stop()` 整体清理；无需屏幕边沿记忆。
+- **HA 侧断链表现**：仅 WiFi 断开或设备断电时 HA 侧实体转 unavailable；
+  HA 重连后自动恢复，无需人工干预。
+- 不新增持久化配置项：服务开关隐含于 WiFi 连接状态。
 - 单客户端假设：同一时间只服务一个 HA 连接；新连接到来时先关旧连接再接受。
 
 ### 1.2 协议版本选择：明文协议 v1 子集
@@ -69,7 +67,7 @@ HA 侧：设备 "EKeys" + 11 个按键实体 → 自动化触发
 | 消息                             | 类型号 | 方向    | 用到的 protobuf 字段                                                                                                                                                           |
 | -------------------------------- | ------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | HelloRequest                     | 1      | HA→设备 | `client_info=1`（string，忽略内容）                                                                                                                                            |
-| HelloResponse                    | 2      | 设备→HA | `api_version_major=1`、`api_version_minor=2`（uint32 varint，固定 1/7）、`server_info=3`（"ekeys native api"）、`name=4`（"ekeys"）                                                  |
+| HelloResponse                    | 2      | 设备→HA | `api_version_major=1`、`api_version_minor=2`（uint32 varint，固定 1/7）、`server_info=3`（"ekeys native api"）、`name=4`（"ekeys"）                                            |
 | ConnectRequest                   | 3      | HA→设备 | `password=1`（string；未配置密码时任意值通过）                                                                                                                                 |
 | ConnectResponse                  | 4      | 设备→HA | `invalid_password=1`（false）                                                                                                                                                  |
 | DisconnectRequest                | 5      | 双向    | 空                                                                                                                                                                             |
@@ -232,8 +230,8 @@ public:
 | HA 未来移除 v1 明文兼容                                 | 2026.1 仅移除了新固件的 authenticate RPC，老固件路径仍保留；若日后真被移除，升级 Noise PSK 加密（协议结构已预留，只在传输层换帧）                                              |
 | `api_version`/字段号偏差                                | 实现时以官方 api.proto 为准核对；api_version 固定报 1.7                                                                                                                        |
 | mDNS 与 WiFi 重连                                       | WiFi 断开时 `stop()` 里做 `MDNS.end()`，重连 `start()` 里重新 `begin()+addService`，避免重复注册；**屏幕切换只开关 TCP 监听，不触碰 mDNS**；DiscoveryService（UDP 广播）无冲突 |
-| 仅页面内连接的断链表现                                  | 离开 HA 屏即断链：HA 侧实体转 unavailable、历史事件不丢（state machine 照常记录）；重进 HA 屏后 HA 按重试周期回连（见 §1.1），非故障                                           |
-| 频繁 listen/close                                       | 进出 HA 屏均可能开关监听：`setListening` 两条路径都要完整清理（client.stop + server.close），防止 socket/内存泄漏；状态机统一回 Idle                                           |
+| 仅页面内连接的断链表现（已随方案 A 废弃）               | ~~离开 HA 屏即断链~~ WiFi 常开监听后 HA 保持长连接；仅 WiFi 断开/断电时实体转 unavailable，重连后自动恢复                                                                      |
+| 频繁 listen/close                                       | WiFi 断开/恢复均可能开关监听：`setListening` 两条路径都要完整清理（client.stop + server.close），防止 socket/内存泄漏；状态机统一回 Idle                                       |
 | HA 屏与 FUN 组合键语义冲突                              | HA 屏内按键全部截胡进 HA，FUN 预扫描跳过（同设置二级页先例）；功能串跳转在 HA 屏内不触发（已在二级页语境）                                                                     |
 | 明文无密码                                              | 局域网内任何人可连 6053 触发按键事件；可后续加 `ha_api_password` 配置项（ConnectRequest 校验位已留好）                                                                         |
 | 大栈对象                                                | 本方案无 >1KB 栈对象；帧缓冲固定 <32B，规则自查无需 static                                                                                                                     |
@@ -244,9 +242,8 @@ public:
    确认 hello/connect/device_info/list_entities 全链路。
 2. HA 添加：设置 → 设备与服务 → 添加集成 → **ESPHome** → 输入设备 IP
    （或等 mDNS 自动发现）→ 密码留空 → 出现 "EKeys" 设备与 11 个
-   binary_sensor。**注意：添加集成时设备必须停留在 HA 屏**
-   （否则 6053 不监听，HA 连不上）。
-3. 按键验证：切到 HA 屏（等 HA 回连、实体恢复 available 后），逐键按住/
+   binary_sensor。WiFi 连接期间 6053 常开监听，添加集成无需停留特定页面。
+3. 按键验证：切到 HA 屏（HA 长连接常在、实体常驻 available），逐键按住/
    松开，HA 开发者工具看实体状态翻转。
 4. 自动化示例：
 
@@ -262,9 +259,8 @@ automation:
         target: { entity_id: light.living_room }
 ```
 
-5. 回归检查：离开 HA 屏后 HA 连接断开（实体转 unavailable，属预期）、
-   按键恢复 HID 正常（含截胡期间按住的键释放不卡键）；FUN 组合键、
-   USB/BLE 模式不受影响。
+5. 回归检查：离开 HA 屏后按键恢复 HID 正常（含截胡期间按住的键释放不
+   卡键），HA 长连接不受屏幕切换影响；FUN 组合键、USB/BLE 模式不受影响。
 
 ## 8. 已定取舍（评审结论）
 
@@ -272,8 +268,9 @@ automation:
   实体及双向控制（light/media_player 等）暂不实现，留作后续路线。
 - 实体类型选 **binary_sensor**（press/release 两态，兼容性最稳、类型号
   12/21 确定），而非 2024.6+ 的 event 实体（更"正统"但类型号需再核对）。
-- **仅 HA 屏激活时监听 6053 并接受连接**（mDNS 声明仍随 WiFi 常开）；
-  离开 HA 屏即断链，HA 侧显示 unavailable 属预期行为。
+- **WiFi 已连即常开 6053 监听**（方案 A，2026-10-12 改；mDNS 声明同为
+  WiFi 常开）：HA 保持长连接、实体常驻 available。原"仅 HA 屏监听"模型
+  （离开 HA 屏即断链、重进页面需等 HA 退避重试回连）已废弃。
 
 ## Sources
 

@@ -1005,9 +1005,9 @@ namespace ekeys
         /*
          * HA Native API（docs/11）：
          *   - WiFi 断开 → 整体 stop（关监听/客户端 + MDNS.end，幂等）；
-         *   - WiFi 连上 → mDNS 声明（幂等）+ 仅 HA 屏激活时监听 6053
-         *     （setListening 幂等：进入时未连 WiFi 只是不监听，连上后
-         *     本分支自动补开，无需额外边沿记忆）；
+         *   - WiFi 连上 → mDNS 声明 + 常开 6053 监听（方案 A：HA 保持
+         *     长连接，消除"重进 HA 屏等 HA 退避重试回连"的等待窗口；
+         *     setListening 幂等，代价仅为常驻一个 TCP socket）；
          *   - process()：accept / 逐帧解析 / 保活超时，全程非阻塞。
          */
         if (!WiFiManager::instance().isConnected())
@@ -1017,11 +1017,7 @@ namespace ekeys
         else
         {
             HaApiService::instance().start();
-            const ui_screen_tag_t ha_screen = ui_get_active_screen_tag();
-            const bool ha_active =
-                (ha_screen == UI_SCREEN_HA ||
-                 ha_screen == UI_SCREEN_HA_SECONDARY);
-            HaApiService::instance().setListening(ha_active);
+            HaApiService::instance().setListening(true);
         }
         HaApiService::instance().process();
 
