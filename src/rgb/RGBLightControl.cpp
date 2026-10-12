@@ -20,8 +20,19 @@ namespace ekeys
 
         constexpr uint32_t kFrameIntervalMs = 30;
 
-        /* 拾音模式：每帧回落步长（30ms/帧 → 满量程回落约 0.6s） */
-        constexpr float kSoundDecayPerFrame = 0.045f;
+        /* 拾音模式：非对称指数平滑（30ms/帧）。
+         * 起跳 0.55 ≈ 2~3 帧到顶，保留鼓点瞬态；回落 0.13 ≈ 0.5s 拖尾。
+         * 替代原"起跳瞬时 + 回落线性定值 0.045/帧"（起跳生硬、下落机械）。 */
+        constexpr float kSoundAttack = 0.55f;
+        constexpr float kSoundDecay = 0.13f;
+        /* 拾音模式：静噪门限（与 MATRIX/GRADIENT 同尺度 0.04），
+         * 避免长时峰值归一化把室内底噪放大成灯光微闪 */
+        constexpr float kSoundNoiseGate = 0.04f;
+        /* 拾音模式：残留截断（同 MATRIX），避免半亮像素长亮 */
+        constexpr float kSoundEpsilon = 0.004f;
+        /* 拾音模式 gamma（≈sRGB 感知曲线）：低电平提亮
+         * （0.2→0.35、0.5→0.64），弱声音的亮度变化在人眼里更连续 */
+        constexpr float kSoundGamma = 0.65f;
         /* 拾音模式：静默时的最低亮度比例（保持模式可见） */
         constexpr float kSoundIdleFloor = 0.12f;
 
@@ -44,7 +55,7 @@ namespace ekeys
         /* 频率渐变（GRADIENT）全局色波：热浪前沿以"行"为单位推进，
          * 满量程 4 行 = 3 行灯位 + 2 行色带宽，即满音量时暖色推过顶行。
          * 波偏高（颜色容易红透）就加大 kGradientWaveSpan，偏低就减小。 */
-        constexpr float kGradientWaveSpan = 4.0f;   /* 前沿最大推进行数 */
+        constexpr float kGradientWaveSpan = 4.0f;    /* 前沿最大推进行数 */
         constexpr float kGradientWaveAttack = 0.45f; /* 推进速度（越大越跟手） */
         constexpr float kGradientWaveDecay = 0.08f;  /* 回落速度（越小越拖尾） */
 
@@ -333,10 +344,18 @@ namespace ekeys
                         target = audio_bands_[b];
                     }
                 }
+                /* 静噪门限：底噪不驱动灯光（与 MATRIX/GRADIENT 同尺度） */
+                if (target < kSoundNoiseGate)
+                {
+                    target = 0.0f;
+                }
 
+                /* 非对称指数平滑：起跳快跟随、回落缓形成拖尾，
+                 * 消掉频段逐帧跳变（原实现起跳瞬时、回落线性定值） */
                 float level = audio_level_[i];
-                level = (target > level) ? target : level - kSoundDecayPerFrame;
-                if (level < 0.0f)
+                const float k = (target > level) ? kSoundAttack : kSoundDecay;
+                level += (target - level) * k;
+                if (level < kSoundEpsilon)
                 {
                     level = 0.0f;
                 }
@@ -348,7 +367,10 @@ namespace ekeys
 
                 uint8_t r, g, b;
                 hueToRgb(hueWheel(i * 256 / RGBDriver::kLedCount), r, g, b);
-                const float scale = (level > kSoundIdleFloor) ? level : kSoundIdleFloor;
+                /* 先 gamma 提亮低电平、再保底亮度：静音时仍是 0.12 底亮 */
+                const float bright = powf(level, kSoundGamma);
+                const float scale = (bright > kSoundIdleFloor) ? bright
+                                                               : kSoundIdleFloor;
                 led.setPixel(i,
                              static_cast<uint8_t>(r * scale),
                              static_cast<uint8_t>(g * scale),

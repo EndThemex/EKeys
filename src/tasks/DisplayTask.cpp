@@ -18,6 +18,7 @@
 #include <Arduino.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h> /* 频谱滚动缓冲 memmove/memcpy */
 
 #include "config/Configuration.h"
 #include "audio/AudioAnalyzer.h"
@@ -637,6 +638,18 @@ namespace ekeys
         const bool rgb_sound = RGBLightControl::instance().wantsMic();
         const bool visible = music_visible || rgb_sound;
 
+        /*
+         * 频谱滚动缓冲（跨轮次累积 PCM，凑满一个完整 512 点窗才做 FFT）。
+         * Mic::Read 超时 20ms < 512 样本所需 32ms，单次直读 512 必然拿到
+         * 残缺帧（尾部补零 + 汉宁窗在中途、窗值仍 ~0.85 处硬截断 → 频谱泄漏），
+         * 且帧间窗口长度随机 → 频段值逐帧跳变（灯效抖动的根因）。
+         * 每轮只取 kHop=256 样本（16ms）累积，凑满后做 FFT 再整体前移 kHop
+         * （50% 重叠，相邻帧共享一半样本，频谱更稳）。
+         */
+        static constexpr size_t kHop = AudioAnalyzer::kFftSize / 2;
+        static int16_t roll[AudioAnalyzer::kFftSize];
+        static size_t roll_n = 0;
+
         if (!visible)
         {
             if (spectrum_active_)
@@ -673,18 +686,30 @@ namespace ekeys
             spectrum_retry_after_ms_ = 0;
             AudioAnalyzer::instance().begin();
             spectrum_active_ = true;
+            roll_n = 0; /* 会话重启：丢弃上次残留样本，避免跨段拼窗 */
             LOG_INFO("DISP", "spectrum started");
         }
 
-        /* 读一帧 PCM（512 样本 @16kHz = 32ms，天然节流）并做 FFT */
-        static int16_t chunk[AudioAnalyzer::kFftSize];
+        /* 读 kHop 样本累积进滚动缓冲，凑满完整窗才做 FFT（见函数开头注释） */
+        static int16_t chunk[kHop];
         static float bands[AudioAnalyzer::kBandCount];
-        const size_t n = Mic::instance().Read(chunk, AudioAnalyzer::kFftSize);
+        const size_t n = Mic::instance().Read(chunk, kHop);
         if (n == 0)
         {
             return;
         }
-        AudioAnalyzer::instance().process(chunk, n, bands, AudioAnalyzer::kBandCount);
+        memcpy(roll + roll_n, chunk, n * sizeof(int16_t));
+        roll_n += n;
+        if (roll_n < AudioAnalyzer::kFftSize)
+        {
+            return; /* 未凑满 512 点，等下一轮补齐 */
+        }
+        AudioAnalyzer::instance().process(roll, AudioAnalyzer::kFftSize,
+                                          bands, AudioAnalyzer::kBandCount);
+        /* 50% 重叠：前移 kHop，保留后半窗样本供下一帧复用 */
+        memmove(roll, roll + kHop,
+                (AudioAnalyzer::kFftSize - kHop) * sizeof(int16_t));
+        roll_n = AudioAnalyzer::kFftSize - kHop;
 
         if (rgb_sound)
         {
