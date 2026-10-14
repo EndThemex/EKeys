@@ -4,7 +4,7 @@
  * 报文（参考工程 onPcStatusCommand）：
  *   请求：{"cmd":0x0d,"seq":N,"data":{"pc_status":{
  *     type?("config"), mask?, network_connected?,
- *     cpu_usage_percent?, memory_usage_percent?, cpu_temp_c?,
+ *     cpu_usage_percent?, memory_usage_percent?, gpu_usage_percent?,
  *     disk_io_percent?, network_up_kbps?, network_down_kbps? }}}
  *   响应：{"cmd":0x8d,"seq":N,"status":0}
  *
@@ -68,7 +68,7 @@ namespace ekeys::protocol::commands
             p.network_connected = pc["network_connected"] | false;
             p.cpu_usage_percent = pc["cpu_usage_percent"] | -1.0f;
             p.memory_usage_percent = pc["memory_usage_percent"] | -1.0f;
-            p.cpu_temp_c = pc["cpu_temp_c"] | -1.0f;
+            p.gpu_usage_percent = pc["gpu_usage_percent"] | -1.0f;
             p.disk_io_percent = pc["disk_io_percent"] | -1.0f;
             p.disk_space_percent = pc["disk_space_percent"] | -1.0f;
             p.network_up_kbps = pc["network_up_kbps"] | -1.0f;

@@ -50,7 +50,7 @@ namespace ekeys
         bool network_connected{false};
         float cpu_usage_percent{-1.0f};
         float memory_usage_percent{-1.0f};
-        float cpu_temp_c{-1.0f};
+        float gpu_usage_percent{-1.0f}; /* CPU 温度从未采集，槽位改显示 GPU 使用率（App 端 PDH 采集） */
         float disk_io_percent{-1.0f};
         float disk_space_percent{-1.0f};
         float network_up_kbps{-1.0f};

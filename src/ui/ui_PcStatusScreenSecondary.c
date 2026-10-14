@@ -83,6 +83,14 @@ static void pc_status_secondary_forward_key(uint32_t key)
  * 该槽位改为显示磁盘剩余空间（disk_space_percent，协议字段原本就有）。
  */
 
+void ui_PcStatusScreenSecondary_set_time(const char *time_text)
+{
+    if (!s_LabelTimeValue || !time_text || !time_text[0])
+        return;
+
+    lv_label_set_text(s_LabelTimeValue, time_text);
+}
+
 void ui_PcStatusScreenSecondary_set_disk_space_percent(float pct)
 {
     char buf[16];
@@ -159,26 +167,23 @@ void ui_PcStatusScreenSecondary_set_cpu_percent(float pct)
     pc_status_set_bar_value(s_BarCpu, pct);
 }
 
-void ui_PcStatusScreenSecondary_set_cpu_temp_c(float c)
+void ui_PcStatusScreenSecondary_set_gpu_usage_percent(float pct)
 {
     char buf[16];
     if (!s_LabelCpuTempValue || !s_BarCpuTemp)
         return;
 
-    if (c < 0.0f)
+    if (pct < 0.0f)
     {
-        lv_label_set_text(s_LabelCpuTempValue, "N/A");
+        lv_label_set_text(s_LabelCpuTempValue, "--");
     }
     else
     {
-        snprintf(buf, sizeof(buf), "%.1fC", c);
+        snprintf(buf, sizeof(buf), "%.1f%%", pct);
         lv_label_set_text(s_LabelCpuTempValue, buf);
     }
-    /*
-     * CPU 温度没有自然的 0~100 区间，沿用旧实现：把摄氏度钳到 0~100 当指示器长度。
-     * 视觉上 50℃ 大约一半，与"越热越长"语义基本一致。
-     */
-    pc_status_set_bar_value(s_BarCpuTemp, c);
+    /* GPU 使用率天然 0~100，指示器长度即百分比 */
+    pc_status_set_bar_value(s_BarCpuTemp, pct);
 }
 
 void ui_PcStatusScreenSecondary_set_mem_percent(float pct)
@@ -337,7 +342,7 @@ void ui_PcStatusScreenSecondary_screen_init(void)
 
     lv_obj_t *labelCpuTemp = lv_label_create(ui_PcStatusScreenSecondary);
     lv_obj_set_pos(labelCpuTemp, 244, 50);
-    lv_label_set_text(labelCpuTemp, "CPU-T");
+    lv_label_set_text(labelCpuTemp, "GPU");
     lv_obj_set_style_text_color(labelCpuTemp, lv_color_hex(0xFDE68A), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(labelCpuTemp, &ui_font_BebasNeueFont28, LV_PART_MAIN | LV_STATE_DEFAULT);
 
@@ -345,7 +350,7 @@ void ui_PcStatusScreenSecondary_screen_init(void)
     lv_obj_set_pos(s_LabelCpuTempValue, 308, 50);
     lv_obj_set_width(s_LabelCpuTempValue, 70);
     lv_label_set_long_mode(s_LabelCpuTempValue, LV_LABEL_LONG_CLIP);
-    lv_label_set_text(s_LabelCpuTempValue, "N/A");
+    lv_label_set_text(s_LabelCpuTempValue, "--");
     lv_obj_set_style_text_color(s_LabelCpuTempValue, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(s_LabelCpuTempValue, &ui_font_BebasNeueFont24, LV_PART_MAIN | LV_STATE_DEFAULT);
 

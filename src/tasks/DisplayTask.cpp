@@ -261,6 +261,9 @@ namespace ekeys
             /* "HH:MM:SS" → 主屏翻页时钟（HH:MM 大卡片 + SS 小卡片 + 冒号闪烁） */
             ui_FlipClock_update(msg.time_text);
 
+            /* PC 状态二级页 TIME 槽位复用同一本地时间源（二级屏未创建时 setter 内部跳过） */
+            ui_PcStatusScreen_set_time(msg.time_text);
+
             /*
              * 日期 + 星期：MainTask 已按 ui_lang 生成最终显示文本
              * （中文 "09月08日"/"星期一"，英文 "SEP 08"/"MON"），
@@ -592,7 +595,7 @@ namespace ekeys
         ui_PcStatusScreen_set_net_up_kbps(pc.network_up_kbps);
         ui_PcStatusScreen_set_net_down_kbps(pc.network_down_kbps);
         ui_PcStatusScreen_set_cpu_percent(pc.cpu_usage_percent);
-        ui_PcStatusScreen_set_cpu_temp_c(pc.cpu_temp_c);
+        ui_PcStatusScreen_set_gpu_usage_percent(pc.gpu_usage_percent);
         ui_PcStatusScreen_set_mem_percent(pc.memory_usage_percent);
         ui_PcStatusScreen_set_disk_io_percent(pc.disk_io_percent);
         ui_PcStatusScreen_set_disk_space_percent(pc.disk_space_percent);

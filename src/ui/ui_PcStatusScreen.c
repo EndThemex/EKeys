@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 lv_obj_t *ui_PcStatusScreen = NULL;
 lv_obj_t *ui_ButtonLeft3 = NULL;
@@ -33,11 +34,13 @@ static struct
     float net_up_kbps;
     float net_down_kbps;
     float cpu_percent;
-    float cpu_temp_c;
+    float gpu_usage_percent; /* 原 cpu_temp_c 槽位改显示 GPU 使用率 */
     float mem_percent;
     float disk_io_percent;
     float disk_space_percent;
-} s_cached = {false, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+    bool time_valid;
+    char time_text[9]; /* "HH:MM:SS" + '\0'，与 DisplayMessage::time_text 同源 */
+} s_cached = {false, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, false, ""};
 
 static void pc_status_forward_key(uint32_t key)
 {
@@ -105,6 +108,18 @@ void ui_event_ButtonEnter3(lv_event_t *e)
 
 /* ---- 数据 setter（唯一收口，DisplayTask 调用点不变；一级页不显示，全部转发二级屏） ---- */
 
+void ui_PcStatusScreen_set_time(const char *time_text)
+{
+    if (!time_text || !time_text[0])
+    {
+        return;
+    }
+    strncpy(s_cached.time_text, time_text, sizeof(s_cached.time_text) - 1);
+    s_cached.time_text[sizeof(s_cached.time_text) - 1] = '\0';
+    s_cached.time_valid = true;
+    ui_PcStatusScreenSecondary_set_time(s_cached.time_text);
+}
+
 void ui_PcStatusScreen_set_net_up_kbps(float kbps)
 {
     s_cached.valid = true;
@@ -126,11 +141,11 @@ void ui_PcStatusScreen_set_cpu_percent(float pct)
     ui_PcStatusScreenSecondary_set_cpu_percent(pct);
 }
 
-void ui_PcStatusScreen_set_cpu_temp_c(float c)
+void ui_PcStatusScreen_set_gpu_usage_percent(float pct)
 {
     s_cached.valid = true;
-    s_cached.cpu_temp_c = c;
-    ui_PcStatusScreenSecondary_set_cpu_temp_c(c);
+    s_cached.gpu_usage_percent = pct;
+    ui_PcStatusScreenSecondary_set_gpu_usage_percent(pct);
 }
 
 void ui_PcStatusScreen_set_mem_percent(float pct)
@@ -156,14 +171,18 @@ void ui_PcStatusScreen_set_disk_space_percent(float pct)
 
 void ui_PcStatusScreen_replay_cached_values(void)
 {
-    if (!s_cached.valid)
+    if (!s_cached.valid && !s_cached.time_valid)
     {
         return;
+    }
+    if (s_cached.time_valid)
+    {
+        ui_PcStatusScreen_set_time(s_cached.time_text);
     }
     ui_PcStatusScreen_set_net_up_kbps(s_cached.net_up_kbps);
     ui_PcStatusScreen_set_net_down_kbps(s_cached.net_down_kbps);
     ui_PcStatusScreen_set_cpu_percent(s_cached.cpu_percent);
-    ui_PcStatusScreen_set_cpu_temp_c(s_cached.cpu_temp_c);
+    ui_PcStatusScreen_set_gpu_usage_percent(s_cached.gpu_usage_percent);
     ui_PcStatusScreen_set_mem_percent(s_cached.mem_percent);
     ui_PcStatusScreen_set_disk_io_percent(s_cached.disk_io_percent);
     ui_PcStatusScreen_set_disk_space_percent(s_cached.disk_space_percent);
