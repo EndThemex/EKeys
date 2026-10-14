@@ -22,6 +22,53 @@ namespace ekeys
     {
         // 默认表（a~k）收口在 utils/keymap_types.h 的 kDefaultKeyMapping，
         // 与协议 0x05 上报、KeymapRepository 补段共用。
+
+        /* 组合层无宏通道，firePress/fireRelease 传入的空宏数组 */
+        const std::array<String, kKeyMappingMacrosCount> kEmptyMacroChannels{};
+
+        /*
+         * 宏步骤 "键名[:间隔ms]" → 键名 + 间隔。
+         * 末段 ':' 右侧为纯数字才算间隔定义，否则整段当键名
+         * （畸形串由后续 resolveKeyWithModifier 返回 0 自然跳过）。
+         */
+        void parseMacroStep(const String &step, String &name,
+                            uint32_t &interval_ms)
+        {
+            interval_ms = kMacroStepDefaultMs;
+            const int sep = step.lastIndexOf(':');
+            if (sep <= 0)
+            {
+                name = step;
+                return;
+            }
+            const String tail = step.substring(sep + 1);
+            if (tail.length() == 0)
+            {
+                /* "键名:"（空间隔）→ 默认间隔，与 App 端 parse_macro_string 对齐 */
+                name = step.substring(0, sep);
+                return;
+            }
+            bool digits = tail.length() > 0;
+            for (unsigned int i = 0; i < tail.length(); ++i)
+            {
+                if (!isDigit(tail[i]))
+                {
+                    digits = false;
+                    break;
+                }
+            }
+            if (!digits)
+            {
+                name = step;
+                return;
+            }
+            const long v = tail.toInt();
+            interval_ms = (v < 0) ? 0
+                          : (v > static_cast<long>(kMacroStepMaxMs))
+                              ? kMacroStepMaxMs
+                              : static_cast<uint32_t>(v);
+            name = step.substring(0, sep);
+        }
     } // namespace
 
     KeyResolver::KeyResolver(Configuration &config)
@@ -124,6 +171,7 @@ namespace ekeys
     void KeyResolver::firePress(
         uint8_t keyId, const String &fk, const String &tk,
         const std::array<String, kKeyMappingNormalCount> &nk,
+        const std::array<String, kKeyMappingMacrosCount> &mk,
         IKeyboard &keyboard) const
     {
         if (fk.length() > 0)
@@ -145,6 +193,15 @@ namespace ekeys
             notifyLedEdge(keyId, true);
             return;
         }
+        bool normal_empty = true;
+        for (uint8_t n = 0; n < kKeyMappingNormalCount; ++n)
+        {
+            if (nk[n].length() > 0)
+            {
+                normal_empty = false;
+                break;
+            }
+        }
         for (uint8_t n = 0; n < kKeyMappingNormalCount; ++n)
         {
             if (nk[n].length() == 0)
@@ -158,14 +215,45 @@ namespace ekeys
             }
         }
 
+        /*
+         * 宏播放通道：优先级最低（function > text > normal > macro）。
+         * 每步 "键名[:间隔ms]"，逐步 press→间隔→release（阻塞式，
+         * 与文本通道同一取舍）；播放中键盘扫描暂停已确认可接受。
+         * 播放一次完成，release 无对应动作，仅回写 LED 边沿。
+         */
+        if (normal_empty)
+        {
+            for (uint8_t n = 0; n < kKeyMappingMacrosCount; ++n)
+            {
+                if (mk[n].length() == 0)
+                {
+                    break;
+                }
+                String name;
+                uint32_t interval_ms;
+                parseMacroStep(mk[n], name, interval_ms);
+                ResolvedKey r = resolveKeyWithModifier(name);
+                if (!r.keycode)
+                {
+                    continue;
+                }
+                keyboard.press(r.keycode, r.modifier);
+                delay(interval_ms);
+                keyboard.release(r.keycode);
+            }
+        }
+
         notifyLedEdge(keyId, true);
     }
 
     void KeyResolver::fireRelease(
         uint8_t keyId, const String &fk, const String &tk,
         const std::array<String, kKeyMappingNormalCount> &nk,
+        const std::array<String, kKeyMappingMacrosCount> &mk,
         IKeyboard &keyboard) const
     {
+        /* 宏通道在 release 侧无动作，参数仅为与 firePress 签名对称 */
+        (void)mk;
         if (fk.length() > 0)
         {
             ResolvedKey r = resolveKeyWithModifier(fk);
@@ -193,6 +281,11 @@ namespace ekeys
                 keyboard.release(r.keycode);
             }
         }
+
+        /*
+         * 宏在 press 时已播放完毕（逐步 press→release），
+         * release 无键可松、无动作。
+         */
 
         notifyLedEdge(keyId, false);
     }
@@ -232,7 +325,7 @@ namespace ekeys
                                          m.combo1_text_key, m.combo1_normal_key))
         {
             firePress(keyId, m.combo1_function_key, m.combo1_text_key,
-                      m.combo1_normal_key, keyboard);
+                      m.combo1_normal_key, kEmptyMacroChannels, keyboard);
             fire_layer_[keyId] = kLayerFun1;
             return;
         }
@@ -240,12 +333,13 @@ namespace ekeys
                                          m.combo2_text_key, m.combo2_normal_key))
         {
             firePress(keyId, m.combo2_function_key, m.combo2_text_key,
-                      m.combo2_normal_key, keyboard);
+                      m.combo2_normal_key, kEmptyMacroChannels, keyboard);
             fire_layer_[keyId] = kLayerFun2;
             return;
         }
 
-        firePress(keyId, m.function_key, m.text_key, m.normal_key, keyboard);
+        firePress(keyId, m.function_key, m.text_key, m.normal_key,
+                  m.macros_key, keyboard);
         fire_layer_[keyId] = kLayerSingle;
     }
 
@@ -283,15 +377,15 @@ namespace ekeys
         {
         case kLayerFun1:
             fireRelease(keyId, m.combo1_function_key, m.combo1_text_key,
-                        m.combo1_normal_key, keyboard);
+                        m.combo1_normal_key, kEmptyMacroChannels, keyboard);
             break;
         case kLayerFun2:
             fireRelease(keyId, m.combo2_function_key, m.combo2_text_key,
-                        m.combo2_normal_key, keyboard);
+                        m.combo2_normal_key, kEmptyMacroChannels, keyboard);
             break;
         default:
             fireRelease(keyId, m.function_key, m.text_key, m.normal_key,
-                        keyboard);
+                        m.macros_key, keyboard);
             break;
         }
         fire_layer_[keyId] = kLayerSingle;

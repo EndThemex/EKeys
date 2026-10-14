@@ -22,6 +22,12 @@ namespace ekeys
   constexpr uint8_t kKeyMappingMacrosCount = 5;
 
   /*
+   * 宏步骤间隔取值：无 ":ms" 后缀用默认值；解析时 clamp 到 [0, Max]。
+   */
+  inline constexpr uint32_t kMacroStepDefaultMs = 20;
+  inline constexpr uint32_t kMacroStepMaxMs = 60000;
+
+  /*
    * 单个物理键 / 特殊输入的映射。
    *
    * function_key:
@@ -33,8 +39,10 @@ namespace ekeys
    *   修饰键名（Ctrl/Shift/Alt/Win）单独成槽即组合键（如 "Ctrl"+"c"）。
    *
    * macros_key[]:
-   *   宏键序列，最多 5 个，按顺序先压后弹；
-   *   仅存储/协议透传，KeyResolver 尚未实现宏播放。
+   *   宏序列，最多 5 步，"+" 分隔；每步 "键名[:间隔ms]"
+   *   （无后缀用 kMacroStepDefaultMs，间隔 clamp 0~kMacroStepMaxMs）。
+   *   触发时逐步 press→间隔→release 阻塞播放（KeyResolver）；
+   *   仅单击层（FUN 组合层无宏通道）。
    *
    * combo1_* / combo2_*:
    *   FUN 组合层通道（FUN1 优先于 FUN2）。设置二级页 / 协议 0x06 配置的

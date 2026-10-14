@@ -167,7 +167,19 @@ namespace ekeys
         {
             return;
         }
-        g_usb_keyboard.print(text);
+        /*
+         * 逐字符发送 + 字符间 20ms 间隔：print() 会让报告背靠背发出，
+         * 主机来不及处理会吞键（kTypeCharIntervalMs，阻塞式可接受）。
+         */
+        const size_t len = text.length();
+        for (size_t i = 0; i < len; ++i)
+        {
+            g_usb_keyboard.write(static_cast<uint8_t>(text[i]));
+            if (i + 1 < len)
+            {
+                delay(kTypeCharIntervalMs);
+            }
+        }
     }
 
     void USBKeyboardImpl::releaseAll()

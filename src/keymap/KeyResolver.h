@@ -82,14 +82,17 @@ namespace ekeys
         static constexpr uint8_t kLayerFun2 = 2;
 
         /*
-         * 按通道组（function > text > normal）注入/释放 HID，
+         * 按通道组（function > text > normal > macro）注入/释放 HID，
          * 保留原有单击路径的 LED 回调行为；单击与两个组合层共用。
+         * 宏通道仅单击层有内容，组合层传入空数组。
          */
         void firePress(uint8_t keyId, const String &fk, const String &tk,
                        const std::array<String, kKeyMappingNormalCount> &nk,
+                       const std::array<String, kKeyMappingMacrosCount> &mk,
                        IKeyboard &keyboard) const;
         void fireRelease(uint8_t keyId, const String &fk, const String &tk,
                          const std::array<String, kKeyMappingNormalCount> &nk,
+                         const std::array<String, kKeyMappingMacrosCount> &mk,
                          IKeyboard &keyboard) const;
 
         /* 组合层三通道是否全空 */

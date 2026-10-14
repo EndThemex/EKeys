@@ -13,7 +13,9 @@
  *   0x06 响应：通用成功（cmd|0x80）。
  *
  * 优先级：单击 function > text（文本注入，ASCII，≤128 字符）> normal / macro；
- * 组合层 combo1（FUN1 按住）/ combo2（FUN2 按住）内部优先级同上，
+ * macro 为宏序列（仅单击层）：最多 5 步 "+" 分隔，每步 "键名[:间隔ms]"
+ * （无后缀默认 20ms，间隔 clamp 0~60000，见 keymap_types.h）；
+ * 组合层 combo1（FUN1 按住）/ combo2（FUN2 按住）内部优先级同上（无宏通道），
  * 与单击通道互相独立（运行时按 FUN 键是否按住选择，FUN1 层优先于 FUN2）。
  *
  * 键映射写入当前激活 Profile 的 keymap{N}.ini，fun_key 持久化到

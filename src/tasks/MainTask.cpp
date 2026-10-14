@@ -138,6 +138,31 @@ namespace ekeys
                 /* 单击视图：只显示单击配置；组合层在 FUN 键按住时整屏切换预览 */
                 combo = layerSummary(mapping.function_key, mapping.text_key,
                                      mapping.normal_key);
+                if (combo.isEmpty())
+                {
+                    /*
+                     * 宏通道（仅单击层）：逐步显示可读键名 "+" 连接，
+                     * 不含 ":间隔ms" 后缀（屏宽有限）。
+                     */
+                    for (uint8_t j = 0; j < kKeyMappingMacrosCount; ++j)
+                    {
+                        if (mapping.macros_key[j].isEmpty())
+                        {
+                            break;
+                        }
+                        String step = mapping.macros_key[j];
+                        const int sep = step.lastIndexOf(':');
+                        if (sep > 0)
+                        {
+                            step = step.substring(0, sep);
+                        }
+                        if (!combo.isEmpty())
+                        {
+                            combo += "+";
+                        }
+                        combo += keyDisplayName(step);
+                    }
+                }
             }
             snprintf(out, cap, "%s", combo.isEmpty() ? "--" : combo.c_str());
         }

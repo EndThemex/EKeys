@@ -10,9 +10,9 @@
  *   normal_key=Ctrl+c
  *
  * function_key 非空时优先使用；其次 text（文本注入，ASCII）；normal_key / macros_key 用 "+" 分隔。
+ * macros_key 为宏序列（KeyResolver 已实现播放）：每步 "键名[:间隔ms]"，
  * 组合键写在 normal_key（"Ctrl"+"c" 拆两槽，修饰键槽经 KeyNameTable
- * 解析为 0xE0~0xE7）；macros_key 仅存储/协议透传，KeyResolver 未实现
- * 宏播放。
+ * 解析为 0xE0~0xE7）。
  *
  * FUN 组合层（combo1_* / combo2_*）：fun_key1 / fun_key2（config.ini
  * [system]）对应物理键按住时，其它键改为触发对应组合层（优先级同单击
