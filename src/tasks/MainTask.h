@@ -17,6 +17,7 @@
 
 #include <stdint.h>
 
+#include "input/InputRouter.h"
 #include "input/MatrixScanner.h"
 #include "input/RotaryEncoder.h"
 #include "keymap/KeyResolver.h"
@@ -110,6 +111,7 @@ namespace ekeys
         MatrixScanner scanner_;
         KeyResolver resolver_;
         RotaryEncoder encoder_;
+        InputRouter router_;
         IKeyboard *keyboard_; // 不持有所有权
         void *display_queue_; // FreeRTOS QueueHandle_t（避免强引用）
         uint32_t last_tick_ms_;

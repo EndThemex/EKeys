@@ -96,14 +96,21 @@ src/tasks/
 src/input/
 ├── MatrixScanner.h/.cpp        # 3×4 矩阵扫描、消抖状态机
 ├── RotaryEncoder.h/.cpp        # 板载 EC11（PCNT + OneButton）
-├── I2CMasterController.h/.cpp  # I2C 主控，ModA(0x06) / ModB(0x08)
-├── InputEvent.h                # 统一输入事件类型（按键 / 旋钮 / 滑动 / 模块）
-└── InputRouter.h/.cpp          # 把原始输入路由到 keymap 或 LVGL（旋钮仅导航）
+├── InputRoute.h                # InputOwner / MatrixRoute（纯 POD，无 LVGL 依赖）
+├── InputRouter.h/.cpp          # 当前屏幕 → 矩阵键 owner 路由表；按下记录 owner
+├── ForegroundKeyQueue.h/.cpp   # 前台玩法按键 SPSC 队列（MainTask → DisplayTask）
+├── I2CMasterController.h/.cpp  # I2C 主控，ModA(0x06) / ModB(0x08)（规划）
+└── InputEvent.h                # 统一输入事件类型（规划）
 ```
 
-- `InputRouter` 决定一个 `InputEvent` 是进入 `KeyEventDispatcher`（走键映射）还是转 `DisplayMessage::ACTION_INPUT`（屏幕导航）。
-  - 当前实现：`InputRouter` 暂未抽象为独立类，由 `MainTask` 在 5ms tick 内直接分流 —— 按键边沿 → `KeyEventDispatcher::onKeyEdge()`（命中 ASR 走 VoiceRecognizer，其余走 RGB ClickHighlight）；EC11 旋钮事件经 `RotaryEncoder::setCallback()` 注入 `MainTask::sendDisplayAction()` 直接走 `ACTION_INPUT`。详见 `MainTask.cpp::loop()`。
-- 对应文档：`2.1 矩阵扫描`、`2.2 旋钮`、`2.3 外挂模块`、`2.4 特殊输入`。
+- `InputRouter` 把"当前屏幕 → 矩阵键由谁消费"收口为一张表：
+  - `Keymap`：`KeyEventDispatcher` + `KeyResolver` → HID；
+  - `Ui`：只投 `DisplayMessage::ACTION_INPUT` → LVGL；
+  - `Ha`：`HaApiService::sendKeyState`；
+  - `Foreground`：写 `ForegroundKeyQueue` → `GameHost`。
+- **按下时记录 owner，释放时按记录执行**，解决"按住键切屏后 release 发错对象"的问题（docs/13 §3.5）。
+- EC11 旋钮仍由 `RotaryEncoder::setCallback()` 注入 `MainTask::sendDisplayAction()` 直接走 `ACTION_INPUT`；Foreground 旋钮暂未接管。
+- 对应文档：`2.1 矩阵扫描`、`2.2 旋钮`、`2.3 外挂模块`、`2.4 特殊输入`；实现细节见 [`docs/13-input-router-design.md`](./docs/13-input-router-design.md)。
 
 ### 3.4 键映射与 HID 输出（FEATURE_DOC §3、§4）
 

@@ -26,6 +26,9 @@
 #include "audio/Mic.h"
 #include "display/Backlight.h"
 #include "display/LvglPort.h"
+#include "game/GameHost.h"
+#include "input/ForegroundKeyQueue.h"
+#include "input/InputRouter.h"
 #include "input/MatrixScanner.h"
 #include "logging/LogManager.h"
 #include "message_types.h"
@@ -216,6 +219,17 @@ namespace ekeys
                 RGBLightControl::instance().tick(delta);
                 /* 频谱调度（阶段 07 7.2）：仅音乐屏可见时占用 Mic/CPU */
                 updateSpectrum();
+                /*
+                 * 前台玩法（docs/13）：先排空按键边沿，再推进一帧。
+                 * GameHost 内部判断 active()，未激活时事件直接丢弃。
+                 */
+                ForegroundKeyEvent fg_ev;
+                while (ForegroundKeyQueue::instance().pop(fg_ev))
+                {
+                    GameHost::instance().onKey(fg_ev.key, fg_ev.pressed,
+                                               fg_ev.timestamp_ms);
+                }
+                GameHost::instance().tick(delta);
                 last = now;
             }
 
@@ -331,6 +345,21 @@ namespace ekeys
                 }
                 break;
             }
+
+            /*
+             * 前台玩法屏（docs/13）：矩阵键不走 ActionInput，只有旋钮动作
+             * 会到这里。第一版用双击旋钮（LV_KEY_ESC）退出游戏；
+             * 后续游戏需要旋钮时改由 GameHost::onEncoder() 消费。
+             */
+            if (InputRouter::isForeground(ui_get_active_screen_tag()))
+            {
+                if (action == LV_KEY_ESC)
+                {
+                    navigateNow(UI_SCREEN_MAIN);
+                }
+                break;
+            }
+
             /*
              * SettingScreenSecondary 旋钮行为：旋转直接发出 LV_KEY_LEFT/RIGHT
              * 进 UI，由 setting_secondary_handle_key 走调值分支
@@ -422,6 +451,21 @@ namespace ekeys
 
     void DisplayTask::navigateNow(ui_screen_tag_t tag)
     {
+        /*
+         * 前台玩法进出（docs/13）：先通知 GameHost，再取目标屏。
+         * GameHost::enter 会惰性创建 ui_GameScreen，因此 screen() 在
+         * 下面 switch 的 UI_SCREEN_GAME 分支可用。
+         */
+        const ui_screen_tag_t prev_tag = ui_get_active_screen_tag();
+        if (prev_tag == UI_SCREEN_GAME && tag != UI_SCREEN_GAME)
+        {
+            GameHost::instance().exit();
+        }
+        else if (tag == UI_SCREEN_GAME && prev_tag != UI_SCREEN_GAME)
+        {
+            GameHost::instance().enter(prev_tag);
+        }
+
         lv_obj_t *target = nullptr;
         switch (tag)
         {
@@ -463,6 +507,9 @@ namespace ekeys
             break;
         case UI_SCREEN_SETTING_SECONDARY:
             target = ui_SettingScreenSecondary;
+            break;
+        case UI_SCREEN_GAME:
+            target = GameHost::instance().screen();
             break;
         default:
             return;
@@ -759,6 +806,11 @@ namespace ekeys
         const ui_screen_tag_t tag = ui_get_active_screen_tag();
         /* 主页不需要自动回；二级页禁用；UNKNOWN 视为禁用（启动首帧） */
         if (tag == UI_SCREEN_MAIN || tag == UI_SCREEN_UNKNOWN)
+        {
+            return false;
+        }
+        /* 前台玩法屏（游戏/乐器/宠物）禁用自动回主页（docs/13） */
+        if (InputRouter::isForeground(tag))
         {
             return false;
         }

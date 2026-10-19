@@ -16,26 +16,11 @@
 #include "lvgl.h"
 #endif
 
+#include "ui_screen_tag.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef enum {
-    UI_SCREEN_UNKNOWN = 0,
-    UI_SCREEN_MAIN,
-    UI_SCREEN_KEYMAPPED,
-    UI_SCREEN_KEYMAPPED_SECONDARY,
-    UI_SCREEN_MUSIC,
-    UI_SCREEN_MUSIC_SECONDARY,
-    UI_SCREEN_AUDIO,
-    UI_SCREEN_AUDIO_SECONDARY,
-    UI_SCREEN_PC_STATUS,
-    UI_SCREEN_PC_STATUS_SECONDARY,
-    UI_SCREEN_HA,
-    UI_SCREEN_HA_SECONDARY,
-    UI_SCREEN_SETTING,
-    UI_SCREEN_SETTING_SECONDARY
-} ui_screen_tag_t;
 
 void ui_KeyMapped_screen_init(void);
 void ui_KeyMapped_screen_destroy(void);

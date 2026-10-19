@@ -21,6 +21,8 @@
 | 文档                                                 | 说明                                          |
 | ---------------------------------------------------- | --------------------------------------------- |
 | [COMPILING.md](./COMPILING.md)                       | 编译、烧录、SPIFFS 上传、串口监视、擦除 Flash |
+| [12-fun-features.md](./12-fun-features.md)           | 好玩功能提案（小游戏 / 宠物 / 乐器 / 场景等，未排期） |
+| [13-input-router-design.md](./13-input-router-design.md) | InputRouter 抽取方案（路由表 / owner 记录 / Foreground 队列） |
 | [PROJECT_LAYOUT.md](./PROJECT_LAYOUT.md)             | 仓库目录速览 / 关键文件 / 文档体系            |
 | [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)           | 硬件 / 软件注意事项与常见问题速查             |
 | [desktop-app-protocol.md](./desktop-app-protocol.md) | 桌面 App 开发对接：通信协议、命令与字段约定   |

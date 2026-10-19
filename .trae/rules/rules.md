@@ -24,7 +24,7 @@ APP端项目在当前项目同级目录下，项目名称为 `EKeysApp`。
   - 逆时针 → `LV_KEY_LEFT`
   - 单击 → `LV_KEY_ENTER`（进入 / 确认）
   - 双击 → `LV_KEY_ESC`（返回）
-- **矩阵 11 键**（应用键 ID 1~11）：HID 输出专用，在 KEYMAPPED 屏被截胡为焦点跳转
+- **矩阵 11 键**（应用键 ID 1~11）：默认 HID 输出；实际由 `InputRouter` 按当前屏幕路由（Keymap / Ui / Ha / Foreground），见 §8
 
 ### 2. LVGL 键值归一化
 
@@ -88,3 +88,21 @@ SquareLine 生成的 `ButtonLeft* / ButtonRight* / ButtonEnter* / ButtonExit*` �
 ### 7. 跨任务读 `g_active_screen_tag`
 
 `ui_get_active_screen_tag()` 由 DisplayTask 单写、MainTask 单读，类型 `ui_screen_tag_t`（uint8_t），8 位读写天然原子无锁安全。若后续改为双核同时读写，需加 atomic 或临界区。
+
+### 8. InputRouter 路由（docs/13）
+
+矩阵键路由的唯一事实源是 [`InputRouter::routeFor()`](file:///d:/search/esp/Keys/EKeys/src/input/InputRouter.cpp)：
+
+| 屏幕 | owner | 行为 |
+| --- | --- | --- |
+| HA / HA_SECONDARY | `Ha` | 只发 binary_sensor；仍投 ActionInput（`bumpActivity` 续命，防 5s 自动回主页） |
+| SETTING_SECONDARY / AUDIO_SECONDARY | `Ui` | 不发 HID，只投 ActionInput |
+| GAME | `Foreground` | 只写 `ForegroundKeyQueue`，DisplayTask → `GameHost` |
+| 其余（含 KEYMAPPED_SECONDARY） | `Keymap` | 现有 HID 主路径 |
+
+规则：
+
+- **按下时记录 owner，释放时按记录执行**；禁止在 release 路径重新用"当前屏"判断（跨屏会发错对象）。
+- 新增屏幕必须同步 `routeFor()` 与 `ui_screen_tag.h`；default 走 `Keymap`，误配会向主机发 HID。
+- 新增玩法屏优先复用 `Foreground` + `GameHost`，不要往 `DisplayMessage` 里塞高频按键边沿（队列 10 × 1.2KB）。
+- `KEYMAPPED_SECONDARY` 目前仍发 HID，这是现状；若要改，单独评估并同步本表。

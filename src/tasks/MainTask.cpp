@@ -29,6 +29,7 @@
 #include "config/Configuration.h"
 #include "ha/HaApiService.h"
 #include "hardware/BatteryMonitor.h"
+#include "input/ForegroundKeyQueue.h"
 #include "keymap/KeyEventDispatcher.h"
 #include "keymap/KeyNameTable.h"
 #include "logging/LogManager.h"
@@ -47,6 +48,9 @@
 
 namespace ekeys
 {
+
+    static_assert(kInputKeyCount == kMatrixKeyCount,
+                  "InputRouter key count mismatch");
 
     namespace
     {
@@ -310,6 +314,7 @@ namespace ekeys
 
         scanner_.begin();
         resolver_.begin();
+        router_.begin();
 
         /* A1 修复：注入 resolver，使 isVoiceTriggerKey 能命中 function_key=KEY_FUNCTION_ASR */
         KeyEventDispatcher::init(&resolver_);
@@ -354,6 +359,7 @@ namespace ekeys
     void MainTask::end()
     {
         g_main_task = nullptr;
+        router_.reset();
         resolver_.end();
     }
 
@@ -409,6 +415,10 @@ namespace ekeys
             else if (fk == "KEY_FUNCTION_PAGE_HA")
             {
                 out = UI_SCREEN_HA_SECONDARY;
+            }
+            else if (fk == "KEY_FUNCTION_PAGE_GAME")
+            {
+                out = UI_SCREEN_GAME;
             }
             else
             {
@@ -610,27 +620,29 @@ namespace ekeys
             scanner_.getReleasedKeys(released, rc);
 
             const ui_screen_tag_t tick_screen = ui_get_active_screen_tag();
+
             /*
-             * HA 屏（docs/11）：矩阵键全部截胡进 HA（press/release →
-             * sendKeyState true/false，未连上 HA 时丢弃），不发 HID；
-             * FUN 预扫描/功能串跳转一并跳过（同设置二级页先例）。
-             * HID release 派发保持原样：被屏蔽 press 对应的 release 派发
-             * 到 HID 无副作用，离开 HA 屏后正常派发避免卡键。
+             * 屏幕边沿：只在进出 Foreground（游戏/乐器等）时清 HID。
+             * 不每次切屏都 releaseAll，避免破坏"按住键 + 旋钮切屏"的现有行为。
              */
-            const bool ha_routing =
-                tick_screen == UI_SCREEN_HA ||
-                tick_screen == UI_SCREEN_HA_SECONDARY;
-            const bool suppress_hid =
-                ha_routing ||
-                tick_screen == UI_SCREEN_SETTING_SECONDARY ||
-                tick_screen == UI_SCREEN_AUDIO_SECONDARY;
-            if (!suppress_hid)
+            const ui_screen_tag_t prev_screen = router_.screen();
+            if (router_.updateScreen(tick_screen) &&
+                (InputRouter::isForeground(prev_screen) ||
+                 InputRouter::isForeground(tick_screen)))
             {
-                /*
-                 * FUN 键同 tick 预扫描：FUN 与其它键同一 5ms tick 按下时，
-                 * 若 FUN 键扫描顺序靠后，先按下其它键会误触发单击层。
-                 * 这里先把 FUN 置位（press 幂等），再走正常循环。
-                 */
+                keyboard_->releaseAll();
+            }
+
+            const MatrixRoute screen_route = InputRouter::routeFor(tick_screen);
+
+            /*
+             * FUN 键同 tick 预扫描：FUN 与其它键同一 5ms tick 按下时，
+             * 若 FUN 键扫描顺序靠后，先按下其它键会误触发单击层。
+             * 这里先把 FUN 置位（press 幂等），再走正常循环。
+             * 仅 Keymap owner 参与 FUN 组合层（HA / Ui / Foreground 不参与）。
+             */
+            if (screen_route.fun_prescan)
+            {
                 const uint8_t fk1 = resolver_.funKey1();
                 const uint8_t fk2 = resolver_.funKey2();
                 for (uint8_t i = 0; i < pc; ++i)
@@ -645,20 +657,32 @@ namespace ekeys
 
             for (uint8_t i = 0; i < pc; ++i)
             {
-                /*
-                 * SettingScreenSecondary 下，矩阵键仅用于 UI 导航（按键 7/11
-                 * 切焦点等），不向主机发送 HID。离开该屏后 release 仍正常派发，
-                 * 避免卡键。
-                 */
-                if (ha_routing)
+                const uint8_t key = pressed[i];
+                const MatrixRoute route = router_.onPress(key, tick_screen);
+
+                switch (route.owner)
                 {
-                    /* HA 屏：矩阵键 press → HA binary_sensor（连 HA 与否都
-                     * 这样走，未连接时 sendKeyState 内部丢弃，docs/11 §4.1） */
-                    HaApiService::instance().sendKeyState(pressed[i], true);
+                case InputOwner::Ha:
+                    /* HA 屏：矩阵键 press → binary_sensor（未连接时内部丢弃） */
+                    HaApiService::instance().sendKeyState(key, true);
+                    break;
+                case InputOwner::Foreground:
+                {
+                    /* 前台玩法：不进 HID/HA，走独立小队列（避免 1.2KB 消息堆积） */
+                    ForegroundKeyEvent fg{};
+                    fg.key = key;
+                    fg.pressed = true;
+                    fg.timestamp_ms = millis();
+                    ForegroundKeyQueue::instance().push(fg);
+                    break;
                 }
-                else if (!suppress_hid)
+                case InputOwner::Ui:
+                    /* 只走下方 ActionInput → LVGL */
+                    break;
+                case InputOwner::Keymap:
+                default:
                 {
-                    KeyEventDispatcher::onKeyEdge(pressed[i], true);
+                    KeyEventDispatcher::onKeyEdge(key, true);
                     /*
                      * 内置固件功能优先于 HID：当前活动层（单击/FUN1/FUN2）的
                      * function 通道命中 KEY_FUNCTION_PAGE_XXX 时按键直接跳转
@@ -666,7 +690,7 @@ namespace ekeys
                      * 空键，无副作用）。
                      */
                     ui_screen_tag_t jump_target = UI_SCREEN_MAIN;
-                    if (functionKeyJumpTarget(resolver_, pressed[i], jump_target))
+                    if (functionKeyJumpTarget(resolver_, key, jump_target))
                     {
                         DisplayMessage jump_msg{};
                         jump_msg.type = DisplayMessageType::Navigate;
@@ -676,36 +700,60 @@ namespace ekeys
                     }
                     else
                     {
-                        resolver_.press(pressed[i], *keyboard_);
+                        resolver_.press(key, *keyboard_);
                     }
+                    break;
                 }
+                }
+
                 /*
                  * A1 修复：应用键 1~11 在 KEYMAPPED 屏被解释为"进入二级页并聚焦该键"。
                  * 编码 = kMatrixKeyActionBase + key_id（2026-09-08 修复：key_id=10
                  * 原来与 LV_KEY_ENTER=10 数值冲突，裸传会被 UI 层当成旋钮单击触发
                  * 导航；加基址偏移后与 LV_KEY_* 完全不重叠，由 DisplayTask 解码）。
+                 *
+                 * 仅 route.ui_action 的 owner 投递：HA 屏需要它触发
+                 * DisplayTask::bumpActivity()（否则 5s 自动回主页会在按 HA 键时
+                 * 误触发）；Foreground 屏不需要 UI 导航。
                  */
-                if (pressed[i] >= 1 && pressed[i] <= kMatrixKeyCount)
+                if (route.ui_action)
                 {
                     DisplayMessage nav_msg{};
                     nav_msg.type = DisplayMessageType::ActionInput;
                     nav_msg.action =
-                        static_cast<uint8_t>(kMatrixKeyActionBase + pressed[i]);
+                        static_cast<uint8_t>(kMatrixKeyActionBase + key);
                     postMessage(nav_msg);
                 }
             }
+
             for (uint8_t i = 0; i < rc; ++i)
             {
-                if (ha_routing)
+                const uint8_t key = released[i];
+                const MatrixRoute route = router_.onRelease(key, tick_screen);
+
+                switch (route.owner)
                 {
-                    /* HA 屏：release → binary_sensor 熄灭（2026-10-09 修复：
-                     * 原 release 只派发 HID，按过的键在 HA 中永远卡 on）。
-                     * 非 HA 屏按下、HA 屏松开的键多发一帧 off 无副作用；
-                     * HA 屏按下、离开后松开时连接已断，HA 侧自动转 unavailable */
-                    HaApiService::instance().sendKeyState(released[i], false);
+                case InputOwner::Ha:
+                    HaApiService::instance().sendKeyState(key, false);
+                    break;
+                case InputOwner::Foreground:
+                {
+                    ForegroundKeyEvent fg{};
+                    fg.key = key;
+                    fg.pressed = false;
+                    fg.timestamp_ms = millis();
+                    ForegroundKeyQueue::instance().push(fg);
+                    break;
                 }
-                KeyEventDispatcher::onKeyEdge(released[i], false);
-                resolver_.release(released[i], *keyboard_);
+                case InputOwner::Ui:
+                    /* 未发过 HID，release 不需要回写 */
+                    break;
+                case InputOwner::Keymap:
+                default:
+                    KeyEventDispatcher::onKeyEdge(key, false);
+                    resolver_.release(key, *keyboard_);
+                    break;
+                }
             }
 
             /*
