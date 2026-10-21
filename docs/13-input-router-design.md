@@ -1,6 +1,6 @@
 # 阶段 13 — InputRouter 实现方案
 
-> 状态：Step 0~3 已实施；Step 4（Simon）待做 · 2026-10-19
+> 状态：Step 0~4 已实施 · 2026-10-19
 > 关联：[12-fun-features §6.1](./12-fun-features.md) · [ARCHITECTURE §3.3](../ARCHITECTURE.md) · [11-home-assistant-native-api](./11-home-assistant-native-api.md)
 > 说明：按项目规则不主动编译；本文给出可评审、可分步落地的实现方案。
 
@@ -57,19 +57,19 @@ else if (tag == UI_SCREEN_AUDIO_SECONDARY) { ... }
 
 ### 2.2 现有行为矩阵
 
-| 屏幕 | 矩阵键 HID | FUN 预扫描 | function 页跳转 | HA 边沿 | ActionInput |
-| --- | --- | --- | --- | --- | --- |
-| MAIN | ✓ | ✓ | ✓ | — | ✓（UI 忽略） |
-| KEYMAPPED | ✓ | ✓ | ✓ | — | ✓（截胡进二级） |
-| KEYMAPPED_SECONDARY | ✓ | ✓ | ✓ | — | ✓（焦点） |
-| MUSIC / MUSIC_SECONDARY | ✓ | ✓ | ✓ | — | ✓（忽略） |
-| AUDIO | ✓ | ✓ | ✓ | — | ✓（忽略） |
-| AUDIO_SECONDARY | — | — | — | — | ✓（音效板） |
-| PC_STATUS / PC_STATUS_SECONDARY | ✓ | ✓ | ✓ | — | ✓（忽略） |
-| HA / HA_SECONDARY | — | — | — | ✓ | ✓（忽略） |
-| SETTING | ✓ | ✓ | ✓ | — | ✓（忽略） |
-| SETTING_SECONDARY | — | — | — | — | ✓（设置 UI） |
-| UNKNOWN（启动首帧） | ✓ | ✓ | ✓ | — | ✓ |
+| 屏幕                            | 矩阵键 HID | FUN 预扫描 | function 页跳转 | HA 边沿 | ActionInput     |
+| ------------------------------- | ---------- | ---------- | --------------- | ------- | --------------- |
+| MAIN                            | ✓          | ✓          | ✓               | —       | ✓（UI 忽略）    |
+| KEYMAPPED                       | ✓          | ✓          | ✓               | —       | ✓（截胡进二级） |
+| KEYMAPPED_SECONDARY             | ✓          | ✓          | ✓               | —       | ✓（焦点）       |
+| MUSIC / MUSIC_SECONDARY         | ✓          | ✓          | ✓               | —       | ✓（忽略）       |
+| AUDIO                           | ✓          | ✓          | ✓               | —       | ✓（忽略）       |
+| AUDIO_SECONDARY                 | —          | —          | —               | —       | ✓（音效板）     |
+| PC_STATUS / PC_STATUS_SECONDARY | ✓          | ✓          | ✓               | —       | ✓（忽略）       |
+| HA / HA_SECONDARY               | —          | —          | —               | ✓       | ✓（忽略）       |
+| SETTING                         | ✓          | ✓          | ✓               | —       | ✓（忽略）       |
+| SETTING_SECONDARY               | —          | —          | —               | —       | ✓（设置 UI）    |
+| UNKNOWN（启动首帧）             | ✓          | ✓          | ✓               | —       | ✓               |
 
 > 注意：`KEYMAPPED_SECONDARY` 目前 **仍发 HID**，只有 `SETTING_SECONDARY` / `AUDIO_SECONDARY` / HA 被屏蔽。这是现状，本方案不改变。
 
@@ -118,13 +118,13 @@ namespace ekeys
 
 `InputRouter::routeFor(screen)` 的唯一事实源：
 
-| 屏幕 | owner | fun_prescan | ui_action | 依据 |
-| --- | --- | --- | --- | --- |
-| HA / HA_SECONDARY | `Ha` | false | **true** | 不发 HID；保留 ActionInput 以触发 `bumpActivity()`，否则 HA 屏 5s 自动回主页 |
-| SETTING_SECONDARY | `Ui` | false | true | 矩阵键只做焦点/调值 |
-| AUDIO_SECONDARY | `Ui` | false | true | 矩阵键触发音效板 |
-| GAME（新增） | `Foreground` | false | false | 矩阵键交给 GameHost；游戏屏禁用自动回主页 |
-| 其余（含 UNKNOWN） | `Keymap` | true | true | 现有 HID 主路径 |
+| 屏幕               | owner        | fun_prescan | ui_action | 依据                                                                         |
+| ------------------ | ------------ | ----------- | --------- | ---------------------------------------------------------------------------- |
+| HA / HA_SECONDARY  | `Ha`         | false       | **true**  | 不发 HID；保留 ActionInput 以触发 `bumpActivity()`，否则 HA 屏 5s 自动回主页 |
+| SETTING_SECONDARY  | `Ui`         | false       | true      | 矩阵键只做焦点/调值                                                          |
+| AUDIO_SECONDARY    | `Ui`         | false       | true      | 矩阵键触发音效板                                                             |
+| GAME（新增）       | `Foreground` | false       | false     | 矩阵键交给 GameHost；游戏屏禁用自动回主页                                    |
+| 其余（含 UNKNOWN） | `Keymap`     | true        | true      | 现有 HID 主路径                                                              |
 
 实现：
 
@@ -210,23 +210,23 @@ MatrixRoute InputRouter::onRelease(uint8_t key, ui_screen_tag_t screen)
 
 **按下（press）**
 
-| owner | 动作 |
-| --- | --- |
-| `Keymap` | `KeyEventDispatcher::onKeyEdge(true)` → function 页跳转判断 → `KeyResolver::press()` |
-| `Ui` | 无 HID；仅后续 ActionInput |
-| `Ha` | `HaApiService::sendKeyState(key, true)` |
-| `Foreground` | `ForegroundKeyQueue::push({key, true, millis()})` |
+| owner        | 动作                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------ |
+| `Keymap`     | `KeyEventDispatcher::onKeyEdge(true)` → function 页跳转判断 → `KeyResolver::press()` |
+| `Ui`         | 无 HID；仅后续 ActionInput                                                           |
+| `Ha`         | `HaApiService::sendKeyState(key, true)`                                              |
+| `Foreground` | `ForegroundKeyQueue::push({key, true, millis()})`                                    |
 
 所有 owner 在 `route.ui_action == true` 时都投 `ActionInput`（101~111），保持现有 UI/自动回主页行为。
 
 **释放（release）**
 
-| 按下时 owner | 动作 |
-| --- | --- |
-| `Keymap` | `KeyEventDispatcher::onKeyEdge(false)` + `KeyResolver::release()` |
-| `Ui` | 无（未发过 HID） |
-| `Ha` | `HaApiService::sendKeyState(key, false)` |
-| `Foreground` | `ForegroundKeyQueue::push({key, false, millis()})` |
+| 按下时 owner | 动作                                                              |
+| ------------ | ----------------------------------------------------------------- |
+| `Keymap`     | `KeyEventDispatcher::onKeyEdge(false)` + `KeyResolver::release()` |
+| `Ui`         | 无（未发过 HID）                                                  |
+| `Ha`         | `HaApiService::sendKeyState(key, false)`                          |
+| `Foreground` | `ForegroundKeyQueue::push({key, false, millis()})`                |
 
 **不再无条件发 HID release**：对现有 13 屏，这是本方案唯一的行为变化，目的是让 release 与 press 配对；跨屏场景仍正确，见 §3.5。
 
@@ -237,6 +237,7 @@ MatrixRoute InputRouter::onRelease(uint8_t key, ui_screen_tag_t screen)
 **function 页跳转**
 
 仍属于 Keymap 通道：按下时 owner 记为 `Keymap`。即使该键最终只跳页面、没发 HID，release 仍走 `KeyEventDispatcher(false)` + `KeyResolver::release()`：
+
 - 若同一物理键是语音触发键，release 能正常 `finishCapture()`；
 - `KeyResolver::release()` 对未按下的映射发 release，主机侧无副作用；
 - 保持 press/release 配对，不引入新状态。
@@ -263,13 +264,13 @@ if (router_.updateScreen(screen) &&
 
 ### 3.5 跨屏释放示例
 
-| 场景 | 按下时 owner | 切到的屏幕 | 释放动作 | 结果 |
-| --- | --- | --- | --- | --- |
-| 主页按 3（HID `c`）→ HA → 松开 | Keymap | HA | HID release `c` | 正确释放，不误发 HA |
-| HA 按 1 → 主页 → 松开 | Ha | MAIN | HA `false` | HA 实体不卡 on |
-| 音效二级页按语音键 → 松开 | Ui | AUDIO_SECONDARY | 无 | 不会误结束 ASR |
-| 主页按语音键 → 游戏 → 松开 | Keymap | GAME | `finishCapture()` | 正常结束录音 |
-| 游戏按 1 → 主页 → 松开 | Foreground | MAIN | 前台 release（GameHost 已退出则丢弃） | 不发 HID |
+| 场景                           | 按下时 owner | 切到的屏幕      | 释放动作                              | 结果                |
+| ------------------------------ | ------------ | --------------- | ------------------------------------- | ------------------- |
+| 主页按 3（HID `c`）→ HA → 松开 | Keymap       | HA              | HID release `c`                       | 正确释放，不误发 HA |
+| HA 按 1 → 主页 → 松开          | Ha           | MAIN            | HA `false`                            | HA 实体不卡 on      |
+| 音效二级页按语音键 → 松开      | Ui           | AUDIO_SECONDARY | 无                                    | 不会误结束 ASR      |
+| 主页按语音键 → 游戏 → 松开     | Keymap       | GAME            | `finishCapture()`                     | 正常结束录音        |
+| 游戏按 1 → 主页 → 松开         | Foreground   | MAIN            | 前台 release（GameHost 已退出则丢弃） | 不发 HID            |
 
 ### 3.6 Foreground 事件队列
 
@@ -347,14 +348,14 @@ public:
 
 ### 4.1 新文件
 
-| 文件 | 作用 |
-| --- | --- |
-| `src/ui/ui_screen_tag.h` | 从 `ui_KeyMapped.h` 拆出 `ui_screen_tag_t`，去掉 LVGL 依赖，便于测试 |
-| `src/input/InputRoute.h` | `InputOwner` / `MatrixRoute` / `kInputKeyCount` |
-| `src/input/InputRouter.h/.cpp` | 路由表 + 按下 owner 记录 |
-| `src/input/ForegroundKeyQueue.h/.cpp` | 前台按键 SPSC 队列（阶段 3） |
-| `src/game/GameHost.h/.cpp` | 前台宿主接口 + 空实现（阶段 3） |
-| `src/ui/game/ui_GameScreen.{h,c}` | 程序化创建的游戏屏（阶段 3，不走 SquareLine） |
+| 文件                                  | 作用                                                                 |
+| ------------------------------------- | -------------------------------------------------------------------- |
+| `src/ui/ui_screen_tag.h`              | 从 `ui_KeyMapped.h` 拆出 `ui_screen_tag_t`，去掉 LVGL 依赖，便于测试 |
+| `src/input/InputRoute.h`              | `InputOwner` / `MatrixRoute` / `kInputKeyCount`                      |
+| `src/input/InputRouter.h/.cpp`        | 路由表 + 按下 owner 记录                                             |
+| `src/input/ForegroundKeyQueue.h/.cpp` | 前台按键 SPSC 队列（阶段 3）                                         |
+| `src/game/GameHost.h/.cpp`            | 前台宿主接口 + 空实现（阶段 3）                                      |
+| `src/ui/game/ui_GameScreen.{h,c}`     | 程序化创建的游戏屏（阶段 3，不走 SquareLine）                        |
 
 > `ui_screen_tag.h` 的拆分是可选但推荐：`InputRouter` 只依赖一个 enum，不再拖入 `lvgl.h`，host 单测更容易。  
 > `ui_KeyMapped.h` 保留 `#include "ui_screen_tag.h"`，删除原 enum 定义。
@@ -502,13 +503,13 @@ for (uint8_t i = 0; i < rc; ++i)
 
 ## 5. 分步实施
 
-| 步骤 | 内容 | 影响 | 验收 |
-| --- | --- | --- | --- |
-| 0 | 拆 `ui_screen_tag.h`；给现有 13 屏跑一遍手工基线 | 无行为变化 | 编译通过；13 屏导航/按键与改动前一致 |
-| 1 | 新增 `InputRoute.h` / `InputRouter.{h,cpp}`，只加不调用 | 无 | host 表单测通过（或 on-device 表驱动自检） |
-| 2 | MainTask 接入 router，替换 `ha_routing`/`suppress_hid` | **唯一行为变化**：release 按按下时 owner | 6 类回归测试全过（见 §6） |
-| 3 | DisplayTask 接入 `isForeground`；加 `ForegroundKeyQueue` + `GameHost` 空实现 | 新屏可达，无 HID | 进出 GAME 无卡键、无 WDT |
-| 4 | 在 GameHost 上实现 Simon（第一个游戏） | 新功能 | 可玩、退出恢复 HID |
+| 步骤 | 内容                                                                         | 影响                                     | 验收                                       |
+| ---- | ---------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------ |
+| 0    | 拆 `ui_screen_tag.h`；给现有 13 屏跑一遍手工基线                             | 无行为变化                               | 编译通过；13 屏导航/按键与改动前一致       |
+| 1    | 新增 `InputRoute.h` / `InputRouter.{h,cpp}`，只加不调用                      | 无                                       | host 表单测通过（或 on-device 表驱动自检） |
+| 2    | MainTask 接入 router，替换 `ha_routing`/`suppress_hid`                       | **唯一行为变化**：release 按按下时 owner | 6 类回归测试全过（见 §6）                  |
+| 3    | DisplayTask 接入 `isForeground`；加 `ForegroundKeyQueue` + `GameHost` 空实现 | 新屏可达，无 HID                         | 进出 GAME 无卡键、无 WDT                   |
+| 4    | 在 GameHost 上实现 Simon（第一个游戏）                                       | 新功能                                   | 可玩、退出恢复 HID                         |
 
 建议每个步骤单独提交，步骤 2 出问题可直接 revert，不影响 0/1。
 
@@ -564,20 +565,20 @@ void test_release_uses_press_owner()
 
 ### 6.2 手工回归矩阵
 
-| 用例 | 步骤 | 预期 |
-| --- | --- | --- |
-| 普通打字 | 主页按 1~11 | HID 字符正常，无延迟变化 |
-| FUN 组合 | 按住 FUN1/FUN2 + 其它键 | 组合层生效，FUN 键本身无 HID |
-| function 页跳转 | 配置 `KEY_FUNCTION_PAGE_*` 后按键 | 跳二级页，不发 HID |
-| KEYMAPPED | 主页旋钮进键映射屏，按 1~11 | 跳二级并聚焦，同时 HID 仍输出（现状） |
-| SETTING_SECONDARY | 设置二级页按 7/11 | 焦点移动，无 HID |
-| AUDIO_SECONDARY | 音效二级页按 1~11 | 播放对应音效，无 HID |
-| HA 屏 | HA 屏按 1~11 | HA binary_sensor 翻转，无 HID；5s 内按键不自动回主页 |
-| 跨屏释放 | 主页按住 3 → 旋钮到 HA → 松开 | HID `c` 释放，HA 无虚假边沿 |
-| HA 跨屏释放 | HA 按住 1 → 回主页 → 松开 | HA 实体转 off，不卡 on |
-| 语音跨屏 | 主页按语音键 → 进游戏 → 松开 | ASR 正常结束，不误触发 |
-| 游戏进出 | 功能键进 GAME，按 1~11，双击旋钮退出 | 无 HID；退出后打字正常；无卡键 |
-| 自动回主页 | 一级页 5s 无操作 | 行为与改动前一致（HA 屏按键可续命） |
+| 用例              | 步骤                                 | 预期                                                 |
+| ----------------- | ------------------------------------ | ---------------------------------------------------- |
+| 普通打字          | 主页按 1~11                          | HID 字符正常，无延迟变化                             |
+| FUN 组合          | 按住 FUN1/FUN2 + 其它键              | 组合层生效，FUN 键本身无 HID                         |
+| function 页跳转   | 配置 `KEY_FUNCTION_PAGE_*` 后按键    | 跳二级页，不发 HID                                   |
+| KEYMAPPED         | 主页旋钮进键映射屏，按 1~11          | 跳二级并聚焦，同时 HID 仍输出（现状）                |
+| SETTING_SECONDARY | 设置二级页按 7/11                    | 焦点移动，无 HID                                     |
+| AUDIO_SECONDARY   | 音效二级页按 1~11                    | 播放对应音效，无 HID                                 |
+| HA 屏             | HA 屏按 1~11                         | HA binary_sensor 翻转，无 HID；5s 内按键不自动回主页 |
+| 跨屏释放          | 主页按住 3 → 旋钮到 HA → 松开        | HID `c` 释放，HA 无虚假边沿                          |
+| HA 跨屏释放       | HA 按住 1 → 回主页 → 松开            | HA 实体转 off，不卡 on                               |
+| 语音跨屏          | 主页按语音键 → 进游戏 → 松开         | ASR 正常结束，不误触发                               |
+| 游戏进出          | 功能键进 GAME，按 1~11，双击旋钮退出 | 无 HID；退出后打字正常；无卡键                       |
+| 自动回主页        | 一级页 5s 无操作                     | 行为与改动前一致（HA 屏按键可续命）                  |
 
 ### 6.3 资源与稳定性
 
@@ -590,16 +591,16 @@ void test_release_uses_press_owner()
 
 ## 7. 风险与回滚
 
-| 风险 | 说明 | 对策 |
-| --- | --- | --- |
-| `ui_screen_tag.h` 被 SquareLine 重导出覆盖 | 该文件是从生成头拆出的 | 文件头注释 `// CUSTOM: do not regenerate`；`ui_KeyMapped.h` 只保留 include |
-| release 语义变化 | 从"总是 HID release"改为"按按下时 owner" | 步骤 2 单独提交；用 §6.2 跨屏用例回归；必要时 revert |
-| HA release 不再走 `KeyEventDispatcher` | 按下在 HA 的键不会误结束 ASR | 这是修正；若发现依赖旧行为，改为 release 时额外调 `KeyEventDispatcher(false)` |
-| KEYMAPPED_SECONDARY 仍发 HID | 现状不是本方案引入 | 本文不改；如需修，另开任务并同步 `.trae/rules` |
-| Foreground 队列丢事件 | 容量 32，极端连按可能满 | 丢弃新事件 + `dropped_` 计数 + 节流日志；后续可扩到 64 |
-| `InputRouter` 依赖 UI enum | input → ui 的反向依赖 | 拆 `ui_screen_tag.h` 后只依赖 enum，不依赖 LVGL |
-| 新增屏忘记配路由 | default 走 Keymap，可能误发 HID | `ui_screen_tag.h` 注释 + code review checklist + 单测覆盖所有枚举值 |
-| 编译风险 | 按项目规则不主动编译 | 实施时由你明确触发 `pio run`，再联调 |
+| 风险                                       | 说明                                     | 对策                                                                          |
+| ------------------------------------------ | ---------------------------------------- | ----------------------------------------------------------------------------- |
+| `ui_screen_tag.h` 被 SquareLine 重导出覆盖 | 该文件是从生成头拆出的                   | 文件头注释 `// CUSTOM: do not regenerate`；`ui_KeyMapped.h` 只保留 include    |
+| release 语义变化                           | 从"总是 HID release"改为"按按下时 owner" | 步骤 2 单独提交；用 §6.2 跨屏用例回归；必要时 revert                          |
+| HA release 不再走 `KeyEventDispatcher`     | 按下在 HA 的键不会误结束 ASR             | 这是修正；若发现依赖旧行为，改为 release 时额外调 `KeyEventDispatcher(false)` |
+| KEYMAPPED_SECONDARY 仍发 HID               | 现状不是本方案引入                       | 本文不改；如需修，另开任务并同步 `.trae/rules`                                |
+| Foreground 队列丢事件                      | 容量 32，极端连按可能满                  | 丢弃新事件 + `dropped_` 计数 + 节流日志；后续可扩到 64                        |
+| `InputRouter` 依赖 UI enum                 | input → ui 的反向依赖                    | 拆 `ui_screen_tag.h` 后只依赖 enum，不依赖 LVGL                               |
+| 新增屏忘记配路由                           | default 走 Keymap，可能误发 HID          | `ui_screen_tag.h` 注释 + code review checklist + 单测覆盖所有枚举值           |
+| 编译风险                                   | 按项目规则不主动编译                     | 实施时由你明确触发 `pio run`，再联调                                          |
 
 **回滚**：
 
@@ -621,22 +622,23 @@ void test_release_uses_press_owner()
 
 ## 9. 实施记录（2026-10-19）
 
-已完成 Step 0~3：
+已完成 Step 0~4：
 
-| 步骤 | 实际改动 |
-| --- | --- |
-| 0 | 新增 `src/ui/ui_screen_tag.h`；`ui_KeyMapped.h` 改为 include；追加 `UI_SCREEN_GAME` |
-| 1 | 新增 `src/input/InputRoute.h`、`InputRouter.h/.cpp` |
-| 2 | `MainTask.h/.cpp` 接入 `InputRouter`；删除 `ha_routing` / `suppress_hid`；release 按按下时 owner |
-| 3 | 新增 `ForegroundKeyQueue`、`GameHost`、`ui_GameScreen`；DisplayTask 排空队列、`isForeground` 禁用自动回主页、`navigateNow` 处理 GAME；功能键 `KEY_FUNCTION_PAGE_GAME` |
+| 步骤 | 实际改动                                                                                                                                                              |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0    | 新增 `src/ui/ui_screen_tag.h`；`ui_KeyMapped.h` 改为 include；追加 `UI_SCREEN_GAME`                                                                                   |
+| 1    | 新增 `src/input/InputRoute.h`、`InputRouter.h/.cpp`                                                                                                                   |
+| 2    | `MainTask.h/.cpp` 接入 `InputRouter`；删除 `ha_routing` / `suppress_hid`；release 按按下时 owner                                                                      |
+| 3    | 新增 `ForegroundKeyQueue`、`GameHost`、`ui_GameScreen`；DisplayTask 排空队列、`isForeground` 禁用自动回主页、`navigateNow` 处理 GAME；功能键 `KEY_FUNCTION_PAGE_GAME` |
+| 4    | `GameHost` 实现 Simon Says；`ui_GameScreen` 加底部 11 格指示条（见 §9.2）                                                                                             |
 
 未做：
 
-- Step 4：Simon 游戏逻辑（当前 GameHost 只显示最近按键，作为路由验证占位）；
 - host 单测文件：设计见 §6.1，尚未加入 `test/`；
-- `pio run` 编译与上板联调：按项目规则未主动编译，等确认后执行。
+- `pio run` 编译与上板联调：按项目规则未主动编译，等确认后执行；
+- Simon 音效 / RGB 联动 / 最高分持久化（依赖 SoundService、玩法存储，见 docs/12）。
 
-### 9.1 试玩入口（占位 GameHost）
+### 9.1 试玩入口
 
 当前 App/Web 的功能键下拉还没加 `KEY_FUNCTION_PAGE_GAME`，可直接改 `data/keymapN.ini`：
 
@@ -645,13 +647,30 @@ void test_release_uses_press_owner()
 function_key=KEY_FUNCTION_PAGE_GAME
 ```
 
-重新 uploadfs / 重启后按该键进入 GAME 屏；矩阵键会显示 `KEY n DOWN/UP`，双击旋钮退出。  
+重新 uploadfs / 重启后按该键进入 GAME 屏；双击旋钮退出。  
 验证重点：进入游戏后按键不再发 HID；退出后普通打字、FUN、HA、设置二级页均正常。
+
+### 9.2 Simon Says（Step 4）
+
+规则与节奏（`src/game/GameHost.h` 常量）：
+
+- 任意键开局；每轮序列随机追加 1 键（1~11，硬件 RNG），上限 32 轮通关；
+- 回放：单步点亮 420ms + 间隔 160ms，回放中按键忽略；
+- 跟按：总超时 5s 判负；按错判负；按对即时点亮对应格，回合边界统一熄灭；
+- 结算：成绩 = 已完成轮数，结算屏锁定 900ms 防误触，任意键重开；best 为本次开机内最好成绩（RAM，不持久化）。
+
+实现约束：
+
+- 全部计时在 `tick(dt)` 内推进（无阻塞等待），事件只来自 `ForegroundKeyQueue`（只消费 press 边沿）；
+- 屏显：中央状态文本（montserrat_24）+ 底部 11 格指示条（`ui_GameScreen_set_cell`，琥珀点亮/暗灰熄灭）；
+- 随机数用 Arduino `random()`（ESP32 核心底层走 `esp_random` 硬件 RNG，无需播种）；
+- 音效 / RGB 联动 / 最高分持久化留待 SoundService 与玩法存储阶段（docs/12）。
 
 ---
 
 ## 变更记录
 
-| 日期 | 变更 |
-| --- | --- |
+| 日期       | 变更                                                                                     |
+| ---------- | ---------------------------------------------------------------------------------------- |
 | 2026-10-19 | 初稿：现状矩阵、四 owner 路由、按下 owner 记录、Foreground SPSC 队列、四步实施与回归矩阵 |
+| 2026-10-19 | Step 4 落地：GameHost 实现 Simon Says，ui_GameScreen 加 11 格指示条                      |
