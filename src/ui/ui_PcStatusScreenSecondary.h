@@ -1,6 +1,8 @@
 #ifndef UI_PCSTATUSSCREENSECONDARY_H
 #define UI_PCSTATUSSCREENSECONDARY_H
 
+#include "ui_types.h"
+
 #ifdef __cplusplus
 extern "C"
 {

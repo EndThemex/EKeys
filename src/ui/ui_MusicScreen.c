@@ -3,7 +3,11 @@
 // LVGL version: 8.3.11
 // Project name: SquareLine_Project
 
-#include "ui.h"
+#include "ui_MusicScreen.h"
+#include "ui_helpers.h"
+#include "ui_AudioScreen.h"
+#include "ui_KeyMapped.h"
+#include "ui_MusicScreenSecondary.h"
 
 lv_obj_t *ui_MusicScreen = NULL;
 lv_obj_t *ui_ButtonLeft2 = NULL;

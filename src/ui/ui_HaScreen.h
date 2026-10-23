@@ -6,6 +6,8 @@
 #ifndef UI_HASCREEN_H
 #define UI_HASCREEN_H
 
+#include "ui_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

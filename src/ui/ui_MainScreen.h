@@ -6,6 +6,8 @@
 #ifndef UI_MAINSCREEN_H
 #define UI_MAINSCREEN_H
 
+#include "ui_types.h"
+
 #ifdef __cplusplus
 extern "C"
 {

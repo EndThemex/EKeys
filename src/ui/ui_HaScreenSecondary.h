@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#include "ui_types.h"
+
 #ifdef __cplusplus
 extern "C"
 {

@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-#include "ui.h"
+#include "ui_types.h"
 
 #define _UI_TEMPORARY_STRING_BUFFER_SIZE 32
 #define _UI_BAR_PROPERTY_VALUE 0

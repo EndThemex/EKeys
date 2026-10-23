@@ -3,8 +3,8 @@
 // LVGL version: 8.3.11
 // Project name: SquareLine_Project
 
-#include "ui.h"
+#include "ui_comp_hook.h"
 
-void ui_comp_Button5_create_hook(lv_obj_t * comp)
+void ui_comp_Button5_create_hook(lv_obj_t *comp)
 {
 }

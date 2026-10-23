@@ -6,7 +6,7 @@
 #ifndef _UI_COMP__H
 #define _UI_COMP__H
 
-#include "ui.h"
+#include "ui_types.h"
 
 #ifdef __cplusplus
 extern "C" {

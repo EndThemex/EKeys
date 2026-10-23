@@ -6,6 +6,8 @@
 #ifndef UI_PCSTATUSSCREEN_H
 #define UI_PCSTATUSSCREEN_H
 
+#include "ui_types.h"
+
 #ifdef __cplusplus
 extern "C"
 {

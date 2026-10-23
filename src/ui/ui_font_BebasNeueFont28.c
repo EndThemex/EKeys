@@ -4,7 +4,7 @@
  * Opts: --bpp 1 --size 28 --font F:/New_Project/FunModularKeyboard/test/LVGL/assets/BebasNeue-Regular.ttf -o F:/New_Project/FunModularKeyboard/test/LVGL/assets\ui_font_BebasNeueFont28.c --format lvgl -r 0x20-0x7f --no-compress --no-prefilter
  ******************************************************************************/
 
-#include "ui.h"
+#include "ui_types.h"
 
 #ifndef UI_FONT_BEBASNEUEFONT28
 #define UI_FONT_BEBASNEUEFONT28 1

@@ -1,5 +1,8 @@
-#include "ui.h"
 #include "ui_KeyMapped.h"
+#include "ui_helpers.h"
+#include "ui_KeyMappedSecondary.h"
+#include "ui_MainScreen.h"
+#include "ui_MusicScreen.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>

@@ -1,5 +1,6 @@
-#include "ui.h"
 #include "ui_KeyMappedSecondary.h"
+#include "ui_helpers.h"
+#include "ui_KeyMapped.h"
 #include "ui_settings_types.h" /* UI_MATRIX_KEY_ACTION_BASE */
 #include <stdint.h>
 #include <stddef.h>

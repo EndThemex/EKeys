@@ -6,6 +6,8 @@
 #ifndef UI_SETTINGSCREEN_H
 #define UI_SETTINGSCREEN_H
 
+#include "ui_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

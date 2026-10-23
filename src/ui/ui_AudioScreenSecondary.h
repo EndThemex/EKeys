@@ -1,9 +1,7 @@
 #ifndef UI_AUDIOSCREENSECONDARY_H
 #define UI_AUDIOSCREENSECONDARY_H
 
-#include <stdint.h>
-
-#include "lvgl.h"
+#include "ui_types.h"
 
 #ifdef __cplusplus
 extern "C" {

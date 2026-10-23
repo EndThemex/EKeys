@@ -3,8 +3,13 @@
 // LVGL version: 8.3.11
 // Project name: SquareLine_Project
 
-#include "ui.h"
+#include "ui_MainScreen.h"
+#include "ui_helpers.h"
 #include "ui_FlipClock.h"
+#include "ui_KeyMapped.h"
+#include "ui_KeyMappedSecondary.h" /* ui_KeyMappedSecondary_bind_main_screen_summary */
+#include "ui_SettingScreen.h"
+#include "ui_StatusBar.h" /* status_bar_set_working_mode */
 #include <stdint.h>
 
 lv_obj_t *ui_MainScreen = NULL;

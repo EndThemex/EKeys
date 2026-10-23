@@ -6,8 +6,11 @@
  */
 
 #include "ui_AudioScreen.h"
-
-#include "ui.h"
+#include "ui_helpers.h"
+#include "ui_AudioScreenSecondary.h"
+#include "ui_MainScreen.h"
+#include "ui_MusicScreen.h"
+#include "ui_PcStatusScreen.h"
 
 lv_obj_t *ui_AudioScreen = NULL;
 lv_obj_t *ui_AudioScreenButtonLeft = NULL;

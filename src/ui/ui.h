@@ -3,6 +3,10 @@
 // LVGL version: 8.3.11
 // Project name: SquareLine_Project
 
+// 注意：本文件仅是各屏幕/组件头的聚合，供需要访问全部屏幕的文件使用。
+// 普通源文件请直接 include 自己需要的 ui_<屏>.h，不要 include 本文件，
+// 以免改动单个屏头文件时全量重编。公共基础定义见 ui_types.h。
+
 #ifndef _SQUARELINE_PROJECT_UI_H
 #define _SQUARELINE_PROJECT_UI_H
 
@@ -10,18 +14,7 @@
 extern "C" {
 #endif
 
-#if defined __has_include
-#if __has_include("lvgl.h")
-#include "lvgl.h"
-#elif __has_include("lvgl/lvgl.h")
-#include "lvgl/lvgl.h"
-#else
-#include "lvgl.h"
-#endif
-#else
-#include "lvgl.h"
-#endif
-
+#include "ui_types.h"
 #include "ui_helpers.h"
 #include "ui_comp.h"
 #include "ui_comp_hook.h"
@@ -42,29 +35,6 @@ extern "C" {
 #include "ui_HaScreenSecondary.h"
 #include "ui_SettingScreen.h"
 #include "ui_SettingScreenSecondary.h"
-
-///////////////////// VARIABLES ////////////////////
-
-
-// EVENTS
-
-extern lv_obj_t * ui____initial_actions0;
-
-// FONTS
-LV_FONT_DECLARE(ui_font_BebasNeueFont48);
-LV_FONT_DECLARE(ui_font_BebasNeueFont24);
-LV_FONT_DECLARE(ui_font_BebasNeueFont16);
-LV_FONT_DECLARE(ui_font_BebasNeueFont28);
-LV_FONT_DECLARE(ui_font_BebasNeueFont86);
-LV_FONT_DECLARE(ui_font_BebasNeueFont36);
-LV_FONT_DECLARE(ui_font_BebasNeueFont14);
-LV_FONT_DECLARE(ui_font_FontCKJGT16);
-LV_FONT_DECLARE(ui_font_FontCKJGT24);
-LV_FONT_DECLARE(ui_font_FontCKJGT28);
-
-// UI INIT
-void ui_init(void);
-void ui_destroy(void);
 
 #ifdef __cplusplus
 } /*extern "C"*/

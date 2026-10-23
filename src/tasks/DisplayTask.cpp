@@ -32,7 +32,7 @@
 #include "rgb/ClickHighlight.h"
 #include "rgb/RGBLightControl.h"
 #include "protocol/SerialProtocol.h"
-#include "ui/ui.h"
+#include "ui/ui_types.h"
 #include "ui/ui_AudioScreen.h"
 #include "ui/ui_FlipClock.h"
 #include "ui/ui_HaScreenSecondary.h"

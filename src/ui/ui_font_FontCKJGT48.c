@@ -4,7 +4,7 @@
  * Opts: --bpp 1 --size 48 --font F:/New_Project/FunModularKeyboard/test/LVGL/assets/创客贴金刚体.ttf -o F:/New_Project/FunModularKeyboard/test/LVGL/assets\ui_font_FontCKJGT48.c --format lvgl -r 0x20-0x7f --no-compress --no-prefilter
  ******************************************************************************/
 
-#include "ui.h"
+#include "ui_types.h"
 
 #ifndef UI_FONT_FONTCKJGT48
 #define UI_FONT_FONTCKJGT48 1

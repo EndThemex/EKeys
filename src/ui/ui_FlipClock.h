@@ -10,7 +10,7 @@ extern "C"
 {
 #endif
 
-#include "lvgl.h"
+#include "ui_types.h"
 
   /**
    * @brief 在 parent 上创建翻页时钟（绝对布局，占满 428x142 屏幕区域）

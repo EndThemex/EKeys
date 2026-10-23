@@ -1,5 +1,5 @@
-#include "ui.h"
 #include "ui_StatusBar.h"
+#include "ui_MainScreen.h"
 
 // 状态栏对象
 static lv_obj_t *status_bar = NULL;

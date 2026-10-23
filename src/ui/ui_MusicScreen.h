@@ -6,6 +6,8 @@
 #ifndef UI_MUSICSCREEN_H
 #define UI_MUSICSCREEN_H
 
+#include "ui_types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

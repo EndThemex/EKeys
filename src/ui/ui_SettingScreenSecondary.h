@@ -7,6 +7,7 @@
 #define UI_SETTINGSCREENSECONDARY_H
 
 #include "ui_settings_types.h"
+#include "ui_types.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -3,7 +3,11 @@
 // LVGL version: 8.3.11
 // Project name: SquareLine_Project
 
-#include "ui.h"
+#include "ui_SettingScreen.h"
+#include "ui_helpers.h"
+#include "ui_HaScreen.h"
+#include "ui_MainScreen.h"
+#include "ui_SettingScreenSecondary.h"
 #include <stdint.h>
 
 lv_obj_t *ui_SettingScreen = NULL;

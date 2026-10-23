@@ -6,7 +6,7 @@
 #ifndef _UI_COMP_BUTTON5_H
 #define _UI_COMP_BUTTON5_H
 
-#include "ui.h"
+#include "ui_types.h"
 
 #ifdef __cplusplus
 extern "C" {

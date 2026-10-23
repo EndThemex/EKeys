@@ -11,11 +11,12 @@
  */
 
 #include "ui_AudioScreenSecondary.h"
+#include "ui_helpers.h"
+#include "ui_AudioScreen.h"
+#include "ui_KeyMappedSecondary.h"
 
 #include <stdbool.h>
 #include <stdio.h>
-
-#include "ui.h"
 
 lv_obj_t *ui_AudioScreenSecondary = NULL;
 
@@ -45,11 +46,19 @@ static lv_obj_t *s_button_exit = NULL;
 
 static const lv_coord_t kPadRects[11][2] = {
     // 第 0 行：键 1/2/3（左对齐）
-    {4, 4}, {92, 4}, {180, 4},
+    {4, 4},
+    {92, 4},
+    {180, 4},
     // 第 1 行：键 4/5/6/7（满 4 列）
-    {4, 46}, {92, 46}, {180, 46}, {268, 46},
+    {4, 46},
+    {92, 46},
+    {180, 46},
+    {268, 46},
     // 第 2 行：键 8/9/10/11（满 4 列）
-    {4, 88}, {92, 88}, {180, 88}, {268, 88},
+    {4, 88},
+    {92, 88},
+    {180, 88},
+    {268, 88},
 };
 
 /* 播放高亮色（与 App 品牌蓝一致的观感） */
@@ -106,11 +115,13 @@ void ui_event_AudioScreenSecondary(lv_event_t *e)
     lv_event_code_t event_code = lv_event_get_code(e);
     uintptr_t key = (uintptr_t)lv_event_get_param(e);
 
-    if (event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_ENTER) {
+    if (event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_ENTER)
+    {
         /* 旋钮单击：停止当前播放 */
         ui_audio_pad_stop();
     }
-    else if (event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_ESC) {
+    else if (event_code == LV_EVENT_KEY && key == (uintptr_t)LV_KEY_ESC)
+    {
         /* 旋钮双击：回一级页 AudioScreen */
         ui_set_active_screen_tag(UI_SCREEN_AUDIO);
         _ui_screen_change(&ui_AudioScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_AudioScreen_screen_init);
@@ -121,28 +132,32 @@ void ui_event_AudioScreenSecondary(lv_event_t *e)
 /* 隐形按钮转发（与其他二级页一致） */
 static void ui_event_ButtonLeftAudioSecondary(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         pad_forward_key(LV_KEY_LEFT);
     }
 }
 
 static void ui_event_ButtonRightAudioSecondary(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         pad_forward_key(LV_KEY_RIGHT);
     }
 }
 
 static void ui_event_ButtonEnterAudioSecondary(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         pad_forward_key(LV_KEY_ENTER);
     }
 }
 
 static void ui_event_ButtonExitAudioSecondary(lv_event_t *e)
 {
-    if (lv_event_get_code(e) == LV_EVENT_CLICKED) {
+    if (lv_event_get_code(e) == LV_EVENT_CLICKED)
+    {
         pad_forward_key(LV_KEY_ESC);
     }
 }
@@ -216,7 +231,8 @@ void ui_AudioScreenSecondary_screen_init(void)
 
     static lv_style_t key_style;
     static bool key_style_ready = false;
-    if (!key_style_ready) {
+    if (!key_style_ready)
+    {
         lv_style_init(&key_style);
         lv_style_set_text_font(&key_style, &ui_font_BebasNeueFont14);
         lv_style_set_text_color(&key_style, lv_color_hex(0xF5F8FF));
@@ -224,7 +240,8 @@ void ui_AudioScreenSecondary_screen_init(void)
     }
     static lv_style_t file_style;
     static bool file_style_ready = false;
-    if (!file_style_ready) {
+    if (!file_style_ready)
+    {
         lv_style_init(&file_style);
         lv_style_set_text_font(&file_style, &ui_font_FontCKJGT16);
         lv_style_set_text_color(&file_style, lv_color_hex(0x9AA7B6));
@@ -232,7 +249,8 @@ void ui_AudioScreenSecondary_screen_init(void)
     }
 
     char buf[16];
-    for (uint8_t i = 0; i < 11; ++i) {
+    for (uint8_t i = 0; i < 11; ++i)
+    {
         s_pad_cells[i] = lv_obj_create(s_keys_card);
         pad_cell_layout(i, s_pad_cells[i]);
 
@@ -300,10 +318,12 @@ void ui_AudioScreenSecondary_screen_init(void)
 
 void ui_AudioScreenSecondary_screen_destroy(void)
 {
-    if (ui_AudioScreenSecondary) lv_obj_del(ui_AudioScreenSecondary);
+    if (ui_AudioScreenSecondary)
+        lv_obj_del(ui_AudioScreenSecondary);
 
     ui_AudioScreenSecondary = NULL;
-    for (uint8_t i = 0; i < 11; ++i) {
+    for (uint8_t i = 0; i < 11; ++i)
+    {
         s_pad_cells[i] = NULL;
         s_pad_key_labels[i] = NULL;
         s_pad_file_labels[i] = NULL;
@@ -321,11 +341,14 @@ void ui_AudioScreenSecondary_screen_destroy(void)
 
 void ui_AudioScreenSecondary_set_pads(const char files[11][25])
 {
-    if (ui_AudioScreenSecondary == NULL) {
+    if (ui_AudioScreenSecondary == NULL)
+    {
         return;
     }
-    for (uint8_t i = 0; i < 11; ++i) {
-        if (s_pad_file_labels[i] == NULL) {
+    for (uint8_t i = 0; i < 11; ++i)
+    {
+        if (s_pad_file_labels[i] == NULL)
+        {
             continue;
         }
         /* 未绑定显示 "--"，已绑定显示文件名（超长省略号截断） */
@@ -336,18 +359,24 @@ void ui_AudioScreenSecondary_set_pads(const char files[11][25])
 
 void ui_AudioScreenSecondary_set_playing(uint8_t key)
 {
-    if (ui_AudioScreenSecondary == NULL) {
+    if (ui_AudioScreenSecondary == NULL)
+    {
         return;
     }
-    for (uint8_t i = 0; i < 11; ++i) {
-        if (s_pad_cells[i] == NULL) {
+    for (uint8_t i = 0; i < 11; ++i)
+    {
+        if (s_pad_cells[i] == NULL)
+        {
             continue;
         }
-        if (key == i + 1) {
+        if (key == i + 1)
+        {
             lv_obj_set_style_border_width(s_pad_cells[i], 2, 0);
             lv_obj_set_style_border_color(s_pad_cells[i],
                                           lv_color_hex(PAD_HL_COLOR), 0);
-        } else {
+        }
+        else
+        {
             lv_obj_set_style_border_width(s_pad_cells[i], 1, 0);
             lv_obj_set_style_border_color(s_pad_cells[i],
                                           lv_color_hex(PAD_BORDER_COLOR), 0);
@@ -355,14 +384,18 @@ void ui_AudioScreenSecondary_set_playing(uint8_t key)
     }
 
     /* 信息卡底部：正在播放的键位（K01~K11），无播放显示 "--" */
-    if (s_playing_label != NULL) {
-        if (key >= 1 && key <= 11) {
+    if (s_playing_label != NULL)
+    {
+        if (key >= 1 && key <= 11)
+        {
             char buf[8];
             snprintf(buf, sizeof(buf), "K%02u", (unsigned)key);
             lv_label_set_text(s_playing_label, buf);
             lv_obj_set_style_text_color(s_playing_label,
                                         lv_color_hex(PAD_HL_COLOR), 0);
-        } else {
+        }
+        else
+        {
             lv_label_set_text(s_playing_label, "--");
             lv_obj_set_style_text_color(s_playing_label,
                                         lv_color_hex(0x8FA0B5), 0);

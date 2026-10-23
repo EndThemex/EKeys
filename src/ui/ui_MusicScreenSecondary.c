@@ -1,4 +1,6 @@
-#include "ui.h"
+#include "ui_MusicScreenSecondary.h"
+#include "ui_helpers.h"
+#include "ui_MusicScreen.h" /* ui_MusicScreen_set_visual_host */
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>

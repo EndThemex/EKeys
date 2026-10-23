@@ -3,6 +3,8 @@
 #ifndef UI_STATUSBAR_H
 #define UI_STATUSBAR_H
 
+#include "ui_types.h"
+
 #ifdef __cplusplus
 extern "C"
 {

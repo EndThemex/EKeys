@@ -8,7 +8,6 @@
  */
 #include "ui_lang.h"
 
-#include "ui.h"
 #include "ui_KeyMapped.h"
 #include "ui_MusicScreen.h"
 #include "ui_AudioScreen.h"

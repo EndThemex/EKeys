@@ -97,7 +97,7 @@
 鬃棕踪宗综总纵邹走奏揍租足卒族祖诅阻组钻纂嘴醉最罪尊遵昨左佐柞做作坐座 --no-compress --no-prefilter
  ******************************************************************************/
 
-#include "ui.h"
+#include "ui_types.h"
 
 #ifndef UI_FONT_FONTCKJGT16
 #define UI_FONT_FONTCKJGT16 1
