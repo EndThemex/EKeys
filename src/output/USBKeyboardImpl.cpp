@@ -168,7 +168,7 @@ namespace ekeys
             return;
         }
         /*
-         * 逐字符发送 + 字符间 20ms 间隔：print() 会让报告背靠背发出，
+         * 逐字符发送 + 字符间 10ms 间隔：print() 会让报告背靠背发出，
          * 主机来不及处理会吞键（kTypeCharIntervalMs，阻塞式可接受）。
          */
         const size_t len = text.length();

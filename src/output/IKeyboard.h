@@ -22,9 +22,9 @@ namespace ekeys
 
     /*
      * 文本通道逐字符间隔（ms）：type() 每发一个字符后延时，
-     * 避免报告背靠背发送被主机吞键（阻塞式，128 字符最长约 2.5s）。
+     * 避免报告背靠背发送被主机吞键（阻塞式，128 字符最长约 1.3s）。
      */
-    inline constexpr uint8_t kTypeCharIntervalMs = 20;
+    inline constexpr uint8_t kTypeCharIntervalMs = 10;
 
     class IKeyboard
     {

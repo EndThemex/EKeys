@@ -239,7 +239,7 @@ namespace ekeys
             return;
         }
         /*
-         * 逐字符发送 + 字符间 20ms 间隔（与 USBKeyboardImpl::type 同策略），
+         * 逐字符发送 + 字符间 10ms 间隔（与 USBKeyboardImpl::type 同策略），
          * 避免 BLE 报告背靠背发送被主机吞键（kTypeCharIntervalMs，阻塞式）。
          */
         const size_t len = text.length();
