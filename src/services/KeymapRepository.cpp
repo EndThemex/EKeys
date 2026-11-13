@@ -110,9 +110,12 @@ namespace ekeys
                  * [keyN] 段/键缺失 = 该键从未配置过（用户显式清空时
                  * saveKeys 仍会写入空串键），回落默认 a~k，避免
                  * "只保存过部分键"的 ini 让其余键加载后静默失效。
+                 * 默认值走 normal_key 通道（与 keymapFillDefaults 一致），
+                 * 不能写 function_key：那是内置功能串通道，App 0x05 会把它
+                 * 归类为「内置功能」而非「键盘键」。
                  */
                 m = KeyMapping{};
-                m.function_key = kDefaultKeyMapping[i];
+                m.normal_key[0] = kDefaultKeyMapping[i];
                 m.valid = true;
                 ++valid_cnt;
                 continue;

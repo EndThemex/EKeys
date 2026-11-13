@@ -87,8 +87,13 @@ namespace ekeys
       "k"};
 
   /*
-   * 用默认映射（a~k，走 function_key 通道）填满 1~11 号键，
+   * 用默认映射（a~k，走 normal_key 通道）填满 1~11 号键，
    * 下标 0 置为无效占位。
+   *
+   * 必须走 normal_key 而非 function_key：function_key 是内置功能串通道，
+   * App 0x05 解析时优先级最高（function > text > normal），放进该通道会
+   * 被 App 归类为「内置功能」而不是「键盘键」，8 套空方案上报的默认值也
+   * 全部混淆（2026-11-13 修正，与 data/keymap1.ini 的 normal_key 写法对齐）。
    */
   inline void keymapFillDefaults(
       std::array<KeyMapping, kMatrixKeyCount + 1> &out)
@@ -97,7 +102,7 @@ namespace ekeys
     for (uint8_t i = 1; i <= kMatrixKeyCount; ++i)
     {
       KeyMapping m{};
-      m.function_key = kDefaultKeyMapping[i];
+      m.normal_key[0] = kDefaultKeyMapping[i];
       m.valid = true;
       out[i] = m;
     }
