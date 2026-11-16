@@ -59,7 +59,19 @@ namespace ekeys
 
     void Backlight::off()
     {
-        setDuty(0);
+        /*
+         * 真正熄灭（电源模式 2 浅休眠使用）。
+         * LCD_BL 低电平点亮 → 反相后 duty 满值 = 熄灭；
+         * setDuty(0) 会被下限钳到 5%，不能用于关屏。
+         */
+        if (!begun_)
+        {
+            pinMode(kPinLcdBacklight, OUTPUT);
+            digitalWrite(kPinLcdBacklight, HIGH);
+            return;
+        }
+        ledcWrite(kBacklightLedcChannel,
+                  (1u << kBacklightLedcResolution) - 1u);
     }
 
     void Backlight::setDuty(uint8_t percent)

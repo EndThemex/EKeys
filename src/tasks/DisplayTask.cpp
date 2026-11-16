@@ -21,6 +21,7 @@
 #include <string.h> /* 频谱滚动缓冲 memmove/memcpy */
 
 #include "config/Configuration.h"
+#include "config/PowerConfig.h"
 #include "audio/AudioAnalyzer.h"
 #include "audio/AudioPad.h"
 #include "audio/Mic.h"
@@ -152,6 +153,8 @@ namespace ekeys
     void DisplayTask::run()
     {
         uint32_t last = millis();
+        /* 电源模式空闲计时基准：开机即开始计时，避免首帧被误判为长时间空闲 */
+        last_input_tick_ = xTaskGetTickCount();
 
         /* SquareLine UI：一次性创建 13 屏（ui_init 全部常驻，切屏不销毁） */
         uint32_t t_ui0 = millis();
@@ -231,6 +234,9 @@ namespace ekeys
             /* 一级页 5s 无操作 → 自动回主页（run() 主循环每帧检查） */
             checkAutoReturn();
 
+            /* 电源模式：长时间无操作 → 降亮度（模式 1）/ 关背光（模式 2） */
+            checkPowerIdle();
+
             /*
              * 音乐控制链路（2026-09-23 接通）：音乐二级页旋钮/触屏按钮置位的
              * PREV/TOGGLE/NEXT 请求在此消费，以 0x0f 主动推送转给桌面 App
@@ -288,6 +294,7 @@ namespace ekeys
              * 旋钮 / 矩阵键都是用户主动操作，重置 5s 自动回主页计时。
              */
             bumpActivity();
+            bumpInputActivity();
             /*
              * 矩阵键动作编码 = kMatrixKeyActionBase + key_id（MainTask 侧编码，
              * 与 LV_KEY_* 数值不重叠；原裸传 key_id 时 key_id=10 与
@@ -354,6 +361,7 @@ namespace ekeys
             /* 主动导航也是用户操作；navigateNow 内部会按目标屏决定是否禁用计时 */
             navigateNow(static_cast<ui_screen_tag_t>(msg.navigate_target));
             bumpActivity();
+            bumpInputActivity();
             break;
 
         case DisplayMessageType::AsrRecording:
@@ -404,9 +412,20 @@ namespace ekeys
          * 开机快照与运行时变更都走这里，ui_init 之后调用时屏幕已存在。 */
         ui_lang_set(s.ui_lang);
 
-        /* 背光即时生效 */
-        Backlight::instance().setDuty(
-            static_cast<uint8_t>(s.tft_brightness));
+        /*
+         * 背光即时生效：
+         *   1) 先落缓存（用户亮度 / 电源模式），供空闲策略恢复时使用；
+         *   2) 正常态直接按配置亮度刷新；
+         *   3) checkPowerIdle() 处理"改配置时仍处于空闲省电态"的情况
+         *      （如 App 在关屏期间把模式改回 0 → 立即恢复亮度）。
+         */
+        tft_brightness_ = static_cast<uint8_t>(s.tft_brightness);
+        power_mode_ = static_cast<uint8_t>(s.power_mode);
+        if (power_idle_state_ == PowerIdleState::Normal)
+        {
+            Backlight::instance().setDuty(tft_brightness_);
+        }
+        checkPowerIdle();
 
         /* RGB 灯效即时生效（以配置层权威值为准，DisplayTask 上下文统一驱动） */
         {
@@ -777,6 +796,66 @@ namespace ekeys
     {
         /* 0 表示尚未开始；用户操作 → 设当前 tick 作为基准 */
         last_activity_tick_ = xTaskGetTickCount();
+    }
+
+    void DisplayTask::bumpInputActivity()
+    {
+        last_input_tick_ = xTaskGetTickCount();
+        /* 省电态（降亮/关屏）下收到任意输入 → 立即恢复用户配置亮度 */
+        if (power_idle_state_ != PowerIdleState::Normal)
+        {
+            power_idle_state_ = PowerIdleState::Normal;
+            Backlight::instance().setDuty(tft_brightness_);
+            LOG_INFO("DISP", "power idle: input detected, restore backlight to %u%%",
+                     static_cast<unsigned>(tft_brightness_));
+        }
+    }
+
+    void DisplayTask::checkPowerIdle()
+    {
+        PowerIdleState desired = PowerIdleState::Normal;
+        if (power_mode_ == kPowerModeLowPower ||
+            power_mode_ == kPowerModeLightSleep)
+        {
+            const TickType_t now = xTaskGetTickCount();
+            if ((now - last_input_tick_) >= pdMS_TO_TICKS(kPowerIdleTimeoutMs))
+            {
+                desired = (power_mode_ == kPowerModeLowPower)
+                              ? PowerIdleState::Dimmed
+                              : PowerIdleState::Off;
+            }
+        }
+
+        if (desired == power_idle_state_)
+        {
+            return;
+        }
+        power_idle_state_ = desired;
+
+        switch (desired)
+        {
+        case PowerIdleState::Dimmed:
+        {
+            const uint8_t dim = (tft_brightness_ < kPowerIdleDimPercent)
+                                    ? tft_brightness_
+                                    : kPowerIdleDimPercent;
+            Backlight::instance().setDuty(dim);
+            LOG_INFO("DISP", "power idle: dim backlight to %u%% (mode %u)",
+                     static_cast<unsigned>(dim),
+                     static_cast<unsigned>(power_mode_));
+            break;
+        }
+        case PowerIdleState::Off:
+            Backlight::instance().off();
+            LOG_INFO("DISP", "power idle: backlight off (mode %u)",
+                     static_cast<unsigned>(power_mode_));
+            break;
+        default:
+            Backlight::instance().setDuty(tft_brightness_);
+            LOG_INFO("DISP", "power idle: restore backlight to %u%%",
+                     static_cast<unsigned>(tft_brightness_));
+            break;
+        }
     }
 
     void DisplayTask::checkAutoReturn()

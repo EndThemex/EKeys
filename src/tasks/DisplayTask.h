@@ -88,6 +88,20 @@ namespace ekeys
         void bumpActivity();
         void checkAutoReturn();
 
+        /*
+         * 电源模式空闲策略（config/PowerConfig.h）：
+         *   - bumpInputActivity()  任意用户输入 / 主动导航 → 重置空闲计时并恢复亮度
+         *   - checkPowerIdle()     run() 每帧检查，按 power_mode 降亮度 / 关背光
+         */
+        enum class PowerIdleState : uint8_t
+        {
+            Normal = 0,
+            Dimmed = 1,
+            Off = 2,
+        };
+        void bumpInputActivity();
+        void checkPowerIdle();
+
         QueueHandle_t queue_;
         bool spectrum_active_ = false;
         /* Mic::begin 失败后的退避时刻（ms），0 表示立即可重试 */
@@ -97,6 +111,12 @@ namespace ekeys
          * 用于 run() 启动首帧 / navigateNow 到 MAIN 时禁用计时。
          */
         TickType_t last_activity_tick_ = 0;
+
+        /* 电源模式空闲策略（背光） */
+        uint8_t power_mode_ = 0;      /* 最近一次 SettingUpdate 的 power_mode */
+        uint8_t tft_brightness_ = 80; /* 用户配置亮度，退出省电态时恢复 */
+        PowerIdleState power_idle_state_ = PowerIdleState::Normal;
+        TickType_t last_input_tick_ = 0; /* 上次输入时刻（开机/任意操作刷新） */
     };
 
 } // namespace ekeys

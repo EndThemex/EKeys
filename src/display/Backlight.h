@@ -25,10 +25,11 @@ namespace ekeys
         void begin();
 
         void on();
+        /* 真正熄灭（绕过 setDuty 的 5% 下限，电源模式 2 关屏用） */
         void off();
 
         /*
-         * 设置占空比，0~100（内部钳位；0=熄灭）。
+         * 设置屏幕亮度，0~100（内部钳位到 [5,100]；需熄灭请调用 off()）。
          */
         void setDuty(uint8_t percent);
 
