@@ -57,6 +57,10 @@ namespace ekeys::protocol::commands
             info["device_name"] = name;
             info["device_id"] = device_id;
             info["firmware_version"] = kFirmwareVersion;
+            /* 协议兼容性判定依据；config_version 供客户端识别配置结构版本 */
+            info["protocol_version"] = kProtocolVersion;
+            info["protocol_minor"] = kProtocolMinor;
+            info["config_version"] = static_cast<int>(snap.config_version);
             SerialProtocol::instance().sendDocument(doc);
             return 0;
         }

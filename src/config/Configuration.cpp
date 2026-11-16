@@ -14,6 +14,7 @@
 #include <lvgl.h> // LV_SYMBOL_*
 
 #include "logging/LogManager.h"
+#include "protocol/DeviceIdentity.h"
 #include "services/ConfigStore.h"
 #include "services/KeymapRepository.h"
 
@@ -168,8 +169,18 @@ namespace ekeys
             static_cast<uint8_t>(ini.GetLongValue("system", "active_keymap_profile", 0));
         settings_.work_mode =
             static_cast<uint8_t>(ini.GetLongValue("system", "work_mode", 0));
+        /*
+         * 配置结构版本：缺键按当前版本处理；显式写 0 视为未初始化。
+         * 旧设备升级后即使 config.ini 没有该键，也会上报当前版本，
+         * 避免 Web/App 把 0 误判为协议不兼容。
+         */
+        const long loadedConfigVersion =
+            ini.GetLongValue("system", "config_version",
+                             protocol::kConfigVersion);
         settings_.config_version =
-            static_cast<uint32_t>(ini.GetLongValue("system", "config_version", 0));
+            (loadedConfigVersion > 0)
+                ? static_cast<uint32_t>(loadedConfigVersion)
+                : static_cast<uint32_t>(protocol::kConfigVersion);
         /* F6 修复：pc_status_mask 作为 uint32 加载，long 范围足够 */
         settings_.pc_status_mask =
             static_cast<uint32_t>(ini.GetLongValue("system", "pc_status_mask", 0));

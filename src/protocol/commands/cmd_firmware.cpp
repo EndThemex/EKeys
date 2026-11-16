@@ -117,6 +117,9 @@ namespace ekeys::protocol::commands
             JsonObject fw = doc["firmware"].to<JsonObject>();
             fw["version"] = kFirmwareVersion;
             fw["device"] = kDeviceName;
+            /* OTA 端可用它拒绝刷入主版本不兼容的固件 */
+            fw["protocol_version"] = kProtocolVersion;
+            fw["protocol_minor"] = kProtocolMinor;
             fw["build_date"] = __DATE__;
             fw["build_time"] = __TIME__;
             SerialProtocol::instance().sendDocument(doc);

@@ -11,7 +11,16 @@
 namespace ekeys::protocol
 {
 
-    /* 配置结构版本（0x01 CMD_CONF_VERSION_GET） */
+    /*
+     * 通信协议版本（MAJOR.MINOR）：
+     *   MAJOR 不同 = 不兼容（命令/字段语义/帧格式发生破坏性变更）
+     *   MINOR 不同 = 向后兼容（仅新增可选字段、命令或枚举值）
+     * Web / App 端以 device_info.protocol_version 做 MAJOR 比对。
+     */
+    constexpr int kProtocolVersion = 1;
+    constexpr int kProtocolMinor = 0;
+
+    /* 配置结构版本（0x01 CMD_CONF_VERSION_GET，与协议版本独立） */
     constexpr int kConfigVersion = 1;
 
     /* 固件版本（0x0b / 0x03 响应共用） */

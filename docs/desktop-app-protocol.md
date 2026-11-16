@@ -34,6 +34,26 @@
 
 桌面 App 必须同时考虑两种通道：一旦 TCP 已连接，固件发送的协议帧会同时通过 USB CDC 和 TCP 输出，见 [SerialProtocol.cpp](../src/protocol/SerialProtocol.cpp#L130-L145)。
 
+### 1.1 协议版本控制
+
+协议版本采用 `MAJOR.MINOR`，常量定义在 [DeviceIdentity.h](../src/protocol/DeviceIdentity.h)：
+
+| 变更类型 | 版本动作 | 示例 |
+| --- | --- | --- |
+| 破坏性变更：删除/重命名命令、字段含义改变、帧格式改变、复用 cmd ID、新增必填字段 | MAJOR +1 | v1.x → v2.0 |
+| 向后兼容变更：新增命令、可选字段、枚举值、能力位 | MINOR +1 | v1.0 → v1.1 |
+| 仅文案/内部实现修复，不改变线缆行为 | 不变 | — |
+
+兼容规则：
+
+- 客户端在 `0x03 device_info` 中读取 `protocol_version` / `protocol_minor`；
+- 仅比较 MAJOR，不同即视为不兼容；MINOR 差异允许，客户端必须忽略未知字段；
+- 旧固件未返回 `protocol_version` 时，客户端按 `1.0` 兜底；
+- `config_version` 是配置结构版本，独立演进，只用于配置迁移，不参与协议兼容判定；
+- 命令 ID 永不复用，新增能力优先用可选字段 / 能力位表达。
+
+三端常量必须一致：固件 [DeviceIdentity.h](../src/protocol/DeviceIdentity.h)、Web `src/protocol/index.ts`、桌面 App `src/protocol.rs`。可运行 [`tools/check_protocol_version.ps1`](../tools/check_protocol_version.ps1) 校验。
+
 ---
 
 ## 2. 通信链路
@@ -468,12 +488,17 @@ App 应始终按 `cmd`、`seq`、`status` 解析，不要依赖响应字段的�
   "device_info": {
     "device_name": "EKeys",
     "device_id": "AABBCCDDEEFF",
-    "firmware_version": "0.6.0"
+    "firmware_version": "0.6.0",
+    "protocol_version": 1,
+    "protocol_minor": 0,
+    "config_version": 1
   }
 }
 ```
 
 - `device_id` 为 12 位大写十六进制，由 ESP32 eFuse MAC 生成；
+- `protocol_version` / `protocol_minor` 用于协议兼容判定（只比较 MAJOR）；
+- `config_version` 为配置结构版本，与协议版本独立；
 - 固件版本当前为 `0.6.0`；
 - 固件版本常量在 [DeviceIdentity.h](../src/protocol/DeviceIdentity.h#L14-L21)；
 - 处理实现见 [cmd_device_info.cpp](../src/protocol/commands/cmd_device_info.cpp#L40-L62)。
@@ -553,6 +578,8 @@ App 应始终按 `cmd`、`seq`、`status` 解析，不要依赖响应字段的�
   "firmware": {
     "version": "0.6.0",
     "device": "EKeys",
+    "protocol_version": 1,
+    "protocol_minor": 0,
     "build_date": "Sep  7 2026",
     "build_time": "12:00:00"
   }
