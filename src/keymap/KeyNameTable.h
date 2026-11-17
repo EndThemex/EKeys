@@ -1,13 +1,17 @@
 /*
  * KeyNameTable.h
  *
- * 字符 / 键名字符串 → HID keycode 映射（阶段 01 精简版）。
+ * 字符 / 键名字符串 → HID keycode 映射（FEATURE_DOC §3.1）。
  *
- * 仅含 FEATURE_DOC §3.1 中本阶段必需的部分：
+ * 支持：
  *
- *     a-z / 0-9 / Enter / Backspace / Space
- *
- * 后续阶段按 §3.1 列表补齐。
+ *     a-z / A-Z / 0-9 / NUM_0~NUM_9
+ *     Space / Enter / Esc / Backspace / Tab / CapsLock
+ *     F1~F12 / PrintScreen / ScrollLock / Pause / Menu
+ *     Insert / Delete / Home / End / PageUp / PageDown
+ *     方向键 Up/Down/Left/Right（及 ← ↑ → ↓ / ArrowXxx 别名）
+ *     符号 , . ; ' [ ] \ / - = `
+ *     修饰键 Ctrl/Shift/Alt/Win（左右双侧）
  *
  * 也支持 "0xNN" / 十进制字面量解析（FEATURE_DOC §3.1 末）。
  */
@@ -31,10 +35,14 @@ namespace ekeys
      *   name = "82"       → 0x52
      *
      * 修饰键名（大小写不敏感）：
-     *   Ctrl/Control/Ctrl_L → 0xE0
-     *   Shift/Shift_L       → 0xE1
-     *   Alt/Option/Alt_L    → 0xE2
-     *   Win/GUI/Meta/Cmd/Super → 0xE3
+     *   Ctrl/Control/Ctrl_L/LCtrl → 0xE0
+     *   Shift/Shift_L/LShift       → 0xE1
+     *   Alt/Option/Alt_L/LAlt      → 0xE2
+     *   Win/GUI/Meta/Cmd/Super/LGUI → 0xE3
+     *   Ctrl_R/RCtrl               → 0xE4
+     *   Shift_R/RShift             → 0xE5
+     *   Alt_R/RAlt                 → 0xE6
+     *   Win_R/RGUI                 → 0xE7
      *
      * 未匹配返回 0x00。调用方应跳过 0x00。
      *
@@ -61,10 +69,11 @@ namespace ekeys
     /*
      * 存储的键名 → 可读显示名（仅供 UI 展示，不影响 HID 解析）。
      *
-     *   "0x04" / "4" → "a"
+     *   "0x04"       → "a"
      *   "0xE0"       → "Ctrl"
      *   "0xFF"       → "0xFF"（未知 usage 保留十六进制）
      *   "a" / "Ctrl" → 原样返回（已是可读名）
+     *   "4"          → "4"（单字符按字符键处理，不再当作十进制字面量）
      */
     String keyDisplayName(const String &name);
 

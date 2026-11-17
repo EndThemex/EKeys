@@ -21,7 +21,6 @@ typedef enum
     SETTING_ITEM_RGB_CLICK_MODE,
     SETTING_ITEM_RGB_COLOR,
     SETTING_ITEM_RGB_BRIGHTNESS,
-    SETTING_ITEM_TFT_THEME,
     SETTING_ITEM_TFT_BRIGHTNESS,
     SETTING_ITEM_DEVICE_VOLUME,
     SETTING_ITEM_AUDIO_ENABLE,
@@ -243,8 +242,6 @@ static const char *setting_secondary_item_name(setting_item_id_t item)
         return "单色灯光";
     case SETTING_ITEM_RGB_BRIGHTNESS:
         return "灯光亮度";
-    case SETTING_ITEM_TFT_THEME:
-        return "屏幕主题";
     case SETTING_ITEM_TFT_BRIGHTNESS:
         return "屏幕亮度";
     case SETTING_ITEM_DEVICE_VOLUME:
@@ -325,21 +322,6 @@ static const char *setting_secondary_rgb_click_mode_text(int32_t value)
     }
 }
 
-static const char *setting_secondary_theme_text(int32_t value)
-{
-    switch (value)
-    {
-    case 1:
-        return "主题 1";
-    case 2:
-        return "主题 2";
-    case 3:
-        return "主题 3";
-    default:
-        return "主题 1";
-    }
-}
-
 static const char *setting_secondary_power_mode_text(int32_t value)
 {
     switch (value)
@@ -383,9 +365,6 @@ static void setting_secondary_value_text(setting_item_id_t item, char *buffer, s
     }
     case SETTING_ITEM_RGB_BRIGHTNESS:
         snprintf(buffer, buffer_size, "%ld%%", (long)s_setting_edit.rgb_brightness);
-        break;
-    case SETTING_ITEM_TFT_THEME:
-        snprintf(buffer, buffer_size, "%s", setting_secondary_theme_text(s_setting_edit.tft_theme));
         break;
     case SETTING_ITEM_TFT_BRIGHTNESS:
         snprintf(buffer, buffer_size, "%ld%%", (long)s_setting_edit.tft_brightness);
@@ -508,8 +487,9 @@ static int setting_secondary_adjust_value(setting_item_id_t item, int step)
     {
     case SETTING_ITEM_WORK_MODE:
     {
+        /* 仅支持 0=有线 / 1=蓝牙；2.4G 模式未实现，不再暴露给 UI */
         const int32_t next = s_setting_edit.work_mode + step;
-        if (next < 0 || next > 2 || next == s_setting_edit.work_mode)
+        if (next < 0 || next > 1 || next == s_setting_edit.work_mode)
         {
             return 0;
         }
@@ -566,16 +546,6 @@ static int setting_secondary_adjust_value(setting_item_id_t item, int step)
             return 0;
         }
         s_setting_edit.rgb_brightness = clamped;
-        return 1;
-    }
-    case SETTING_ITEM_TFT_THEME:
-    {
-        const int32_t next = s_setting_edit.tft_theme + step;
-        if (next < 1 || next > 3 || next == s_setting_edit.tft_theme)
-        {
-            return 0;
-        }
-        s_setting_edit.tft_theme = next;
         return 1;
     }
     case SETTING_ITEM_TFT_BRIGHTNESS:

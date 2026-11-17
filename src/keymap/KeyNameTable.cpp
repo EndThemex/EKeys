@@ -1,9 +1,16 @@
 /*
  * KeyNameTable.cpp
  *
- * 阶段 01 仅解析：
+ * 解析 FEATURE_DOC §3.1 键名表：
  *
- *     a-z / A-Z / 0-9 / Space / Enter / Backspace / 0xNN
+ *     a-z / A-Z / 0-9 / NUM_0~NUM_9
+ *     Space / Enter / Esc / Backspace / Tab / CapsLock
+ *     F1~F12 / PrintScreen / ScrollLock / Pause
+ *     Insert / Delete / Home / End / PageUp / PageDown
+ *     方向键（Up/Down/Left/Right 及箭头符号）
+ *     符号 , . ; ' [ ] \ / - = `
+ *     修饰键 Ctrl/Shift/Alt/Win（左右双侧）
+ *     0xNN 十六进制 / 十进制字面量
  */
 
 #include "KeyNameTable.h"
@@ -19,8 +26,38 @@ namespace ekeys
         constexpr uint8_t HID_KEY_1 = 0x1E;
         constexpr uint8_t HID_KEY_0 = 0x27;
         constexpr uint8_t HID_KEY_ENTER = 0x28;
+        constexpr uint8_t HID_KEY_ESCAPE = 0x29;
         constexpr uint8_t HID_KEY_BACKSPACE = 0x2A;
+        constexpr uint8_t HID_KEY_TAB = 0x2B;
         constexpr uint8_t HID_KEY_SPACE = 0x2C;
+        constexpr uint8_t HID_KEY_MINUS = 0x2D;
+        constexpr uint8_t HID_KEY_EQUAL = 0x2E;
+        constexpr uint8_t HID_KEY_LEFTBRACKET = 0x2F;
+        constexpr uint8_t HID_KEY_RIGHTBRACKET = 0x30;
+        constexpr uint8_t HID_KEY_BACKSLASH = 0x31;
+        constexpr uint8_t HID_KEY_SEMICOLON = 0x33;
+        constexpr uint8_t HID_KEY_QUOTE = 0x34;
+        constexpr uint8_t HID_KEY_GRAVE = 0x35;
+        constexpr uint8_t HID_KEY_COMMA = 0x36;
+        constexpr uint8_t HID_KEY_PERIOD = 0x37;
+        constexpr uint8_t HID_KEY_SLASH = 0x38;
+        constexpr uint8_t HID_KEY_CAPSLOCK = 0x39;
+        constexpr uint8_t HID_KEY_F1 = 0x3A;
+        constexpr uint8_t HID_KEY_PRINTSCREEN = 0x46;
+        constexpr uint8_t HID_KEY_SCROLLLOCK = 0x47;
+        constexpr uint8_t HID_KEY_PAUSE = 0x48;
+        constexpr uint8_t HID_KEY_INSERT = 0x49;
+        constexpr uint8_t HID_KEY_HOME = 0x4A;
+        constexpr uint8_t HID_KEY_PAGEUP = 0x4B;
+        constexpr uint8_t HID_KEY_DELETE = 0x4C;
+        constexpr uint8_t HID_KEY_END = 0x4D;
+        constexpr uint8_t HID_KEY_PAGEDOWN = 0x4E;
+        constexpr uint8_t HID_KEY_RIGHT = 0x4F;
+        constexpr uint8_t HID_KEY_LEFT = 0x50;
+        constexpr uint8_t HID_KEY_DOWN = 0x51;
+        constexpr uint8_t HID_KEY_UP = 0x52;
+        constexpr uint8_t HID_KEY_NUMLOCK = 0x53;
+        constexpr uint8_t HID_KEY_MENU = 0x65;
         constexpr uint8_t HID_MOD_LSHIFT = 0x02;
 
         /*
@@ -34,39 +71,76 @@ namespace ekeys
         constexpr uint8_t HID_KEY_LSHIFT = 0xE1;
         constexpr uint8_t HID_KEY_LALT = 0xE2;
         constexpr uint8_t HID_KEY_LGUI = 0xE3;
+        constexpr uint8_t HID_KEY_RCTRL = 0xE4;
+        constexpr uint8_t HID_KEY_RSHIFT = 0xE5;
+        constexpr uint8_t HID_KEY_RALT = 0xE6;
+        constexpr uint8_t HID_KEY_RGUI = 0xE7;
 
         /*
          * 修饰键名 → usage code（大小写不敏感）。
-         * 仅左侧修饰键；未匹配返回 0x00。
+         * 支持左侧（默认 / *_L / L*）与右侧（*_R / R*）别名；
+         * 未匹配返回 0x00。
          */
         uint8_t resolveModifierName(const String &name)
         {
-            if (name.equalsIgnoreCase("Ctrl") || name.equalsIgnoreCase("Control") ||
-                name.equalsIgnoreCase("Ctrl_L"))
+            struct ModifierName
             {
-                return HID_KEY_LCTRL;
-            }
-            if (name.equalsIgnoreCase("Shift") || name.equalsIgnoreCase("Shift_L"))
+                const char *name;
+                uint8_t usage;
+            };
+            static constexpr ModifierName kModifiers[] = {
+                {"Ctrl", HID_KEY_LCTRL},
+                {"Control", HID_KEY_LCTRL},
+                {"Ctrl_L", HID_KEY_LCTRL},
+                {"LCtrl", HID_KEY_LCTRL},
+                {"LeftCtrl", HID_KEY_LCTRL},
+                {"Ctrl_R", HID_KEY_RCTRL},
+                {"RCtrl", HID_KEY_RCTRL},
+                {"RightCtrl", HID_KEY_RCTRL},
+                {"Shift", HID_KEY_LSHIFT},
+                {"Shift_L", HID_KEY_LSHIFT},
+                {"LShift", HID_KEY_LSHIFT},
+                {"LeftShift", HID_KEY_LSHIFT},
+                {"Shift_R", HID_KEY_RSHIFT},
+                {"RShift", HID_KEY_RSHIFT},
+                {"RightShift", HID_KEY_RSHIFT},
+                {"Alt", HID_KEY_LALT},
+                {"Option", HID_KEY_LALT},
+                {"Alt_L", HID_KEY_LALT},
+                {"LAlt", HID_KEY_LALT},
+                {"LeftAlt", HID_KEY_LALT},
+                {"Alt_R", HID_KEY_RALT},
+                {"RAlt", HID_KEY_RALT},
+                {"RightAlt", HID_KEY_RALT},
+                {"Win", HID_KEY_LGUI},
+                {"GUI", HID_KEY_LGUI},
+                {"Meta", HID_KEY_LGUI},
+                {"Cmd", HID_KEY_LGUI},
+                {"Super", HID_KEY_LGUI},
+                {"Win_L", HID_KEY_LGUI},
+                {"LGUI", HID_KEY_LGUI},
+                {"LeftWin", HID_KEY_LGUI},
+                {"Win_R", HID_KEY_RGUI},
+                {"RGUI", HID_KEY_RGUI},
+                {"RightWin", HID_KEY_RGUI},
+            };
+            for (const ModifierName &m : kModifiers)
             {
-                return HID_KEY_LSHIFT;
-            }
-            if (name.equalsIgnoreCase("Alt") || name.equalsIgnoreCase("Option") ||
-                name.equalsIgnoreCase("Alt_L"))
-            {
-                return HID_KEY_LALT;
-            }
-            if (name.equalsIgnoreCase("Win") || name.equalsIgnoreCase("GUI") ||
-                name.equalsIgnoreCase("Meta") || name.equalsIgnoreCase("Cmd") ||
-                name.equalsIgnoreCase("Super"))
-            {
-                return HID_KEY_LGUI;
+                if (name.equalsIgnoreCase(m.name))
+                {
+                    return m.usage;
+                }
             }
             return 0;
         }
 
         bool parseLiteralNumber(const String &name, uint8_t &out)
         {
-            if (name.length() == 0)
+            /*
+             * 单字符交由 resolveKeyName 的字符表处理（"1" 是数字键 0x1E，
+             * 不是十进制字面量 1）；字面量至少 2 字符（"82" / "0x52"）。
+             */
+            if (name.length() < 2)
             {
                 return false;
             }
@@ -114,6 +188,93 @@ namespace ekeys
             return true;
         }
 
+        /*
+         * 具名键表（大小写不敏感）：覆盖 FEATURE_DOC §3.1 的编辑键 / 功能键 /
+         * 锁定键 / 方向键，并兼容 App 编辑器展示名（CapsLock / PrintScreen /
+         * PageUp / Delete 等）与箭头符号。
+         */
+        struct NamedKey
+        {
+            const char *name;
+            uint8_t usage;
+        };
+
+        uint8_t resolveNamedKey(const String &name)
+        {
+            static constexpr NamedKey kNamedKeys[] = {
+                {"Enter", HID_KEY_ENTER},
+                {"Return", HID_KEY_ENTER},
+                {"Escape", HID_KEY_ESCAPE},
+                {"Esc", HID_KEY_ESCAPE},
+                {"Backspace", HID_KEY_BACKSPACE},
+                {"Tab", HID_KEY_TAB},
+                {"Space", HID_KEY_SPACE},
+                {"CapsLock", HID_KEY_CAPSLOCK},
+                {"Caps", HID_KEY_CAPSLOCK},
+                {"PrintScreen", HID_KEY_PRINTSCREEN},
+                {"PrtSc", HID_KEY_PRINTSCREEN},
+                {"ScrollLock", HID_KEY_SCROLLLOCK},
+                {"ScrlLk", HID_KEY_SCROLLLOCK},
+                {"Pause", HID_KEY_PAUSE},
+                {"Insert", HID_KEY_INSERT},
+                {"Ins", HID_KEY_INSERT},
+                {"Home", HID_KEY_HOME},
+                {"PageUp", HID_KEY_PAGEUP},
+                {"PgUp", HID_KEY_PAGEUP},
+                {"Delete", HID_KEY_DELETE},
+                {"Del", HID_KEY_DELETE},
+                {"End", HID_KEY_END},
+                {"PageDown", HID_KEY_PAGEDOWN},
+                {"PgDn", HID_KEY_PAGEDOWN},
+                {"Right", HID_KEY_RIGHT},
+                {"ArrowRight", HID_KEY_RIGHT},
+                {"Left", HID_KEY_LEFT},
+                {"ArrowLeft", HID_KEY_LEFT},
+                {"Down", HID_KEY_DOWN},
+                {"ArrowDown", HID_KEY_DOWN},
+                {"Up", HID_KEY_UP},
+                {"ArrowUp", HID_KEY_UP},
+                {"→", HID_KEY_RIGHT},
+                {"←", HID_KEY_LEFT},
+                {"↓", HID_KEY_DOWN},
+                {"↑", HID_KEY_UP},
+                {"NumLock", HID_KEY_NUMLOCK},
+                {"NumLk", HID_KEY_NUMLOCK},
+                {"Menu", HID_KEY_MENU},
+                {"Application", HID_KEY_MENU},
+                /* 小键盘数字键名（FEATURE_DOC §3.1） */
+                {"NUM_0", HID_KEY_0},
+                {"NUM_1", HID_KEY_1},
+                {"NUM_2", static_cast<uint8_t>(HID_KEY_1 + 1)},
+                {"NUM_3", static_cast<uint8_t>(HID_KEY_1 + 2)},
+                {"NUM_4", static_cast<uint8_t>(HID_KEY_1 + 3)},
+                {"NUM_5", static_cast<uint8_t>(HID_KEY_1 + 4)},
+                {"NUM_6", static_cast<uint8_t>(HID_KEY_1 + 5)},
+                {"NUM_7", static_cast<uint8_t>(HID_KEY_1 + 6)},
+                {"NUM_8", static_cast<uint8_t>(HID_KEY_1 + 7)},
+                {"NUM_9", static_cast<uint8_t>(HID_KEY_1 + 8)},
+            };
+            for (const NamedKey &k : kNamedKeys)
+            {
+                if (name.equalsIgnoreCase(k.name))
+                {
+                    return k.usage;
+                }
+            }
+
+            /* F1~F12 */
+            if (name.length() >= 2 && name.length() <= 3 &&
+                (name[0] == 'F' || name[0] == 'f'))
+            {
+                const int fn = name.substring(1).toInt();
+                if (fn >= 1 && fn <= 12)
+                {
+                    return static_cast<uint8_t>(HID_KEY_F1 + (fn - 1));
+                }
+            }
+            return 0;
+        }
+
     } // namespace
 
     uint8_t resolveKeyName(const String &name)
@@ -127,6 +288,11 @@ namespace ekeys
         if (mod)
         {
             return mod;
+        }
+        const uint8_t named = resolveNamedKey(name);
+        if (named)
+        {
+            return named;
         }
         if (name.length() == 1)
         {
@@ -143,25 +309,41 @@ namespace ekeys
             {
                 return static_cast<uint8_t>(HID_KEY_1 + (c - '1'));
             }
-            if (c == '0')
+            switch (c)
             {
+            case '0':
                 return HID_KEY_0;
-            }
-            if (c == ' ')
-            {
+            case ' ':
                 return HID_KEY_SPACE;
-            }
-            if (c == '\n')
-            {
+            case '\n':
                 return HID_KEY_ENTER;
+            /* FEATURE_DOC §3.1 符号键 */
+            case '-':
+                return HID_KEY_MINUS;
+            case '=':
+                return HID_KEY_EQUAL;
+            case '[':
+                return HID_KEY_LEFTBRACKET;
+            case ']':
+                return HID_KEY_RIGHTBRACKET;
+            case '\\':
+                return HID_KEY_BACKSLASH;
+            case ';':
+                return HID_KEY_SEMICOLON;
+            case '\'':
+                return HID_KEY_QUOTE;
+            case '`':
+                return HID_KEY_GRAVE;
+            case ',':
+                return HID_KEY_COMMA;
+            case '.':
+                return HID_KEY_PERIOD;
+            case '/':
+                return HID_KEY_SLASH;
+            default:
+                break;
             }
         }
-        if (name == "Enter")
-            return HID_KEY_ENTER;
-        if (name == "Backspace")
-            return HID_KEY_BACKSPACE;
-        if (name == "Space")
-            return HID_KEY_SPACE;
         return 0;
     }
 
@@ -295,6 +477,28 @@ namespace ekeys
                 return "Esc";
             case 0x2B:
                 return "Tab";
+            case 0x2D:
+                return "-";
+            case 0x2E:
+                return "=";
+            case 0x2F:
+                return "[";
+            case 0x30:
+                return "]";
+            case 0x31:
+                return "\\";
+            case 0x33:
+                return ";";
+            case 0x34:
+                return "'";
+            case 0x35:
+                return "`";
+            case 0x36:
+                return ",";
+            case 0x37:
+                return ".";
+            case 0x38:
+                return "/";
             case 0x39:
                 return "Caps";
             case 0x3A: /* F1~F12 = 0x3A~0x45 */
@@ -340,6 +544,16 @@ namespace ekeys
                 return "NumLk";
             case 0x58:
                 return "KPEnter";
+            case 0x65:
+                return "Menu";
+            case 0xE4:
+                return "RCtrl";
+            case 0xE5:
+                return "RShift";
+            case 0xE6:
+                return "RAlt";
+            case 0xE7:
+                return "RGUI";
             default:
                 break;
             }
