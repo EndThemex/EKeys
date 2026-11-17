@@ -338,6 +338,9 @@ namespace ekeys
             [](const char *ip)
             { TcpChannel::instance().connectTo(ip); });
         Speaker::instance().begin();
+        /* 恢复持久化的音频总开关（静音态开机即不发声） */
+        Speaker::instance().setOutputEnabled(
+            Configuration::instance().settings().audio_enable != 0);
         BatteryMonitor::instance().begin();
         if (WiFiManager::instance().isEnabled())
         {
@@ -1001,6 +1004,8 @@ namespace ekeys
 
         /* 音量即时生效（Speaker::loop 与本任务同上下文） */
         Speaker::instance().applyDeviceVolume(curr.device_volume);
+        /* 音频总开关即时生效（先落音量档位，再按开关决定是否静音） */
+        Speaker::instance().setOutputEnabled(curr.audio_enable != 0);
 
         DisplayMessage msg;
         msg.type = DisplayMessageType::SettingUpdate;

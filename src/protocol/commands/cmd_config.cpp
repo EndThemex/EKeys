@@ -142,6 +142,8 @@ namespace ekeys::protocol::commands
                 Configuration::instance().snapshot(snap);
                 /* 音量即时生效（cmd handler 与 Speaker::loop 同在 MainTask 上下文） */
                 Speaker::instance().applyDeviceVolume(snap.device_volume);
+                /* 音频总开关：静音态强制音量为 0，解除后恢复配置档位 */
+                Speaker::instance().setOutputEnabled(snap.audio_enable != 0);
                 postSettingUpdate();
                 sendConfigSnapshot(0);
             }

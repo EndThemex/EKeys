@@ -38,6 +38,13 @@ public:
     /* device_volume(0~100) → SetVolume(0~21)，100% = 库最高档（0dB 满幅） */
     void applyDeviceVolume(uint8_t device_volume);
 
+    /*
+     * 音频总开关（audio_enable）：false 时强制静音（音量 0），
+     * 播放流仍可静默解码；重新开启时恢复最近一次 applyDeviceVolume 的档位。
+     * 与音量一样只在 MainTask 上下文调用（与 Speaker::loop 串行）。
+     */
+    void setOutputEnabled(bool enabled);
+
     void SetVolume(uint8_t volume_0_21);
 
     bool PlayRemoteAudio(const char *url);
@@ -80,6 +87,10 @@ private:
     uint8_t target_volume_ = 12;
     bool ramping_ = false;
     uint32_t ramp_start_ms_ = 0;
+
+    /* audio_enable=0 时强制静音；requested_volume_0_21_ 保存静音前的目标档位 */
+    bool output_enabled_ = true;
+    uint8_t requested_volume_0_21_ = 12;
 };
 
 }  // namespace ekeys

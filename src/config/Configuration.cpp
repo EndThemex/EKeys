@@ -222,7 +222,8 @@ namespace ekeys
         settings_.device_volume =
             static_cast<uint8_t>(ini.GetLongValue("audio", "device_volume", 0));
         settings_.audio_enable =
-            static_cast<uint8_t>(ini.GetLongValue("audio", "audio_enable", 0));
+            /* 缺省视为开启：0 是旧占位默认值，若沿用会在实现音频开关后让存量设备静默 */
+            static_cast<uint8_t>(ini.GetLongValue("audio", "audio_enable", 1));
         settings_.power_mode =
             static_cast<uint8_t>(ini.GetLongValue("audio", "power_mode", 0));
 

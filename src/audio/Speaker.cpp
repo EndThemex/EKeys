@@ -39,8 +39,10 @@ void Speaker::begin()
      * "register I2S object to platform failed"（每 tick 重试刷屏）。 */
     auto *audio = new Audio(false, 3, I2S_NUM_1);
     audio->setPinout(kPinI2sBclkSpeaker, kPinI2sLrclkSpeaker, kPinI2sDataSpeaker);
-    audio->setVolume(12);  // 默认中等音量（0~21）
-    target_volume_ = 12;
+    /* 音频开关已在 begin 前设置时（重启/重建），静音态直接以 0 初始化 */
+    const uint8_t initial_volume = output_enabled_ ? requested_volume_0_21_ : 0;
+    audio->setVolume(initial_volume);  // 默认中等音量（0~21）
+    target_volume_ = initial_volume;
     ramping_ = false;  // end() 重建后不残留旧淡入状态
     impl_ = audio;
     inited_ = true;
@@ -122,7 +124,26 @@ void Speaker::applyDeviceVolume(uint8_t device_volume)
 {
     /* 0~100 四舍五入映射到库的 0~21（22 档）。
      * 旧 /5 映射 100% 只到 20 档 = 58/64 ≈ -0.9dB，永远到不了满幅。 */
-    SetVolume((device_volume * 21 + 50) / 100);
+    requested_volume_0_21_ = (device_volume * 21 + 50) / 100;
+    /* 静音期间只记档位，不解除静音；解除由 setOutputEnabled(true) 负责 */
+    SetVolume(output_enabled_ ? requested_volume_0_21_ : 0);
+}
+
+void Speaker::setOutputEnabled(bool enabled)
+{
+    if (output_enabled_ == enabled)
+    {
+        return;
+    }
+    output_enabled_ = enabled;
+    if (!inited_)
+    {
+        /* 尚未 begin：由 begin() 按 output_enabled_ 初始化音量 */
+        return;
+    }
+    SetVolume(enabled ? requested_volume_0_21_ : 0);
+    LOG_INFO("SPK", "output %s (volume=%u)", enabled ? "on" : "muted",
+             static_cast<unsigned>(target_volume_));
 }
 
 bool Speaker::PlayRemoteAudio(const char *url)
