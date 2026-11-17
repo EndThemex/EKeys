@@ -2,7 +2,7 @@
  * AudioAnalyzer.cpp
  *
  * 见 AudioAnalyzer.h。arduinoFFT@2.0.4 模板 API
- * （ArduinoFFT<double> / compute(FFTDirection::Forward) / complexToMagnitude）。
+ * （ArduinoFFT<float> / compute(FFTDirection::Forward) / complexToMagnitude）。
  */
 
 #include "AudioAnalyzer.h"
@@ -14,6 +14,35 @@
 
 namespace ekeys
 {
+
+  namespace
+  {
+    /*
+     * 逐段非对称平滑（A2：原分散在 RGBLightControl 三个灯效里）。
+     * 系数按 FFT hop=256 @16kHz（约 62.5fps）标定：把原效果层 30ms 帧下的
+     * 0.55/0.13 按 1-(1-k)^(16/30) 换算，得到等价系数 0.35/0.072，
+     * 起跳 ~2~3 帧到顶、回落约 1s 拖尾的观感与原实现保持一致。
+     */
+    constexpr float kSmoothAttack = 0.35f;
+    constexpr float kSmoothDecay = 0.072f;
+    constexpr float kSmoothEpsilon = 0.004f;
+
+    /* 单段电平的一步非对称平滑 + 残留截断 */
+    float smoothBand(float current, float target)
+    {
+      const float k = (target > current) ? kSmoothAttack : kSmoothDecay;
+      float value = current + (target - current) * k;
+      if (value < kSmoothEpsilon)
+      {
+        return 0.0f;
+      }
+      if (value > 1.0f)
+      {
+        return 1.0f;
+      }
+      return value;
+    }
+  } // namespace
 
   AudioAnalyzer &AudioAnalyzer::instance()
   {
@@ -27,16 +56,29 @@ namespace ekeys
     {
       return true;
     }
-    v_real_ = static_cast<double *>(ps_malloc(sizeof(double) * kFftSize));
-    v_imag_ = static_cast<double *>(ps_malloc(sizeof(double) * kFftSize));
-    if (v_real_ == nullptr || v_imag_ == nullptr)
+    v_real_ = static_cast<float *>(ps_malloc(sizeof(float) * kFftSize));
+    v_imag_ = static_cast<float *>(ps_malloc(sizeof(float) * kFftSize));
+    window_ = static_cast<float *>(ps_malloc(sizeof(float) * kFftSize));
+    if (v_real_ == nullptr || v_imag_ == nullptr || window_ == nullptr)
     {
       LOG_ERROR("ANALYZER", "ps_malloc failed");
       free(v_real_);
       free(v_imag_);
-      v_real_ = v_imag_ = nullptr;
+      free(window_);
+      v_real_ = v_imag_ = window_ = nullptr;
       return false;
     }
+    /* 汉宁窗只算一次：原实现每帧 512 次 cos()，在 16ms 周期里开销明显 */
+    for (size_t i = 0; i < kFftSize; ++i)
+    {
+      window_[i] = static_cast<float>(
+          0.5 * (1.0 - cos(2.0 * PI * i / (kFftSize - 1))));
+    }
+    for (size_t b = 0; b < kBandCount; ++b)
+    {
+      smooth_[b] = 0.0f;
+    }
+    peak_track_ = 0.0f;
     inited_ = true;
     return true;
   }
@@ -49,12 +91,18 @@ namespace ekeys
     }
     free(v_real_);
     free(v_imag_);
+    free(window_);
     v_real_ = nullptr;
     v_imag_ = nullptr;
+    window_ = nullptr;
     inited_ = false;
     /* 复位长时峰值跟踪：重新启用（如离开拾音灯效后回来）时增益重新收敛，
      * 避免沿用上一段会话的高增益把安静片段放大 */
-    peak_track_ = 0.0;
+    peak_track_ = 0.0f;
+    for (size_t b = 0; b < kBandCount; ++b)
+    {
+      smooth_[b] = 0.0f;
+    }
     LOG_INFO("ANALYZER", "psram buffers released");
   }
 
@@ -66,12 +114,14 @@ namespace ekeys
       return;
     }
     /* C5 修复：count=0 时跳过 FFT，避免空帧白算 ~5ms CPU。
-     * 调用方（DisplayTask 频谱）每 20ms 一次，少算一帧不影响视觉。 */
+     * 调用方（DisplayTask 频谱）每 16ms 一次，少算一帧不影响视觉。
+     * 平滑状态仍按回落方向推进，避免读取超时造成电平瞬断。 */
     if (count == 0)
     {
       for (size_t b = 0; b < kBandCount; ++b)
       {
-        out_bands[b] = 0.0f;
+        smooth_[b] = smoothBand(smooth_[b], 0.0f);
+        out_bands[b] = smooth_[b];
       }
       return;
     }
@@ -80,20 +130,19 @@ namespace ekeys
       count = kFftSize;
     }
 
-    /* DC 去除 + 汉宁窗 + 补零 */
-    double mean = 0;
+    /* DC 去除 + 预计算汉宁窗 + 补零 */
+    float mean = 0;
     for (size_t i = 0; i < count; ++i)
     {
       mean += samples[i];
     }
-    mean = (count > 0) ? mean / static_cast<double>(count) : 0;
+    mean = (count > 0) ? mean / static_cast<float>(count) : 0;
 
     for (size_t i = 0; i < kFftSize; ++i)
     {
       if (i < count)
       {
-        const double window = 0.5 * (1.0 - cos(2.0 * PI * i / (kFftSize - 1)));
-        v_real_[i] = static_cast<float>((samples[i] - mean) * window);
+        v_real_[i] = (samples[i] - mean) * window_[i];
       }
       else
       {
@@ -104,14 +153,14 @@ namespace ekeys
 
     /*
      * 幅度谱 0..N/2 均分 16 段（跳过 DC），每段取峰值。
-     * 已手工加汉宁窗，无需再调用 windowing()（Rectangle 窗为无操作）。
+     * 窗口已在上面乘过，无需再调用 windowing()。
      *
      * B4 修复：原经验系数 8000 未上机校准；改为按本帧整体峰值自适应归一化，
      * 避免高频段贴地、满量程过载。两方向都偏向合理的视觉效果。
      */
-    ArduinoFFT<double> fft(v_real_, v_imag_,
-                           static_cast<uint_fast16_t>(kFftSize),
-                           static_cast<double>(kSampleRate));
+    ArduinoFFT<float> fft(v_real_, v_imag_,
+                          static_cast<uint_fast16_t>(kFftSize),
+                          static_cast<float>(kSampleRate));
     fft.compute(FFTDirection::Forward);
     fft.complexToMagnitude();
 
@@ -124,14 +173,14 @@ namespace ekeys
      * 注意：本机 16 段是等带宽（各 ~469Hz），与 WLED 的分段区间不完全一致，
      * 上机后可按实测观感再调这 16 个系数。
      */
-    constexpr double kPinkComp[kBandCount] = {
-        1.70, 1.71, 1.73, 1.78, 1.68, 1.56, 1.55, 1.63,
-        1.79, 1.62, 1.80, 2.06, 2.47, 3.35, 6.83, 9.55};
-    double peaks[kBandCount];
-    double frame_peak = 0;
+    constexpr float kPinkComp[kBandCount] = {
+        1.70f, 1.71f, 1.73f, 1.78f, 1.68f, 1.56f, 1.55f, 1.63f,
+        1.79f, 1.62f, 1.80f, 2.06f, 2.47f, 3.35f, 6.83f, 9.55f};
+    float peaks[kBandCount];
+    float frame_peak = 0;
     for (size_t b = 0; b < kBandCount; ++b)
     {
-      double peak = 0;
+      float peak = 0;
       for (size_t i = 1 + b * per_band; i < 1 + (b + 1) * per_band; ++i)
       {
         if (v_real_[i] > peak)
@@ -163,17 +212,17 @@ namespace ekeys
      * 当帧归一化掉（最强频段永远 ≈1.0），动态在源头被压平、灯效无跳动；
      * 放缓后瞬态先冲满再被归一化压回，节拍起伏回到 0~1 区间。
      * 回落系数（≈100 帧 ≈ 3s）保持不变。 */
-    constexpr double kPeakTrackRise = 0.25;
-    constexpr double kPeakTrackDecay = 0.01; /* 回落系数（≈100 帧 ≈ 3s） */
-    constexpr double kAbsNoiseFloor = 8000.0;
-    const double track_k = (frame_peak > peak_track_) ? kPeakTrackRise
-                                                      : kPeakTrackDecay;
+    constexpr float kPeakTrackRise = 0.25f;
+    constexpr float kPeakTrackDecay = 0.01f; /* 回落系数（≈100 帧 ≈ 3s） */
+    constexpr float kAbsNoiseFloor = 8000.0f;
+    const float track_k = (frame_peak > peak_track_) ? kPeakTrackRise
+                                                     : kPeakTrackDecay;
     peak_track_ += (frame_peak - peak_track_) * track_k;
-    const double denom = (peak_track_ > kAbsNoiseFloor) ? peak_track_
-                                                        : kAbsNoiseFloor;
+    const float denom = (peak_track_ > kAbsNoiseFloor) ? peak_track_
+                                                       : kAbsNoiseFloor;
     for (size_t b = 0; b < kBandCount; ++b)
     {
-      float v = static_cast<float>(peaks[b] / denom);
+      float v = peaks[b] / denom;
       if (v < 0.0f)
       {
         v = 0.0f;
@@ -182,7 +231,9 @@ namespace ekeys
       {
         v = 1.0f;
       }
-      out_bands[b] = v;
+      /* A2：平滑在分析层统一完成，效果层直接消费 */
+      smooth_[b] = smoothBand(smooth_[b], v);
+      out_bands[b] = smooth_[b];
     }
   }
 

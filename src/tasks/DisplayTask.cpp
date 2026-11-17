@@ -682,6 +682,9 @@ namespace ekeys
             {
                 spectrum_active_ = false;
                 Mic::instance().end();
+                /* 与 Mic::end() 对称释放 PSRAM 双缓冲，并复位长时峰值跟踪，
+                 * 避免下次进入拾音时沿用上一段会话的高增益放大底噪 */
+                AudioAnalyzer::instance().end();
                 VoiceRecognizer::instance().resume();
                 LOG_INFO("DISP", "spectrum stopped");
             }

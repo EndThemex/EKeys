@@ -3,8 +3,9 @@
  *
  * 频谱分析（FEATURE_DOC §10.3，阶段 06 任务 6.9）。
  *
- *   - FFT_SIZE=512 / BANDS=16，底层 arduinoFFT@2.0.4（ArduinoFFT<double> 模板 API）
- *   - DC 去除 + 汉宁窗 → 幅度谱 → 16 频段能量（对数压缩到 0~1）
+ *   - FFT_SIZE=512 / BANDS=16，底层 arduinoFFT@2.0.4（ArduinoFFT<float> 模板 API）
+ *   - DC 去除 + 预计算汉宁窗 → 幅度谱 → 16 频段能量（0~1）
+ *   - 输出前做逐段非对称平滑（起跳快/回落缓），三个灯效共用同一套系数
  *   - 本阶段只编译不调度；阶段 07 频谱屏接入
  */
 
@@ -38,7 +39,7 @@ namespace ekeys
 
         /*
          * 输入一帧 PCM（最多 FFT_SIZE 样本，不足补零）。
-         * 输出写入 out_bands[16]（0~1）。
+         * 输出写入 out_bands[16]（0~1，已做逐段非对称平滑）。
          */
         void process(const int16_t *samples, size_t count,
                      float *out_bands, size_t band_cap);
@@ -54,12 +55,15 @@ namespace ekeys
     private:
         AudioAnalyzer() = default;
 
-        double *v_real_ = nullptr; // kFftSize（arduinoFFT 2.0.4 模板 T=double）
-        double *v_imag_ = nullptr; // kFftSize
+        float *v_real_ = nullptr;  // kFftSize（arduinoFFT 2.0.4 模板 T=float）
+        float *v_imag_ = nullptr;  // kFftSize
+        float *window_ = nullptr;  // kFftSize，begin() 时预计算的汉宁窗
         bool inited_ = false;
         /* 长时峰值跟踪（归一化分母）：粉噪补偿后的帧峰值，
          * 瞬时跟上、极慢回落（≈3s），替代逐帧峰值归一化 */
-        double peak_track_ = 0.0;
+        float peak_track_ = 0.0f;
+        /* 逐段平滑状态（A2）：效果层不再各自平滑 */
+        float smooth_[kBandCount] = {0};
     };
 
 } // namespace ekeys

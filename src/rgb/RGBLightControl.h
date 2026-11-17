@@ -108,10 +108,9 @@ namespace ekeys
         bool highlight_[11] = {false};
         uint32_t last_render_ms_ = 0;
         uint8_t fire_seed_[11] = {0};
-        /* 拾音模式：最近一帧 16 频段能量（0~1）与 11 灯显示电平（含回落） */
+        /* 拾音模式：最近一帧 16 频段能量（0~1，AudioAnalyzer 已平滑） */
         float audio_bands_[16] = {0};
-        float audio_level_[11] = {0};
-        /* 矩阵律动：4 列电平（含回落），列 = 频段组，行高 = 音量 */
+        /* 矩阵律动/频率渐变：4 列电平（每帧取自 audio_bands_） */
         float audio_col_[4] = {0};
         /* 频率渐变：全局热浪前沿（0~1，乘 kGradientWaveSpan 得到"行"单位） */
         float audio_wave_ = 0.0f;

@@ -212,7 +212,7 @@ namespace ekeys
         settings_.rgb_click_mode =
             static_cast<uint8_t>(ini.GetLongValue("rgb", "rgb_click_mode", 0));
         settings_.rgb_brightness =
-            static_cast<uint8_t>(ini.GetLongValue("rgb", "rgb_brightness", 0));
+            static_cast<uint8_t>(ini.GetLongValue("rgb", "rgb_brightness", 80));
 
         settings_.tft_theme =
             static_cast<uint8_t>(ini.GetLongValue("display", "tft_theme", 0));

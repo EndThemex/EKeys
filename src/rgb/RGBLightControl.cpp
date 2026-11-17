@@ -20,16 +20,10 @@ namespace ekeys
 
         constexpr uint32_t kFrameIntervalMs = 30;
 
-        /* 拾音模式：非对称指数平滑（30ms/帧）。
-         * 起跳 0.55 ≈ 2~3 帧到顶，保留鼓点瞬态；回落 0.13 ≈ 0.5s 拖尾。
-         * 替代原"起跳瞬时 + 回落线性定值 0.045/帧"（起跳生硬、下落机械）。 */
-        constexpr float kSoundAttack = 0.55f;
-        constexpr float kSoundDecay = 0.13f;
         /* 拾音模式：静噪门限（与 MATRIX/GRADIENT 同尺度 0.04），
-         * 避免长时峰值归一化把室内底噪放大成灯光微闪 */
+         * 避免长时峰值归一化把室内底噪放大成灯光微闪。
+         * 起跳/回落平滑已下沉到 AudioAnalyzer（三个灯效共用）。 */
         constexpr float kSoundNoiseGate = 0.04f;
-        /* 拾音模式：残留截断（同 MATRIX），避免半亮像素长亮 */
-        constexpr float kSoundEpsilon = 0.004f;
         /* 拾音模式 gamma（≈sRGB 感知曲线）：低电平提亮
          * （0.2→0.35、0.5→0.64），弱声音的亮度变化在人眼里更连续 */
         constexpr float kSoundGamma = 0.65f;
@@ -37,20 +31,17 @@ namespace ekeys
         constexpr float kSoundIdleFloor = 0.12f;
 
         /* 矩阵律动滤波：
-         * 底噪/帧间波动会被归一化放大成高频微闪。门限以下视为 0；
-         * 起跳/回落改用指数平滑（非对称：起跳快而不过冲、回落缓），
-         * 消掉帧间抖动。2026-09-23：触发阈值调高 0.07 → 0.15
+         * 底噪/帧间波动会被归一化放大成高频微闪。门限以下视为 0。
+         * 2026-09-23：触发阈值调高 0.07 → 0.15
          * （弱信号/底噪不点亮，需更响的声音才触发灯效）。
          *
          * 2026-09-23 二次修订：AudioAnalyzer 归一化去掉了"帧峰值 ×0.25"的
          * 增益（改为长时峰值相除），同一段能量算出的电平平均小 ~4 倍，
          * 旧值 0.15 在新尺度下等价于 0.6 —— 高频列几乎点不亮。故按
          * 0.15 / 4 ≈ 0.04 换算回原先调好的触发灵敏度。
-         * 该门限 MATRIX 模式共用，一并跟随新尺度。 */
+         * 该门限 MATRIX 模式共用，一并跟随新尺度。
+         * 起跳/回落平滑已下沉到 AudioAnalyzer（A2）。 */
         constexpr float kMatrixNoiseGate = 0.04f; /* 静噪门限（归一化 0~1） */
-        constexpr float kMatrixAttack = 0.50f;    /* 起跳平滑系数（越大越跟手） */
-        constexpr float kMatrixDecay = 0.10f;     /* 回落平滑系数（越小越缓） */
-        constexpr float kMatrixEpsilon = 0.004f;  /* 残留截断，避免半亮像素长亮 */
 
         /* 频率渐变（GRADIENT）全局色波：热浪前沿以"行"为单位推进，
          * 满量程 4 行 = 3 行灯位 + 2 行色带宽，即满音量时暖色推过顶行。
@@ -59,11 +50,8 @@ namespace ekeys
         constexpr float kGradientWaveAttack = 0.45f; /* 推进速度（越大越跟手） */
         constexpr float kGradientWaveDecay = 0.08f;  /* 回落速度（越小越拖尾） */
 
-        /* 频率渐变柱体起落（与矩阵律动的 kMatrix* 分开调，互不影响）：
-         * 起跳快（~2 帧到顶）、回落跟拍（一个节拍内基本落完），
-         * 让柱高随节拍明显起伏。 */
-        constexpr float kGradientAttack = 0.60f;
-        constexpr float kGradientDecay = 0.15f;
+        /* 频率渐变柱体起落：起跳/回落平滑同由 AudioAnalyzer 统一完成，
+         * 效果层不再单独维护一套系数。 */
 
         /* 频率渐变列分组（近似对数）：16 段等带宽（各 ~469Hz）按低频细分、
          * 高频粗分归并成 4 列，避免上半段 3 列（3k~7.5kHz）各只占 1 段能量 */
@@ -156,6 +144,15 @@ namespace ekeys
         {
             /* 切模式时清空峰值水位，避免残留峰值点凭空出现在渐变模式里 */
             audio_peak_[0] = audio_peak_[1] = audio_peak_[2] = audio_peak_[3] = 0.0f;
+            /* 同时清空最近一帧频段与各模式平滑状态：audio_bands_ 在离开拾音
+             * 后会保留最后一帧值，不清会让重新进入拾音模式的首帧用陈旧数据
+             * 闪一下（尤其上一段会话最后是满电平） */
+            for (uint8_t i = 0; i < 16; ++i)
+            {
+                audio_bands_[i] = 0.0f;
+            }
+            audio_col_[0] = audio_col_[1] = audio_col_[2] = audio_col_[3] = 0.0f;
+            audio_wave_ = 0.0f;
         }
         if (mode_changed && mode_ == RGB_NONE_MODE)
         {
@@ -350,20 +347,9 @@ namespace ekeys
                     target = 0.0f;
                 }
 
-                /* 非对称指数平滑：起跳快跟随、回落缓形成拖尾，
-                 * 消掉频段逐帧跳变（原实现起跳瞬时、回落线性定值） */
-                float level = audio_level_[i];
-                const float k = (target > level) ? kSoundAttack : kSoundDecay;
-                level += (target - level) * k;
-                if (level < kSoundEpsilon)
-                {
-                    level = 0.0f;
-                }
-                else if (level > 1.0f)
-                {
-                    level = 1.0f;
-                }
-                audio_level_[i] = level;
+                /* A2：起跳/回落平滑已下沉到 AudioAnalyzer，
+                 * 三个灯效共用一套系数，这里直接使用平滑后的频段能量 */
+                const float level = target;
 
                 uint8_t r, g, b;
                 hueToRgb(hueWheel(i * 256 / RGBDriver::kLedCount), r, g, b);
@@ -387,11 +373,12 @@ namespace ekeys
              *
              *   高度：每列按自身音量自下而上点亮 0~3 行（顶部行含小数亮度过渡），
              *         并叠加 peak-hold 峰值点（白光，回落时独自下落到柱顶之下）
-             *   颜色：全局色波——4 列"平滑前"的原始电平均值驱动同一条
-             *         "热浪前沿"，同一行永远同色；行色相由 age = 前沿 - 行号
+             *   颜色：全局色波——4 列电平均值驱动同一条"热浪前沿"，
+             *         同一行永远同色；行色相由 age = 前沿 - 行号
              *         线性决定（170 蓝 → 0 红），前沿随音量自底向上推进，
              *         满音量时推过顶行（全场渐暖），安静后缓慢回落。
-             *         取平滑前电平是为了让颜色跟节拍一起跳，不被列平滑拖慢。
+             *         电平已由 AudioAnalyzer 逐段平滑（起跳 2~3 帧），
+             *         颜色仍能跟拍，不再需要效果层单独取原始值。
              */
             float sum = 0.0f;
             for (uint8_t col = 0; col < 4; ++col)
@@ -416,21 +403,11 @@ namespace ekeys
                 {
                     target = 0.0f;
                 }
-                /* 色波用平滑前的原始电平累积，节拍一到颜色立刻跟随 */
+                /* 色波累积当前电平（分析层已平滑，起跳足够快） */
                 sum += target;
 
-                float level = audio_col_[col];
-                const float k = (target > level) ? kGradientAttack
-                                                 : kGradientDecay;
-                level += (target - level) * k;
-                if (level < kMatrixEpsilon)
-                {
-                    level = 0.0f;
-                }
-                else if (level > 1.0f)
-                {
-                    level = 1.0f;
-                }
+                /* A2：平滑已下沉到 AudioAnalyzer */
+                const float level = target;
                 audio_col_[col] = level;
 
                 /* 峰值水位（peak-hold）：瞬间抬高、每帧定速下落 */
@@ -556,19 +533,8 @@ namespace ekeys
                     target = 0.0f;
                 }
 
-                /* 非对称指数平滑：起跳快跟随、回落缓，消除帧间微闪 */
-                float level = audio_col_[col];
-                const float k = (target > level) ? kMatrixAttack : kMatrixDecay;
-                level += (target - level) * k;
-                if (level < kMatrixEpsilon)
-                {
-                    level = 0.0f;
-                }
-                else if (level > 1.0f)
-                {
-                    level = 1.0f;
-                }
-                audio_col_[col] = level;
+                /* A2：起跳/回落平滑已下沉到 AudioAnalyzer */
+                const float level = target;
 
                 /* 行下标 → LED 下标（与 MatrixScanner::keyIdToRowCol 同布局，
                  * ROW0 只有 COL0~2，故行基址 0/3/7） */
