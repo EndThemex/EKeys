@@ -50,6 +50,8 @@ void ui_init(void)
     ui_HaScreenSecondary_screen_init();
     ui_SettingScreen_screen_init();
     ui_SettingScreenSecondary_screen_init();
+    ui_AiScreen_screen_init();
+    ui_AiScreenSecondary_screen_init();
     
     ui____initial_actions0 = lv_obj_create(NULL);
     ui_set_active_screen_tag(UI_SCREEN_MAIN);
@@ -71,4 +73,6 @@ void ui_destroy(void)
     ui_HaScreenSecondary_screen_destroy();
     ui_SettingScreen_screen_destroy();
     ui_SettingScreenSecondary_screen_destroy();
+    ui_AiScreen_screen_destroy();
+    ui_AiScreenSecondary_screen_destroy();
 }

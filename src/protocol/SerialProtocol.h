@@ -62,6 +62,19 @@ namespace ekeys
         /* MainTask::loop() 周期调用：流式收字节，拼成行后解析分发 */
         void poll();
 
+        /*
+         * AI Mode 串口分流（docs/13 §4.4）：
+         *   - feedByte：单字节喂入行解析（AiSerialLink 回喂非 AI 字节用）；
+         *   - isLineBufferEmpty：'\n' 归属判定（空 = 可被 AI 链路吞掉置期望
+         *     magic 标志；非空 = 它是 JSON 行结束符，必须回喂）；
+         *   - setSuspendForAiBinary：AiSerialLink 进入二进制态时置 true，
+         *     poll() 直接返回（否则其 while(Serial.available()) 会无条件
+         *     消费剩余帧字节，造成 line overflow / 伪造 parse error）。
+         */
+        void feedByte(char c);
+        bool isLineBufferEmpty() const { return line_len_ == 0 && !overflow_; }
+        void setSuspendForAiBinary(bool suspend) { ai_suspend_ = suspend; }
+
         /* 把构建好的响应文档序列化为 JSON 行发出 */
         void sendDocument(JsonDocument &doc);
 
@@ -102,6 +115,7 @@ namespace ekeys
         size_t line_len_ = 0;
         bool overflow_ = false; // 超长行丢弃直到换行
         bool begun_ = false;
+        bool ai_suspend_ = false; // AI 二进制态挂起（docs/13 §4.4 规则 5）
         LineSink line_sink_ = nullptr;
     };
 

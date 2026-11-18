@@ -35,6 +35,8 @@ extern "C" {
 #include "ui_HaScreenSecondary.h"
 #include "ui_SettingScreen.h"
 #include "ui_SettingScreenSecondary.h"
+#include "ui_AiScreen.h"
+#include "ui_AiScreenSecondary.h"
 
 #ifdef __cplusplus
 } /*extern "C"*/

@@ -24,6 +24,7 @@
 #include <time.h>
 
 #include "app/AppContext.h"
+#include "ai/AiMode.h"
 #include "audio/AudioPad.h"
 #include "audio/Speaker.h"
 #include "config/Configuration.h"
@@ -413,6 +414,11 @@ namespace ekeys
             {
                 out = UI_SCREEN_HA_SECONDARY;
             }
+            else if (fk == "KEY_FUNCTION_PAGE_AI")
+            {
+                /* AI 图像流二级页（docs/13 §8.3）：与其它 PAGE_* 一致跳功能页 */
+                out = UI_SCREEN_AI_SECONDARY;
+            }
             else
             {
                 return false;
@@ -423,6 +429,13 @@ namespace ekeys
 
     void MainTask::loop()
     {
+        /*
+         * AI 串口分流（docs/13 §4.4）：AI 页激活时先经 AiSerialLink 判定
+         * 0xA5 二进制态，非帧字节回喂 SerialProtocol（必须在 SerialProtocol
+         * poll 之前，否则其 while(Serial.available()) 会无条件消费帧字节）。
+         */
+        ai::AiMode::instance().pollSerial();
+
         /* 协议层轮询（CDC JSON 行收发），不依赖 keyboard_ 注入 */
         SerialProtocol::instance().poll();
 
@@ -1024,6 +1037,8 @@ namespace ekeys
         NtpSync::instance().process();
         DiscoveryService::instance().process();
         TcpChannel::instance().process();
+        /* AI Mode TCP 泵（docs/13 §4.3）：accept/读流/半帧超时，非阻塞 */
+        ai::AiMode::instance().pollNetwork();
         /* 音效板：消费 DisplayTask（Core 0）的播放/停止请求。必须先于
          * Speaker::loop——启停与喂流同任务串行访问 Audio 实例（INT WDT 修复） */
         AudioPad::instance().service();

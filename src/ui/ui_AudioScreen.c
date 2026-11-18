@@ -8,6 +8,7 @@
 #include "ui_AudioScreen.h"
 #include "ui_helpers.h"
 #include "ui_AudioScreenSecondary.h"
+#include "ui_AiScreen.h"
 #include "ui_MainScreen.h"
 #include "ui_MusicScreen.h"
 #include "ui_PcStatusScreen.h"
@@ -46,8 +47,8 @@ void ui_event_AudioScreen(lv_event_t *e)
     uintptr_t key = (uintptr_t)lv_event_get_param(e);
     if (key == (uintptr_t)LV_KEY_RIGHT)
     {
-        ui_set_active_screen_tag(UI_SCREEN_PC_STATUS);
-        _ui_screen_change(&ui_PcStatusScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_PcStatusScreen_screen_init);
+        ui_set_active_screen_tag(UI_SCREEN_AI);
+        _ui_screen_change(&ui_AiScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_AiScreen_screen_init);
         lv_refr_now(NULL);
     }
     else if (key == (uintptr_t)LV_KEY_LEFT)

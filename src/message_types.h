@@ -42,6 +42,8 @@ namespace ekeys
         Navigate = 10,      /* 屏幕路由（docs/05 §5.2），载荷 navigate_target */
         BatteryStatus = 11, /* 电池电量（5s 节流，载荷 battery_percent） */
         AudioPad = 12,      /* 音效板绑定/播放状态（载荷 audio_pad） */
+        AiFrame = 13,       /* AI Mode 完整帧就绪（载荷 ai_slot，仅槽号不搬像素） */
+        AiStatus = 14,      /* AI Mode 统计/HUD（载荷 ai_status，AiTask 2Hz 投递） */
     };
 
     /* PC 状态（CMD_PC_STATUS，阶段 06 起由协议层填充） */
@@ -103,6 +105,23 @@ namespace ekeys
     };
 
     /*
+     * AI Mode 状态（docs/13 §7.2）：AiTask 2Hz 投递，仅刷 HUD 统计。
+     *   fps_x10：提交帧率 ×10；bytes_per_s：接收负载字节速率；
+     *   state：ai::AiPageState（0 WAITING / 1 STREAMING / 2 SERIAL / 3 ERROR）；
+     *   format：最后接收帧的 ai::AiFrameType；dropped：累计丢帧数。
+     */
+    struct AiStatusInfo
+    {
+        uint16_t fps_x10{0};
+        uint32_t bytes_per_s{0};
+        uint8_t state{0};
+        uint8_t format{0};
+        uint16_t dropped{0};
+        uint16_t width{428};
+        uint16_t height{142};
+    };
+
+    /*
      * 键映射 Profile 屏数据：
      *   keymap_labels[i] 对应应用键 i+1，格式 "K{i}:映射"（docs/05 §5.4）。
      *   profile_index：本消息描述的 profile（0~7）；
@@ -143,6 +162,7 @@ namespace ekeys
         uint8_t navigate_target{0}; /* Navigate：ui_screen_tag_t */
         bool asr_recording{false};
         uint8_t battery_percent{0}; /* BatteryStatus：0~100 */
+        uint8_t ai_slot{0};         /* AiFrame：AiFramePool 槽号 */
 
         ui_settings_snapshot_t setting{};
         PcStatusInfo pc_status{};
@@ -150,6 +170,7 @@ namespace ekeys
         MusicPlayerInfo music_player{};
         KeymapProfileInfo keymap_profile{};
         AudioPadInfo audio_pad{};
+        AiStatusInfo ai_status{};
     };
 
     /*

@@ -39,36 +39,45 @@ namespace ekeys
         {
             return;
         }
+        /* AI 二进制态挂起（docs/13 §4.4 规则 5）：剩余帧字节归 AiSerialLink，
+         * 不得被行解析消费（防 line overflow / 吃掉下一帧 0xA5） */
+        if (ai_suspend_)
+        {
+            return;
+        }
 
         while (Serial.available() > 0)
         {
-            char c = static_cast<char>(Serial.read());
+            feedByte(static_cast<char>(Serial.read()));
+        }
+    }
 
-            if (c == '\n')
+    void SerialProtocol::feedByte(char c)
+    {
+        if (c == '\n')
+        {
+            if (overflow_)
             {
-                if (overflow_)
-                {
-                    overflow_ = false;
-                    line_len_ = 0;
-                    continue;
-                }
-                line_[line_len_] = '\0';
-                handleLine(line_);
+                overflow_ = false;
                 line_len_ = 0;
+                return;
             }
-            else if (c == '\r')
-            {
-                continue;
-            }
-            else if (line_len_ + 1 >= kLineBufferSize)
-            {
-                overflow_ = true;
-                LOG_WARNING("PROTO", "line overflow, discarded");
-            }
-            else
-            {
-                line_[line_len_++] = c;
-            }
+            line_[line_len_] = '\0';
+            handleLine(line_);
+            line_len_ = 0;
+        }
+        else if (c == '\r')
+        {
+            return;
+        }
+        else if (line_len_ + 1 >= kLineBufferSize)
+        {
+            overflow_ = true;
+            LOG_WARNING("PROTO", "line overflow, discarded");
+        }
+        else
+        {
+            line_[line_len_++] = c;
         }
     }
 

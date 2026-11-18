@@ -117,6 +117,10 @@ namespace ekeys
         uint8_t tft_brightness_ = 80; /* 用户配置亮度，退出省电态时恢复 */
         PowerIdleState power_idle_state_ = PowerIdleState::Normal;
         TickType_t last_input_tick_ = 0; /* 上次输入时刻（开机/任意操作刷新） */
+
+        /* AI Mode 激活钩子（docs/13 §7.2）：run() 每帧 tag 比对，变化时
+         * 调 AiMode::setScreenActive()（DisplayTask 单写方） */
+        ui_screen_tag_t last_screen_tag_ = UI_SCREEN_UNKNOWN;
     };
 
 } // namespace ekeys

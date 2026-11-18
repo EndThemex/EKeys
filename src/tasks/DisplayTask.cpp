@@ -22,6 +22,8 @@
 
 #include "config/Configuration.h"
 #include "config/PowerConfig.h"
+#include "ai/AiFramePool.h"
+#include "ai/AiMode.h"
 #include "audio/AudioAnalyzer.h"
 #include "audio/AudioPad.h"
 #include "audio/Mic.h"
@@ -34,6 +36,8 @@
 #include "rgb/RGBLightControl.h"
 #include "protocol/SerialProtocol.h"
 #include "ui/ui_types.h"
+#include "ui/ui_AiScreen.h"
+#include "ui/ui_AiScreenSecondary.h"
 #include "ui/ui_AudioScreen.h"
 #include "ui/ui_AudioScreenSecondary.h"
 #include "ui/ui_FlipClock.h"
@@ -80,6 +84,52 @@ namespace ekeys
          * DeviceSettings.work_mode（0=USB 1=BLE）与
          * ui_StatusBar 的 WORKMODE 枚举同序（状态栏图标显示，主页不再有模式文字）。
          */
+
+        /*
+         * AI 页内置渐变测试图（docs/13 验收 P0）：进 AI 页且无流时，
+         * 用 FramePool 槽 0 画一张 RGB 渐变整帧并直接 adopt 上屏，
+         * 验证 PSRAM 帧槽 → lv_img 的渲染链路。
+         */
+        void fillAiTestPattern(uint8_t *px)
+        {
+            auto *rows = reinterpret_cast<uint16_t *>(px);
+            for (uint16_t y = 0; y < 142; ++y)
+            {
+                uint16_t *row = rows + static_cast<uint32_t>(y) * 428;
+                for (uint16_t x = 0; x < 428; ++x)
+                {
+                    const uint8_t r = static_cast<uint8_t>(x * 255 / 427);
+                    const uint8_t g = static_cast<uint8_t>(y * 255 / 141);
+                    const uint8_t b = 96 + static_cast<uint8_t>((x + y) % 64);
+                    row[x] = static_cast<uint16_t>(((r & 0xF8) << 8) |
+                                                   ((g & 0xFC) << 3) | (b >> 3));
+                }
+            }
+        }
+
+        void showAiTestPattern()
+        {
+            ai::AiFramePool &pool = ai::AiFramePool::instance();
+            if (!pool.ensureAllocated())
+            {
+                ui_AiScreenSecondary_set_state(UI_AI_STATE_ERROR, "PSRAM ALLOC FAILED");
+                return;
+            }
+            const int slot = pool.acquireWriteSlot();
+            if (slot < 0)
+            {
+                return;
+            }
+            fillAiTestPattern(pool.px(slot));
+            pool.adoptDisplaying(slot);
+            ui_AiScreenSecondary_show_frame(pool.dsc(slot));
+            /* 初始状态：WiFi 就绪 → WAITING；无 WiFi → 串口模式（USB CDC 兜底） */
+            ui_AiScreenSecondary_set_state(
+                ai::AiMode::instance().netReady() ? UI_AI_STATE_WAITING
+                                                  : UI_AI_STATE_SERIAL,
+                nullptr);
+            LOG_INFO("AI", "test pattern shown (slot %d)", slot);
+        }
 
     } // namespace
 
@@ -224,6 +274,25 @@ namespace ekeys
                 /* 频谱调度（阶段 07 7.2）：仅音乐屏可见时占用 Mic/CPU */
                 updateSpectrum();
                 last = now;
+            }
+
+            /*
+             * AI 页激活钩子（docs/13 §7.2）：run() 每帧 tag 比对（比
+             * navigateNow 里埋点更稳——旋钮/矩阵键/触屏按钮/协议导航
+             * 全都覆盖）。只有进入二级功能页才启停 AiMode 并渲染测试图；
+             * 一级入口页仅显示图标标题，不开启串口/WiFi 握手。
+             */
+            {
+                const ui_screen_tag_t cur_tag = ui_get_active_screen_tag();
+                if (cur_tag != last_screen_tag_)
+                {
+                    last_screen_tag_ = cur_tag;
+                    ai::AiMode::instance().setScreenActive(cur_tag == UI_SCREEN_AI_SECONDARY);
+                    if (cur_tag == UI_SCREEN_AI_SECONDARY)
+                    {
+                        showAiTestPattern();
+                    }
+                }
             }
 
             if (xQueueReceive(queue_, &msg, kDisplayMessageBlockTicks) == pdTRUE)
@@ -392,6 +461,25 @@ namespace ekeys
             applyAudioPad(msg);
             break;
 
+        case DisplayMessageType::AiFrame:
+        {
+            /* AI 帧上屏（docs/13 §7.2）：只换 lv_img 数据指针（AiFramePool 槽），
+             * Queued → Displaying 并释放上一个 Displaying 槽 */
+            ai::AiFramePool::instance().presentSlot(msg.ai_slot);
+            ui_AiScreenSecondary_show_frame(ai::AiFramePool::instance().dsc(msg.ai_slot));
+            break;
+        }
+
+        case DisplayMessageType::AiStatus:
+        {
+            /* HUD 统计 2Hz（AiTask 投递）：顺带覆盖等待/流式状态文案 */
+            const AiStatusInfo &st = msg.ai_status;
+            ui_AiScreenSecondary_set_stats(st.fps_x10, st.bytes_per_s, st.format,
+                                           st.dropped, st.width, st.height);
+            ui_AiScreenSecondary_set_state(st.state, nullptr);
+            break;
+        }
+
         default:
             break;
         }
@@ -486,6 +574,12 @@ namespace ekeys
             break;
         case UI_SCREEN_SETTING_SECONDARY:
             target = ui_SettingScreenSecondary;
+            break;
+        case UI_SCREEN_AI:
+            target = ui_AiScreen;
+            break;
+        case UI_SCREEN_AI_SECONDARY:
+            target = ui_AiScreenSecondary;
             break;
         default:
             return;
@@ -774,6 +868,7 @@ namespace ekeys
         case UI_SCREEN_PC_STATUS_SECONDARY:
         case UI_SCREEN_HA_SECONDARY:
         case UI_SCREEN_SETTING_SECONDARY:
+        case UI_SCREEN_AI_SECONDARY:
             return true;
         default:
             return false;
@@ -788,6 +883,8 @@ namespace ekeys
         {
             return false;
         }
+        /* AI 二级功能页（图像流）常驻展示，不参与 5s 自动回主页（docs/13 §4.1）；
+         * 一级入口页与其它一级页一致，仍参与自动回主页 */
         if (isSecondaryScreen(tag))
         {
             return false;
@@ -827,6 +924,13 @@ namespace ekeys
                               ? PowerIdleState::Dimmed
                               : PowerIdleState::Off;
             }
+        }
+
+        /* AI 二级功能页常亮豁免（docs/13 §4.1）：图像流展示期间强制 Normal，
+         * 若已处于省电态（进页前已空闲）立即恢复亮度 */
+        if (ui_get_active_screen_tag() == UI_SCREEN_AI_SECONDARY)
+        {
+            desired = PowerIdleState::Normal;
         }
 
         if (desired == power_idle_state_)

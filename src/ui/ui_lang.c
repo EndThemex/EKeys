@@ -11,6 +11,8 @@
 #include "ui_KeyMapped.h"
 #include "ui_MusicScreen.h"
 #include "ui_AudioScreen.h"
+#include "ui_AiScreen.h"
+#include "ui_AiScreenSecondary.h"
 #include "ui_PcStatusScreen.h"
 #include "ui_HaScreen.h"
 #include "ui_SettingScreen.h"
@@ -38,6 +40,8 @@ void ui_lang_apply(void)
     ui_KeyMapped_apply_language(s_ui_lang);
     ui_MusicScreen_apply_language(s_ui_lang);
     ui_AudioScreen_apply_language(s_ui_lang);
+    ui_AiScreen_apply_language(s_ui_lang);
+    ui_AiScreenSecondary_apply_language(s_ui_lang);
     ui_PcStatusScreen_apply_language(s_ui_lang);
     ui_HaScreen_apply_language(s_ui_lang);
     ui_SettingScreen_apply_language(s_ui_lang);

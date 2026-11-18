@@ -64,7 +64,11 @@ extern "C"
     UI_SCREEN_HA,
     UI_SCREEN_HA_SECONDARY,
     UI_SCREEN_SETTING,
-    UI_SCREEN_SETTING_SECONDARY
+    UI_SCREEN_SETTING_SECONDARY,
+    /* AI 一级入口页（图标 + 标题）；旋钮单击进入 AI_SECONDARY 才开始收发 */
+    UI_SCREEN_AI,
+    /* AI 图像流二级页（docs/13）：矩阵键 101~111 不作焦点跳转，HID 照发 */
+    UI_SCREEN_AI_SECONDARY
   } ui_screen_tag_t;
 
   ui_screen_tag_t ui_get_active_screen_tag(void);

@@ -15,6 +15,7 @@
 | 07   | [07-placeholder-completion.md](./07-placeholder-completion.md)                            | 2.4G / 频谱 / OTA / 占位命令补齐         | 06    |
 | 09   | [09-ui-theme-system.md](./09-ui-theme-system.md)（已拆分为 [theme-spec/](./theme-spec/)） | UI 主题系统（调色板 + 切屏动画）         | 05    |
 | 10   | [10-bluetooth-media-control.md](./10-bluetooth-media-control.md)                          | BLE HID Consumer 媒体控制 + App 状态推送 | 06    |
+| 13   | [13-ai-mode-image-streaming.md](./13-ai-mode-image-streaming.md)                          | AI Mode 页面：串口 / WiFi 图像接收与渲染 | 05/06 |
 
 ## 其他文档
 
