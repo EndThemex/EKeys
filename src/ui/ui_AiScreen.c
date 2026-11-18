@@ -75,7 +75,7 @@ void ui_AiScreen_screen_init(void)
         lv_style_set_border_width(&s_ai_icon_style, 3);
         lv_style_set_border_color(&s_ai_icon_style, lv_color_hex(0xF5F8FF));
         lv_style_set_border_opa(&s_ai_icon_style, LV_OPA_COVER);
-        lv_style_set_radius(&s_ai_icon_style, 18);
+        lv_style_set_radius(&s_ai_icon_style, 16);
         s_ai_icon_style_ready = true;
     }
 
@@ -90,11 +90,13 @@ void ui_AiScreen_screen_init(void)
     }
 
     /* 图标：圆角描边方块 + "AI"（ui_font_Symbol48 未收录图片符号，
-     * 沿用 docs/13 §8.1 的"文字 + 描边矩形"占位方案） */
+     * 沿用 docs/13 §8.1 的"文字 + 描边矩形"占位方案）。
+     * 尺寸按可视面积与其它一级页的 48px 字形对齐（64×64），
+     * 避免描边框撑满 80×80 时与下方标题重叠。 */
     s_AiIcon = lv_obj_create(ui_AiScreen);
-    lv_obj_set_size(s_AiIcon, 80, 80);
-    lv_obj_set_x(s_AiIcon, 20);
-    lv_obj_set_y(s_AiIcon, -2);
+    lv_obj_set_size(s_AiIcon, 64, 64);
+    lv_obj_set_x(s_AiIcon, 4);
+    lv_obj_set_y(s_AiIcon, -18);
     lv_obj_set_align(s_AiIcon, LV_ALIGN_CENTER);
     lv_obj_add_style(s_AiIcon, &s_ai_icon_style, 0);
     lv_obj_clear_flag(s_AiIcon, LV_OBJ_FLAG_SCROLLABLE);
@@ -111,7 +113,7 @@ void ui_AiScreen_screen_init(void)
     lv_label_set_long_mode(s_AiTitle, LV_LABEL_LONG_CLIP);
     lv_obj_set_style_text_align(s_AiTitle, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_add_style(s_AiTitle, &s_ai_title_style, 0);
-    lv_obj_align_to(s_AiTitle, s_AiIcon, LV_ALIGN_OUT_BOTTOM_MID, -16, -22);
+    lv_obj_align_to(s_AiTitle, s_AiIcon, LV_ALIGN_OUT_BOTTOM_MID, 0, 2);
 
     lv_obj_add_event_cb(ui_AiScreen, ui_event_AiScreen, LV_EVENT_ALL, NULL);
 }
