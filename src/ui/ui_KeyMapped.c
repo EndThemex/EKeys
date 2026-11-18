@@ -58,7 +58,7 @@ static void keymapped_apply_cached_image(void)
 }
 
 /*
- * 图标回退路径：显示符号（lv_img 支持符号 src，走 montserrat_48 文字样式）。
+ * 图标回退路径：显示符号（lv_img 支持符号 src，走 ui_font_Symbol48 文字样式）。
  * widget 恢复 80×80 设计尺寸——位图路径会按图标尺寸缩放 widget。
  */
 void ui_KeyMapped_set_profile_icon_source(const char *fallback_symbol)
@@ -210,7 +210,7 @@ void ui_KeyMapped_screen_init(void)
     if (!s_keymapped_icon_style_ready)
     {
         lv_style_init(&s_keymapped_icon_style);
-        lv_style_set_text_font(&s_keymapped_icon_style, &lv_font_montserrat_48);
+        lv_style_set_text_font(&s_keymapped_icon_style, &ui_font_Symbol48);
         s_keymapped_icon_style_ready = true;
     }
 

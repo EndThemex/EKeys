@@ -19,6 +19,7 @@
 #include "DisplayDriver.h"
 #include "hardware/PinMap.h"
 #include "logging/LogManager.h"
+#include "ui/ui_types.h"
 
 namespace ekeys {
 
@@ -53,7 +54,7 @@ void showSplashImpl()
     lv_obj_t *label = lv_label_create(splash_scr);
     lv_label_set_text(label, "EKeys");
     lv_obj_set_style_text_color(label, lv_palette_main(LV_PALETTE_ORANGE), 0);
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_48, 0);
+    lv_obj_set_style_text_font(label, &ui_font_Symbol48, 0);
     lv_obj_center(label);
 
     /* 设为活动屏并同步渲染一帧，立即上屏（不依赖 lv_tick / timer） */

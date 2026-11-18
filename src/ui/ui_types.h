@@ -42,6 +42,10 @@ extern "C"
   LV_FONT_DECLARE(ui_font_FontCKJGT16);
   LV_FONT_DECLARE(ui_font_FontCKJGT24);
   LV_FONT_DECLARE(ui_font_FontCKJGT28);
+  /* 48px 精简字体：仅含 "EKeys" 5 个字母 + 8 个内置 LV_SYMBOL 字形，
+   * 替代体积 94 KB 的 lv_font_montserrat_48（见 ui_font_Symbol48.c 头注释）。
+   * 如需在 48px 上显示其它字符，必须重新生成该字体。 */
+  LV_FONT_DECLARE(ui_font_Symbol48);
 
   // SCREEN NAVIGATION
 

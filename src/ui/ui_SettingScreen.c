@@ -162,7 +162,7 @@ void ui_SettingScreen_screen_init(void)
     lv_img_set_src(ui_Image3, LV_SYMBOL_SETTINGS);
     static lv_style_t icon_large_style;
     lv_style_init(&icon_large_style);
-    lv_style_set_text_font(&icon_large_style, &lv_font_montserrat_48);
+    lv_style_set_text_font(&icon_large_style, &ui_font_Symbol48);
     lv_obj_add_style(ui_Image3, &icon_large_style, 0);
     lv_obj_set_width(ui_Image3, 80);
     lv_obj_set_height(ui_Image3, 80);

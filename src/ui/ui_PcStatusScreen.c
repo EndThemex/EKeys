@@ -200,7 +200,7 @@ void ui_PcStatusScreen_screen_init(void)
     if (!s_pc_status_icon_style_ready)
     {
         lv_style_init(&s_pc_status_icon_style);
-        lv_style_set_text_font(&s_pc_status_icon_style, &lv_font_montserrat_48);
+        lv_style_set_text_font(&s_pc_status_icon_style, &ui_font_Symbol48);
         s_pc_status_icon_style_ready = true;
     }
 

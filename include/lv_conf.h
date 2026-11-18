@@ -101,7 +101,9 @@
 #define LV_FONT_MONTSERRAT_42 0
 #define LV_FONT_MONTSERRAT_44 0
 #define LV_FONT_MONTSERRAT_46 0
-#define LV_FONT_MONTSERRAT_48 1
+/* 48px 内置字体含完整 ASCII（编译后约 94 KB），本工程仅用其显示
+ * "EKeys" 与少量 LV_SYMBOL，已由 ui_font_Symbol48（src/ui）替代，故关闭。 */
+#define LV_FONT_MONTSERRAT_48 0
 
 /* 字体解压缩总开关（lv_font_fmt_txt 的 tiny_rle 解码路径，压缩字体必须开启） */
 #define LV_USE_FONT_COMPRESSED 1

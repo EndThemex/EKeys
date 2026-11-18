@@ -103,7 +103,7 @@ void ui_AudioScreen_screen_init(void)
     if (!s_audio_screen_icon_style_ready)
     {
         lv_style_init(&s_audio_screen_icon_style);
-        lv_style_set_text_font(&s_audio_screen_icon_style, &lv_font_montserrat_48);
+        lv_style_set_text_font(&s_audio_screen_icon_style, &ui_font_Symbol48);
         s_audio_screen_icon_style_ready = true;
     }
 
