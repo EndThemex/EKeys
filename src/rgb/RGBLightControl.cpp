@@ -197,10 +197,53 @@ namespace ekeys
         return static_cast<uint8_t>(hue & 0xFF);
     }
 
+    void RGBLightControl::setGamePalette(const RgbColor *colors)
+    {
+        if (colors == nullptr)
+        {
+            clearGamePalette();
+            return;
+        }
+        for (uint8_t i = 0; i < RGBDriver::kLedCount; ++i)
+        {
+            game_palette_[i] = colors[i];
+        }
+        game_palette_active_ = true;
+        renderFrame(); /* 立即上屏，不等 30ms tick */
+    }
+
+    void RGBLightControl::clearGamePalette()
+    {
+        if (!game_palette_active_)
+        {
+            return;
+        }
+        game_palette_active_ = false;
+        /* 强制普通模式下一帧重绘（NONE 模式的掩码跳过逻辑依赖此重置） */
+        last_none_mask_ = 0xFFFF;
+        renderFrame();
+    }
+
     void RGBLightControl::renderFrame()
     {
         RGBDriver &led = RGBDriver::instance();
         const RgbColor c = currentSingleColor();
+
+        /* 游戏调色板覆盖（docs/14）：最高优先级，跳过所有普通灯效分支 */
+        if (game_palette_active_)
+        {
+            for (uint8_t i = 0; i < RGBDriver::kLedCount; ++i)
+            {
+                const RgbColor &g = game_palette_[i];
+                /* 亮度按当前配置缩放，避免游戏灯刺眼 */
+                led.setPixel(i,
+                             static_cast<uint8_t>((uint16_t)g.r * brightness_ / 100),
+                             static_cast<uint8_t>((uint16_t)g.g * brightness_ / 100),
+                             static_cast<uint8_t>((uint16_t)g.b * brightness_ / 100));
+            }
+            led.show();
+            return;
+        }
 
         /*
          * 关灯模式下仍渲染点击高亮（FEATURE_DOC §9：RGB_CLICK_MODE 独立于

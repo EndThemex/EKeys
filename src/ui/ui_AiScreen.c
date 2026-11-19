@@ -5,7 +5,7 @@
  * 大图标 + 标题，旋钮单击（ENTER）才进入二级功能页 ui_AiScreenSecondary，
  * 进入后才启动串口 / WiFi 收发（避免仅翻页就开启握手）。
  *
- * 键值约定：LEFT→音效页，RIGHT→PC 状态页，ENTER→AI 功能页，ESC→主页。
+ * 键值约定：LEFT→音效页，RIGHT→游戏菜单页（docs/14 轮播插入），ENTER→AI 功能页，ESC→主页。
  */
 
 #include "ui_AiScreen.h"
@@ -14,9 +14,9 @@
 
 #include "ui_AiScreenSecondary.h"
 #include "ui_AudioScreen.h"
+#include "ui_GameScreen.h"
 #include "ui_helpers.h"
 #include "ui_MainScreen.h"
-#include "ui_PcStatusScreen.h"
 
 lv_obj_t *ui_AiScreen = NULL;
 static lv_obj_t *s_AiIcon = NULL;
@@ -38,8 +38,8 @@ void ui_event_AiScreen(lv_event_t *e)
     uintptr_t key = (uintptr_t)lv_event_get_param(e);
     if (key == (uintptr_t)LV_KEY_RIGHT)
     {
-        ui_set_active_screen_tag(UI_SCREEN_PC_STATUS);
-        _ui_screen_change(&ui_PcStatusScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_PcStatusScreen_screen_init);
+        ui_set_active_screen_tag(UI_SCREEN_GAMES);
+        _ui_screen_change(&ui_GameScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_GameScreen_screen_init);
         lv_refr_now(NULL);
     }
     else if (key == (uintptr_t)LV_KEY_LEFT)

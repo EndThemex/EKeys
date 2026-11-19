@@ -7,7 +7,7 @@
 #include "ui_helpers.h"
 #include "ui_PcStatusScreenSecondary.h"
 #include "ui_AudioScreen.h"
-#include "ui_AiScreen.h"
+#include "ui_GameScreen.h" /* LEFT→游戏菜单（docs/14 轮播插入） */
 #include "ui_HaScreen.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -75,8 +75,8 @@ void ui_event_PcStatusScreen(lv_event_t *e)
     }
     else if (key == (uintptr_t)LV_KEY_LEFT)
     {
-        ui_set_active_screen_tag(UI_SCREEN_AI);
-        _ui_screen_change(&ui_AiScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_AiScreen_screen_init);
+        ui_set_active_screen_tag(UI_SCREEN_GAMES);
+        _ui_screen_change(&ui_GameScreen, LV_SCR_LOAD_ANIM_NONE, 0, 0, &ui_GameScreen_screen_init);
         lv_refr_now(NULL);
     }
     else if (key == (uintptr_t)LV_KEY_ENTER)

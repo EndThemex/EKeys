@@ -37,6 +37,9 @@ extern "C" {
 #include "ui_SettingScreenSecondary.h"
 #include "ui_AiScreen.h"
 #include "ui_AiScreenSecondary.h"
+#include "ui_GameScreen.h"
+#include "ui_GameSelectScreen.h"
+#include "ui_TetrisScreen.h"
 
 #ifdef __cplusplus
 } /*extern "C"*/

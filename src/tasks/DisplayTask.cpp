@@ -29,6 +29,7 @@
 #include "audio/Mic.h"
 #include "display/Backlight.h"
 #include "display/LvglPort.h"
+#include "game/TetrisGame.h"
 #include "input/MatrixScanner.h"
 #include "logging/LogManager.h"
 #include "message_types.h"
@@ -39,6 +40,8 @@
 #include "ui/ui_AiScreen.h"
 #include "ui/ui_AiScreenSecondary.h"
 #include "ui/ui_AudioScreen.h"
+#include "ui/ui_GameScreen.h"
+#include "ui/ui_GameSelectScreen.h"
 #include "ui/ui_AudioScreenSecondary.h"
 #include "ui/ui_FlipClock.h"
 #include "ui/ui_HaScreen.h"
@@ -273,6 +276,14 @@ namespace ekeys
                 RGBLightControl::instance().tick(delta);
                 /* 频谱调度（阶段 07 7.2）：仅音乐屏可见时占用 Mic/CPU */
                 updateSpectrum();
+                /*
+                 * 俄罗斯方块重力驱动（docs/14 §7）：仅游戏页激活时推进，
+                 * delta 与 LVGL tick 共用同一时基。
+                 */
+                if (tetrisGame_isActive())
+                {
+                    tetrisGame_tick(static_cast<uint16_t>(delta > 65535 ? 65535 : delta));
+                }
                 last = now;
             }
 
@@ -378,6 +389,18 @@ namespace ekeys
              *   - 其它屏：矩阵键为 HID 专用，不触发 UI 导航。
              */
             const uint8_t action = msg.action;
+
+            /*
+             * 俄罗斯方块竖屏页（docs/14 §5.3）：旋钮与矩阵键全部直送游戏门面，
+             * 不走通用 lv_event_send 导航（避免 ESC 被当成切屏、ENTER 误触）。
+             * GAME_SELECT 二级页的旋钮仍走下方通用路由（由页面自身处理）。
+             */
+            if (ui_get_active_screen_tag() == UI_SCREEN_TETRIS)
+            {
+                tetrisGame_handleInput(action);
+                break;
+            }
+
             if (action > kMatrixKeyActionBase &&
                 action <= kMatrixKeyActionBase + kMatrixKeyCount)
             {
@@ -581,6 +604,16 @@ namespace ekeys
         case UI_SCREEN_AI_SECONDARY:
             target = ui_AiScreenSecondary;
             break;
+        case UI_SCREEN_GAMES:
+            target = ui_GameScreen;
+            break;
+        case UI_SCREEN_GAME_SELECT:
+            target = ui_GameSelectScreen;
+            break;
+        case UI_SCREEN_TETRIS:
+            /* 竖屏游戏页由 tetrisGame_enter() 统一切屏 + 开局；协议/主动导航兜底 */
+            tetrisGame_enter();
+            return;
         default:
             return;
         }
@@ -869,6 +902,8 @@ namespace ekeys
         case UI_SCREEN_HA_SECONDARY:
         case UI_SCREEN_SETTING_SECONDARY:
         case UI_SCREEN_AI_SECONDARY:
+        case UI_SCREEN_GAME_SELECT: /* docs/14：游戏二级页与竖屏游戏页不参与 5s 回主页 */
+        case UI_SCREEN_TETRIS:
             return true;
         default:
             return false;
@@ -929,6 +964,11 @@ namespace ekeys
         /* AI 二级功能页常亮豁免（docs/13 §4.1）：图像流展示期间强制 Normal，
          * 若已处于省电态（进页前已空闲）立即恢复亮度 */
         if (ui_get_active_screen_tag() == UI_SCREEN_AI_SECONDARY)
+        {
+            desired = PowerIdleState::Normal;
+        }
+        /* 俄罗斯方块游戏页常亮豁免（docs/14 §7）：落块过程不因空闲被降亮/关屏 */
+        if (tetrisGame_isActive())
         {
             desired = PowerIdleState::Normal;
         }

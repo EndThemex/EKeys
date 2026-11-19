@@ -41,6 +41,9 @@ extern "C"
   LV_FONT_DECLARE(ui_font_BebasNeueFont14);
   LV_FONT_DECLARE(ui_font_FontCKJGT16);
   LV_FONT_DECLARE(ui_font_FontCKJGT24);
+  /* FontCKJGT16 原字库缺 转/软/逆/重/钮/退；该后备字体只含这 6 字，
+   * 通过 ui_font_FontCKJGT16.fallback 链补全，其余字符仍用原字体。 */
+  LV_FONT_DECLARE(ui_font_TetrisFallback16);
   LV_FONT_DECLARE(ui_font_FontCKJGT28);
   /* 48px 精简字体：仅含 "EKeys" 5 个字母 + 8 个内置 LV_SYMBOL 字形，
    * 替代体积 94 KB 的 lv_font_montserrat_48（见 ui_font_Symbol48.c 头注释）。
@@ -68,7 +71,11 @@ extern "C"
     /* AI 一级入口页（图标 + 标题）；旋钮单击进入 AI_SECONDARY 才开始收发 */
     UI_SCREEN_AI,
     /* AI 图像流二级页（docs/13）：矩阵键 101~111 不作焦点跳转，HID 照发 */
-    UI_SCREEN_AI_SECONDARY
+    UI_SCREEN_AI_SECONDARY,
+    /* 游戏菜单一级页 / 游戏选择二级页 / 俄罗斯方块竖屏游戏页（docs/14） */
+    UI_SCREEN_GAMES,
+    UI_SCREEN_GAME_SELECT,
+    UI_SCREEN_TETRIS
   } ui_screen_tag_t;
 
   ui_screen_tag_t ui_get_active_screen_tag(void);

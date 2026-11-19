@@ -13,6 +13,9 @@
 #include "ui_AudioScreen.h"
 #include "ui_AiScreen.h"
 #include "ui_AiScreenSecondary.h"
+#include "ui_GameScreen.h"
+#include "ui_GameSelectScreen.h"
+#include "ui_TetrisScreen.h"
 #include "ui_PcStatusScreen.h"
 #include "ui_HaScreen.h"
 #include "ui_SettingScreen.h"
@@ -42,6 +45,9 @@ void ui_lang_apply(void)
     ui_AudioScreen_apply_language(s_ui_lang);
     ui_AiScreen_apply_language(s_ui_lang);
     ui_AiScreenSecondary_apply_language(s_ui_lang);
+    ui_GameScreen_apply_language(s_ui_lang);
+    ui_GameSelectScreen_apply_language(s_ui_lang);
+    ui_TetrisScreen_apply_language(s_ui_lang);
     ui_PcStatusScreen_apply_language(s_ui_lang);
     ui_HaScreen_apply_language(s_ui_lang);
     ui_SettingScreen_apply_language(s_ui_lang);

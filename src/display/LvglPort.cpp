@@ -25,6 +25,9 @@ namespace ekeys {
 
 constexpr uint16_t kScreenWidth       = 428;
 constexpr uint16_t kScreenHeight      = 142;
+/* docs/14 竖屏俄罗斯方块：物理面板 142×428，rotation=0 时逻辑分辨率 */
+constexpr uint16_t kPortraitWidth     = 142;
+constexpr uint16_t kPortraitHeight    = 428;
 constexpr uint8_t  kLvglBufferLines   = 16;
 
 namespace {
@@ -188,6 +191,24 @@ void LvglPort::showSplash()
 void LvglPort::clearSplash()
 {
     clearSplashImpl();
+}
+
+void LvglPort::setOrientation(bool portrait)
+{
+    if (!inited_ || portrait == portrait_)
+    {
+        return;
+    }
+    portrait_ = portrait;
+    disp_drv_.hor_res = portrait ? kPortraitWidth : kScreenWidth;
+    disp_drv_.ver_res = portrait ? kPortraitHeight : kScreenHeight;
+    if (lv_disp_get_default() != NULL)
+    {
+        lv_obj_invalidate(lv_scr_act());
+    }
+    LOG_INFO("DISP", "orientation -> %s (%ux%u)",
+             portrait ? "portrait" : "landscape",
+             (unsigned)disp_drv_.hor_res, (unsigned)disp_drv_.ver_res);
 }
 
 void LvglPort::tick(uint32_t elapsed_ms)

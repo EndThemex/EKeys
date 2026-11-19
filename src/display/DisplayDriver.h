@@ -21,6 +21,13 @@ public:
 
     Arduino_GFX *gfx() const { return gfx_; }
 
+    /*
+     * 运行时切换屏幕方向（docs/14 竖屏俄罗斯方块）：
+     *   1 = 横屏 428×142（全局默认）；0 / 2 = 竖屏 142×428。
+     * 必须配合 LvglPort::setOrientation() 同步改 LVGL 逻辑分辨率。
+     */
+    void setRotation(uint8_t rotation);
+
     void fillScreen(uint16_t color);
     void draw16bitRGBBitmap(int32_t x, int32_t y, uint16_t *bitmap,
                             int32_t w, int32_t h);

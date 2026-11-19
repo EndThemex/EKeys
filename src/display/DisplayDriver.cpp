@@ -66,6 +66,20 @@ namespace ekeys
         return gfx_->begin(spi_hz);
     }
 
+    void DisplayDriver::setRotation(uint8_t rotation)
+    {
+        if (gfx_)
+        {
+            /*
+             * Arduino_TFT::setRotation 会同步更新 _width/_height 与 column/row
+             * 偏移（见 lib/GFX.../Arduino_TFT.cpp:147）：偶数 142×428、奇数
+             * 428×142。切换后须由调用方紧跟 LvglPort::setOrientation() +
+             * lv_refr_now，避免出现一帧横屏内容画在竖屏分辨率上。
+             */
+            gfx_->setRotation(rotation);
+        }
+    }
+
     void DisplayDriver::fillScreen(uint16_t color)
     {
         if (gfx_)

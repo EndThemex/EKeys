@@ -639,7 +639,11 @@ namespace ekeys
             const bool suppress_hid =
                 ha_routing ||
                 tick_screen == UI_SCREEN_SETTING_SECONDARY ||
-                tick_screen == UI_SCREEN_AUDIO_SECONDARY;
+                tick_screen == UI_SCREEN_AUDIO_SECONDARY ||
+                /* docs/14：游戏页矩阵键作游戏控制（1~8），不发 HID；
+                 * release 仍照常派发，避免离开游戏后卡键（rules.md §5）。 */
+                tick_screen == UI_SCREEN_GAME_SELECT ||
+                tick_screen == UI_SCREEN_TETRIS;
             if (!suppress_hid)
             {
                 /*

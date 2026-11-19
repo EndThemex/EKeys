@@ -52,7 +52,11 @@ espressif32 ≥ 6.5 不再解析自定义分区表计算 app 偏移，不显式�
 
 `build_src_filter` 已排除 `BebasNeueFont32/64/80` 与 `FontCKJGT32/40/48/64/80`，主固件不参与编译。如需新增超大字体需同步检查 PSRAM 占用。
 
-### 2.3 分区表仅 ASCII
+### 2.3 新增字体的头文件路径
+
+`lv_font_conv` 生成的字体 `.c` 默认写 `#include "lvgl/lvgl.h"`；本项目 PlatformIO 只包含 `lvgl.h`（见 `ui_types.h` 中的兼容判断）。新增字体后若报 `fatal error: lvgl/lvgl.h: No such file or directory`，把生成文件顶部的条件包含改成 `#include "ui_types.h"`，与现有 `ui_font_*.c` 保持一致。
+
+### 2.4 分区表仅 ASCII
 
 [`partitions-16MB.csv`](../partitions-16MB.csv) 顶部注释明确，Windows zh-CN 系统默认 GBK 解码，非 ASCII 注释会在 `checkprogsize` 阶段报 `UnicodeDecodeError`。
 

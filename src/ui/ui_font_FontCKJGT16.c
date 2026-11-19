@@ -28037,7 +28037,9 @@ lv_font_t ui_font_FontCKJGT16 = {
 #endif
     .dsc = &font_dsc,          /*The custom font data. Will be accessed by `get_glyph_bitmap/dsc` */
 #if LV_VERSION_CHECK(8, 2, 0) || LVGL_VERSION_MAJOR >= 9
-    .fallback = NULL,
+    /* 原字库缺 转/软/逆/重/钮/退（俄罗斯方块键位提示用到），
+     * 缺字走后备字体；其余字符仍由本字体渲染。 */
+    .fallback = &ui_font_TetrisFallback16,
 #endif
     .user_data = NULL,
 };

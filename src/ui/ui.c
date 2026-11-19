@@ -52,7 +52,10 @@ void ui_init(void)
     ui_SettingScreenSecondary_screen_init();
     ui_AiScreen_screen_init();
     ui_AiScreenSecondary_screen_init();
-    
+    /* docs/14：游戏两个横屏页常驻；竖屏游戏页首次进入时懒创建 */
+    ui_GameScreen_screen_init();
+    ui_GameSelectScreen_screen_init();
+
     ui____initial_actions0 = lv_obj_create(NULL);
     ui_set_active_screen_tag(UI_SCREEN_MAIN);
     lv_disp_load_scr(ui_MainScreen);
@@ -75,4 +78,7 @@ void ui_destroy(void)
     ui_SettingScreenSecondary_screen_destroy();
     ui_AiScreen_screen_destroy();
     ui_AiScreenSecondary_screen_destroy();
+    ui_GameScreen_screen_destroy();
+    ui_GameSelectScreen_screen_destroy();
+    ui_TetrisScreen_screen_destroy();
 }

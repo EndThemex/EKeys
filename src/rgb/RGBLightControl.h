@@ -87,6 +87,15 @@ namespace ekeys
         /* 拾音模式：DisplayTask 频谱链路喂入 16 频段能量（0~1） */
         void setAudioBands(const float *bands, uint8_t count);
 
+        /*
+         * 游戏调色板覆盖（docs/14）：俄罗斯方块页把 11 颗 LED 固定为功能色，
+         * 优先级高于所有普通模式与 ClickHighlight；退出时 clear 恢复。
+         * colors 指向 11 组 RGB；传 nullptr 表示清除。
+         */
+        void setGamePalette(const RgbColor *colors);
+        void clearGamePalette();
+        bool gamePaletteActive() const { return game_palette_active_; }
+
         /* 当前是否为拾音模式（DisplayTask 据此决定是否接管 Mic） */
         bool wantsMic() const
         {
@@ -119,6 +128,9 @@ namespace ekeys
         /* NONE 模式下上帧渲染的高亮掩码（位 i = highlight_[i]）。
          * 11 颗 LED 需 11 位，必须 uint16_t（uint8_t 会截断 LED 8~10） */
         uint16_t last_none_mask_ = 0xFFFF;
+        /* 游戏调色板覆盖：11 颗固定色，优先于普通灯效与点击高亮 */
+        bool game_palette_active_ = false;
+        RgbColor game_palette_[11]{};
     };
 
 } // namespace ekeys
