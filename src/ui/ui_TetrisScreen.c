@@ -3,9 +3,11 @@
  *
  * 俄罗斯方块竖屏游戏页（docs/14 §4.3）：142×428。
  *   - 屏幕左侧 3 列 × 4 行键位图，与竖屏实体键一一对应（末行两键 + 旋钮）
- *   - 右侧 HUD：分数 / 等级 / 消行 / NEXT×3 / HOLD
+ *   - 右上 HUD：SCORE / LV / LINES（灰色小标题 + 彩色数值）
+ *   - 键位图与棋盘间横带：HOLD + NEXT×3（各带小标题，统一 18×18）
  *   - 10×20 索引 4-bit 画布（120×240，cell=12px）
- *   - 底部提示与状态覆盖层（READY / PAUSED / GAME OVER）
+ *   - 底部提示与卡片化状态覆盖层（PAUSED / GAME OVER）
+ * 无功能键槽（K3/K7/K10/K11）暗底 + 彩色描边降权，有效键更突出。
  *
  * 棋盘 buffer 从 PSRAM 分配（14.5KB），不占本已紧张的 128KB LVGL 池；
  * 直接写 4bit 像素后一次性 invalidate，避免 lv_canvas_set_px 逐像素刷新。
@@ -39,6 +41,12 @@
 
 lv_obj_t *ui_TetrisScreen = NULL;
 static lv_obj_t *s_board = NULL;
+/* HUD 小标题（SCORE / LV / LINES / HOLD / NEXT），静态英文缩写，不随语言切换 */
+static lv_obj_t *s_score_caption = NULL;
+static lv_obj_t *s_level_caption = NULL;
+static lv_obj_t *s_lines_caption = NULL;
+static lv_obj_t *s_hold_caption = NULL;
+static lv_obj_t *s_next_caption = NULL;
 static lv_obj_t *s_score_label = NULL;
 static lv_obj_t *s_level_label = NULL;
 static lv_obj_t *s_lines_label = NULL;
@@ -56,7 +64,7 @@ static uint8_t s_lang = 0;
 /* 动作索引 = 功能槽位（与物理键颜色/LED 下标一一对应，改动功能只需改文字）：
  *   0=重开(K1) 1=右移(K2) 2=无 3=暂停(K4) 4=旋转(K5) 5=硬降(K6)
  *   6=无 7=退出(K8) 8=左移(K9) 9=无 10=无
- * 无功能槽位文字显示占位符 "-"，底色保留对应物理键的 LED 色。 */
+ * 无功能槽位文字显示占位符 "-"，暗底 + 对应物理键 LED 色描边（降权）。 */
 static const char *s_action_text[ACTION_COUNT][2] = {
     {"重", "RS"},  {"右", "R"},   {"-", "-"},    {"停", "P"},
     {"转", "ROT"}, {"硬", "D"},   {"-", "-"},    {"出", "X"},
@@ -91,6 +99,23 @@ static bool action_needs_dark_text(uint8_t action)
 {
     return action == 2 || action == 4 || action == 6 ||
            action == 8 || action == 9 || action == 10;
+}
+
+/* 暂无功能的动作槽位（K3/K7/K10/K11）：降权显示，暗底 + 彩色描边 */
+static bool is_inactive_action(uint8_t action)
+{
+    return action == 2 || action == 6 || action == 9 || action == 10;
+}
+
+/* 统一的 HUD 小标题：英文缩写，灰色弱化，让数值成为视觉焦点 */
+static lv_obj_t *create_hud_caption(const char *text, lv_coord_t x, lv_coord_t y)
+{
+    lv_obj_t *lbl = lv_label_create(ui_TetrisScreen);
+    lv_obj_set_pos(lbl, x, y);
+    lv_obj_set_style_text_font(lbl, &ui_font_BebasNeueFont14, 0);
+    lv_obj_set_style_text_color(lbl, lv_color_hex(0x7C8798), 0);
+    lv_label_set_text(lbl, text);
+    return lbl;
 }
 
 /* 直接写 4bit 索引像素：跳过 16×lv_color32_t 调色板头，x 偶数高半字节 */
@@ -139,12 +164,12 @@ void ui_TetrisScreen_set_hud(uint32_t score, uint8_t level,
     }
     if (s_level_label)
     {
-        snprintf(buf, sizeof(buf), "LV %u", (unsigned)level);
+        snprintf(buf, sizeof(buf), "%u", (unsigned)level);
         lv_label_set_text(s_level_label, buf);
     }
     if (s_lines_label)
     {
-        snprintf(buf, sizeof(buf), "LN %lu", (unsigned long)lines);
+        snprintf(buf, sizeof(buf), "%lu", (unsigned long)lines);
         lv_label_set_text(s_lines_label, buf);
     }
     if (s_combo_label)
@@ -250,8 +275,8 @@ void ui_TetrisScreen_apply_language(uint8_t lang)
     if (s_hint)
     {
         lv_label_set_text(s_hint, s_lang == 0
-                                      ? "旋钮:移动/单击转\n双击暂停"
-                                      : "KNOB: MOVE/ROT\nDBL-CLICK PAUSE");
+                                      ? "旋钮 移动/单击转\n双击 暂停"
+                                      : "KNOB MOVE / ROT\nDBL-CLICK PAUSE");
         lv_obj_set_style_text_font(s_hint, s_lang == 0
                                                ? &ui_font_FontCKJGT16
                                                : &ui_font_BebasNeueFont14,
@@ -299,44 +324,71 @@ void ui_TetrisScreen_screen_init(void)
         {
             s_action_chip[action] = chip;
             lv_obj_set_style_radius(chip, 4, 0);
-            lv_obj_set_style_bg_color(chip,
-                                      lv_color_make(s_action_rgb[action][0],
-                                                    s_action_rgb[action][1],
-                                                    s_action_rgb[action][2]),
-                                      0);
-            lv_obj_set_style_text_color(chip,
-                                        action_needs_dark_text(action)
-                                            ? lv_color_hex(0x0A0E18)
-                                            : lv_color_hex(0xFFFFFF),
-                                        0);
+            if (is_inactive_action(action))
+            {
+                /* 空槽降权：暗底 + 物理键色描边，弱化视觉权重但不丢失颜色对应关系 */
+                lv_obj_set_style_bg_color(chip, lv_color_hex(0x1A2230), 0);
+                lv_obj_set_style_border_color(chip,
+                                              lv_color_make(s_action_rgb[action][0],
+                                                            s_action_rgb[action][1],
+                                                            s_action_rgb[action][2]),
+                                              0);
+                lv_obj_set_style_border_width(chip, 2, 0);
+                lv_obj_set_style_text_color(chip, lv_color_hex(0x5F6B7A), 0);
+            }
+            else
+            {
+                lv_obj_set_style_bg_color(chip,
+                                          lv_color_make(s_action_rgb[action][0],
+                                                        s_action_rgb[action][1],
+                                                        s_action_rgb[action][2]),
+                                          0);
+                lv_obj_set_style_text_color(chip,
+                                            action_needs_dark_text(action)
+                                                ? lv_color_hex(0x0A0E18)
+                                                : lv_color_hex(0xFFFFFF),
+                                            0);
+            }
         }
     }
 
-    /* ---- 右侧 HUD：分数 / 等级 / 消行 / HOLD / NEXT×3 ---- */
+    /* ---- 右侧 HUD：SCORE / LV / LINES，与左侧键位图并排（y=2..76） ----
+     * 灰色小标题（create_hud_caption）+ 彩色数值，语义统一、数值为视觉焦点。 */
+    s_score_caption = create_hud_caption("SCORE", 82, 4);
     s_score_label = lv_label_create(ui_TetrisScreen);
-    lv_obj_set_pos(s_score_label, 82, 2);
+    lv_obj_set_pos(s_score_label, 82, 15);
     lv_obj_set_width(s_score_label, 56);
     lv_obj_set_style_text_font(s_score_label, &ui_font_BebasNeueFont24, 0);
     lv_obj_set_style_text_color(s_score_label, lv_color_hex(0xFFFFFF), 0);
     lv_label_set_text(s_score_label, "0");
 
+    s_level_caption = create_hud_caption("LV", 82, 47);
+    s_lines_caption = create_hud_caption("LN", 106, 47);
     s_level_label = lv_label_create(ui_TetrisScreen);
-    lv_obj_set_pos(s_level_label, 82, 28);
-    lv_obj_set_style_text_font(s_level_label, &ui_font_BebasNeueFont14, 0);
+    lv_obj_set_pos(s_level_label, 82, 58);
+    lv_obj_set_style_text_font(s_level_label, &ui_font_BebasNeueFont16, 0);
     lv_obj_set_style_text_color(s_level_label, lv_color_hex(0x9FE1CB), 0);
-    lv_label_set_text(s_level_label, "LV 1");
+    lv_label_set_text(s_level_label, "1");
 
     s_lines_label = lv_label_create(ui_TetrisScreen);
-    lv_obj_set_pos(s_lines_label, 82, 44);
-    lv_obj_set_style_text_font(s_lines_label, &ui_font_BebasNeueFont14, 0);
+    lv_obj_set_pos(s_lines_label, 106, 58);
+    lv_obj_set_style_text_font(s_lines_label, &ui_font_BebasNeueFont16, 0);
     lv_obj_set_style_text_color(s_lines_label, lv_color_hex(0x85B7EB), 0);
-    lv_label_set_text(s_lines_label, "LN 0");
+    lv_label_set_text(s_lines_label, "0");
 
+    /* ---- 预览横带：HOLD + NEXT×3，位于键位图与棋盘之间（y=79..110） ----
+     * 原方案把预览挤在右侧且无标签、尺寸不一；这里独立成带，统一 18×18
+     * 并各加英文小标题，一眼分清暂存与预览。 */
+    s_hold_caption = create_hud_caption("HOLD", 14, 79);
+    s_next_caption = create_hud_caption("NEXT", 90, 79);
     s_hold_label = lv_label_create(ui_TetrisScreen);
-    lv_obj_set_pos(s_hold_label, 82, 62);
-    lv_obj_set_size(s_hold_label, 20, 20);
+    lv_obj_set_pos(s_hold_label, 20, 92);
+    lv_obj_set_size(s_hold_label, 18, 18);
     lv_obj_set_style_bg_color(s_hold_label, lv_color_hex(0x121826), 0);
     lv_obj_set_style_bg_opa(s_hold_label, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(s_hold_label, lv_color_hex(0x2F3B4C), 0);
+    lv_obj_set_style_border_width(s_hold_label, 1, 0);
+    lv_obj_set_style_radius(s_hold_label, 3, 0);
     lv_obj_set_style_text_color(s_hold_label, lv_color_hex(0xB5D4F4), 0);
     lv_obj_set_style_text_align(s_hold_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_text_font(s_hold_label, &ui_font_BebasNeueFont16, 0);
@@ -344,10 +396,13 @@ void ui_TetrisScreen_screen_init(void)
     for (uint8_t i = 0; i < 3; ++i)
     {
         s_next_label[i] = lv_label_create(ui_TetrisScreen);
-        lv_obj_set_pos(s_next_label[i], 82 + i * 20, 84);
+        lv_obj_set_pos(s_next_label[i], 76 + i * 20, 92);
         lv_obj_set_size(s_next_label[i], 18, 18);
         lv_obj_set_style_bg_color(s_next_label[i], lv_color_hex(0x121826), 0);
         lv_obj_set_style_bg_opa(s_next_label[i], LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(s_next_label[i], lv_color_hex(0x2F3B4C), 0);
+        lv_obj_set_style_border_width(s_next_label[i], 1, 0);
+        lv_obj_set_style_radius(s_next_label[i], 3, 0);
         lv_obj_set_style_text_color(s_next_label[i], lv_color_hex(0xE8FFF6), 0);
         lv_obj_set_style_text_align(s_next_label[i], LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_set_style_text_font(s_next_label[i], &ui_font_BebasNeueFont16, 0);
@@ -393,15 +448,23 @@ void ui_TetrisScreen_screen_init(void)
     s_hint = lv_label_create(ui_TetrisScreen);
     lv_obj_set_pos(s_hint, 2, 384);
     lv_obj_set_width(s_hint, 138);
-    lv_obj_set_style_text_color(s_hint, lv_color_hex(0x7C8798), 0);
+    lv_obj_set_style_text_color(s_hint, lv_color_hex(0x9FB0C4), 0);
 
+    /* 状态覆盖层：卡片化（高对比底 + 青色描边 + 圆角 + 内边距），
+     * 使 PAUSED / GAME OVER 与棋盘层次分明，不再像一层薄雾贴在画面上。 */
     s_status = lv_label_create(ui_TetrisScreen);
-    lv_obj_set_size(s_status, 128, 60);
+    /* 136×74 + 4px 内边距：中文提示（"单击继续 · 双击退出"）在窄屏内会折成
+     * 3 行，留足高度避免溢出；居中偏移 20 使其落在棋盘中部。 */
+    lv_obj_set_size(s_status, 136, 74);
     lv_obj_align(s_status, LV_ALIGN_CENTER, 0, 20);
     lv_obj_set_style_text_font(s_status, &ui_font_FontCKJGT16, 0);
     lv_obj_set_style_text_color(s_status, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_bg_color(s_status, lv_color_hex(0x0A0E18), 0);
-    lv_obj_set_style_bg_opa(s_status, LV_OPA_80, 0);
+    lv_obj_set_style_bg_opa(s_status, LV_OPA_90, 0);
+    lv_obj_set_style_border_color(s_status, lv_color_hex(0x00DCFF), 0);
+    lv_obj_set_style_border_width(s_status, 2, 0);
+    lv_obj_set_style_radius(s_status, 8, 0);
+    lv_obj_set_style_pad_all(s_status, 4, 0);
     lv_obj_set_style_text_align(s_status, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_add_flag(s_status, LV_OBJ_FLAG_HIDDEN);
 
@@ -416,6 +479,8 @@ void ui_TetrisScreen_screen_destroy(void)
     }
     ui_TetrisScreen = NULL;
     s_board = NULL;
+    s_score_caption = s_level_caption = s_lines_caption = NULL;
+    s_hold_caption = s_next_caption = NULL;
     s_score_label = s_level_label = s_lines_label = s_combo_label = NULL;
     s_hold_label = s_status = s_hint = s_knob_chip = NULL;
     for (uint8_t i = 0; i < 3; ++i)
